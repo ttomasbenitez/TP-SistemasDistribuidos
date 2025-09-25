@@ -68,12 +68,18 @@ def generate_docker_compose(data):
             service_name = f"{name}-{i}" if replicas > 1 else name
             env_vars = generate_service_env(service, i, queue_consumers)
 
-            docker_compose["services"][service_name] = {
+            svc_dict = {
                 "environment": env_vars,
+                "networks": ["testing_network"],
             }
 
             if "ports" in service:
-                docker_compose["services"][service_name]["ports"] = service["ports"]
+                svc_dict["ports"] = service["ports"]
+
+            if name != "rabbitmq":
+                svc_dict["depends_on"] = ["rabbitmq"]
+
+            docker_compose["services"][service_name] = svc_dict
 
     return docker_compose
 
