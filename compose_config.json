@@ -1,0 +1,167 @@
+{
+    "name": "tp-escalabilidad",
+    "services": [
+        {
+            "name": "rabbitmq",
+            "image": "rabbitmq:management",
+            "ports": ["5672:5672", "15672:15672"]
+        },
+        {
+            "name": "gateway",
+            "log_level": "info",
+            "PORT": 3000,
+            "input_queues": {
+                "INPUT_QUEUE_1": "results-queue"
+            },
+            "output_queues": {
+                "OUTPUT_QUEUE_1": "batches-queue",
+                "OUTPUT_QUEUE_2": "stores-q3-queue",
+                "OUTPUT_QUEUE_3": "stores-q4-queue",
+                "OUTPUT_QUEUE_4": "menu-items-queue",
+                "OUTPUT_QUEUE_5": "users-queue"
+            },
+            "EXCHANGE_NAME": "gateway-exchange"
+        },
+        {
+            "name": "filter-year",
+            "replicas": 3,
+            "log_level": "info",
+            "input_queues": {
+                "INPUT_QUEUE_1": "batches-queue"
+            },
+            "output_queues": {
+                "OUTPUT_QUEUE_1": "year-filtered-queue-q1-q3",
+                "OUTPUT_QUEUE_2": "year-filtered-queue-q4",
+                "OUTPUT_QUEUE_3": "year-filtered-queue-q2"
+            },
+            "EXCHANGE_NAME": "year-filtered-exchange"
+        },
+        {
+            "name": "filter-time",
+            "replicas": 3,
+            "log_level": "info",
+            "input_queues": {
+                "INPUT_QUEUE_1": "year-filtered-queue-q1-q3"
+            },
+            "output_queues": {
+                "OUTPUT_QUEUE_1": "time-filtered-queue-q1",
+                "OUTPUT_QUEUE_2": "time-filtered-queue-q3"
+            },
+            "EXCHANGE_NAME": "time-filtered-exchange"
+        },
+        {
+            "name": "filter-amount",
+            "replicas": 3,
+            "log_level": "info",
+            "input_queues": {
+                "INPUT_QUEUE_1": "time-filtered-queue-q1"
+            },
+            "output_queues": {
+                "OUTPUT_QUEUE_1": "results-queue"
+            }
+        },
+        {
+            "name": "aggregator-store-q3",
+            "replicas": 3,
+            "log_level": "info",
+            "input_queues": {
+                "INPUT_QUEUE_1": "time-filtered-queue-q3"
+            },
+            "output_queues": {
+                "OUTPUT_QUEUE_1": "aggregated-store-q3-queue"
+            }
+        },
+        {
+            "name": "agreggator-semester",
+            "replicas": 3,
+            "log_level": "info",
+            "input_queues": {
+                "INPUT_QUEUE_1": "aggregated-store-q3-queue"
+            },
+            "output_queues": {
+                "OUTPUT_QUEUE_1": "aggregated-semester-q3-queue"
+            }
+        },
+        {
+            "name": "aggregator-month",
+            "replicas": 3,
+            "log_level": "info",
+            "input_queues": {
+                "INPUT_QUEUE_1": "year-filtered-queue-q2"
+            },
+            "output_queues": {
+                "OUTPUT_QUEUE_1": "aggregated-month-queue"
+            }
+        },
+        {
+            "name": "aggregator-quantity-profit",
+            "replicas": 3,
+            "log_level": "info",
+            "input_queues": {
+                "INPUT_QUEUE_1": "aggregated-month-queue"
+            },
+            "output_queues": {
+                "OUTPUT_QUEUE_1": "products-results-queue"
+            }
+        },
+        {
+            "name": "aggregator-store-q4",
+            "replicas": 3,
+            "log_level": "info",
+            "input_queues": {
+                "INPUT_QUEUE_1": "year-filtered-queue-q4"
+            },
+            "output_queues": {
+                "OUTPUT_QUEUE_1": "aggregated-store-q4-queue"
+            }
+        },
+        {
+            "name": "top-three-clients",
+            "replicas": 3,
+            "log_level": "info",
+            "input_queues": {
+                "INPUT_QUEUE_1": "aggregated-store-q4-queue",
+                "INPUT_QUEUE_2": "users-queue"
+            },
+            "output_queues": {
+                "OUTPUT_QUEUE_1": "top-clients-queue"
+            }
+        },
+        {
+            "name": "join-menu-items",
+            "replicas": 3,
+            "log_level": "info",
+            "input_queues": {
+                "INPUT_QUEUE_1": "products-results-queue",
+                "INPUT_QUEUE_2": "menu-items-queue"
+            },
+            "output_queues": {
+                "OUTPUT_QUEUE_1": "results-queue"
+            }
+        },
+        {
+            "name": "join-stores-q3",
+            "replicas": 3,
+            "log_level": "info",
+            "input_queues": {
+                "INPUT_QUEUE_1": "aggregated-semester-q3-queue",
+                "INPUT_QUEUE_2": "stores-q3-queue"
+            },
+            "output_queues": {
+                "OUTPUT_QUEUE_1": "results-queue"
+            }
+        },
+        {
+            "name": "join-stores-q4",
+            "replicas": 3,
+            "log_level": "info",
+            "input_queues": {
+                "INPUT_QUEUE_1": "top-clients-queue",
+                "INPUT_QUEUE_2": "stores-q4-queue"
+            },
+            "output_queues": {
+                "OUTPUT_QUEUE_1": "results-queue"
+            }
+        }
+    ]
+}

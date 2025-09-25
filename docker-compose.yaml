@@ -1,0 +1,231 @@
+version: '3'
+services:
+  rabbitmq:
+    environment: {}
+    ports:
+    - 5672:5672
+    - 15672:15672
+  gateway:
+    environment:
+      INPUT_QUEUE_1: results-queue
+      OUTPUT_QUEUE_1: batches-queue
+      OUTPUT_QUEUE_2: stores-q3-queue-1
+      OUTPUT_QUEUE_3: stores-q3-queue-2
+      OUTPUT_QUEUE_4: stores-q3-queue-3
+      OUTPUT_QUEUE_5: stores-q4-queue-1
+      OUTPUT_QUEUE_6: stores-q4-queue-2
+      OUTPUT_QUEUE_7: stores-q4-queue-3
+      OUTPUT_QUEUE_8: menu-items-queue-1
+      OUTPUT_QUEUE_9: menu-items-queue-2
+      OUTPUT_QUEUE_10: menu-items-queue-3
+      OUTPUT_QUEUE_11: users-queue
+      PORT: 3000
+      EXCHANGE_NAME: gateway-exchange
+      LOG_LEVEL: info
+  filter-year-1:
+    environment:
+      INPUT_QUEUE_1: batches-queue
+      OUTPUT_QUEUE_1: year-filtered-queue-q1-q3
+      OUTPUT_QUEUE_2: year-filtered-queue-q4
+      OUTPUT_QUEUE_3: year-filtered-queue-q2
+      EXCHANGE_NAME: year-filtered-exchange
+      LOG_LEVEL: info
+  filter-year-2:
+    environment:
+      INPUT_QUEUE_1: batches-queue
+      OUTPUT_QUEUE_1: year-filtered-queue-q1-q3
+      OUTPUT_QUEUE_2: year-filtered-queue-q4
+      OUTPUT_QUEUE_3: year-filtered-queue-q2
+      EXCHANGE_NAME: year-filtered-exchange
+      LOG_LEVEL: info
+  filter-year-3:
+    environment:
+      INPUT_QUEUE_1: batches-queue
+      OUTPUT_QUEUE_1: year-filtered-queue-q1-q3
+      OUTPUT_QUEUE_2: year-filtered-queue-q4
+      OUTPUT_QUEUE_3: year-filtered-queue-q2
+      EXCHANGE_NAME: year-filtered-exchange
+      LOG_LEVEL: info
+  filter-time-1:
+    environment:
+      INPUT_QUEUE_1: year-filtered-queue-q1-q3
+      OUTPUT_QUEUE_1: time-filtered-queue-q1
+      OUTPUT_QUEUE_2: time-filtered-queue-q3
+      EXCHANGE_NAME: time-filtered-exchange
+      LOG_LEVEL: info
+  filter-time-2:
+    environment:
+      INPUT_QUEUE_1: year-filtered-queue-q1-q3
+      OUTPUT_QUEUE_1: time-filtered-queue-q1
+      OUTPUT_QUEUE_2: time-filtered-queue-q3
+      EXCHANGE_NAME: time-filtered-exchange
+      LOG_LEVEL: info
+  filter-time-3:
+    environment:
+      INPUT_QUEUE_1: year-filtered-queue-q1-q3
+      OUTPUT_QUEUE_1: time-filtered-queue-q1
+      OUTPUT_QUEUE_2: time-filtered-queue-q3
+      EXCHANGE_NAME: time-filtered-exchange
+      LOG_LEVEL: info
+  filter-amount-1:
+    environment:
+      INPUT_QUEUE_1: time-filtered-queue-q1
+      OUTPUT_QUEUE_1: results-queue
+      LOG_LEVEL: info
+  filter-amount-2:
+    environment:
+      INPUT_QUEUE_1: time-filtered-queue-q1
+      OUTPUT_QUEUE_1: results-queue
+      LOG_LEVEL: info
+  filter-amount-3:
+    environment:
+      INPUT_QUEUE_1: time-filtered-queue-q1
+      OUTPUT_QUEUE_1: results-queue
+      LOG_LEVEL: info
+  aggregator-store-q3-1:
+    environment:
+      INPUT_QUEUE_1: time-filtered-queue-q3
+      OUTPUT_QUEUE_1: aggregated-store-q3-queue
+      LOG_LEVEL: info
+  aggregator-store-q3-2:
+    environment:
+      INPUT_QUEUE_1: time-filtered-queue-q3
+      OUTPUT_QUEUE_1: aggregated-store-q3-queue
+      LOG_LEVEL: info
+  aggregator-store-q3-3:
+    environment:
+      INPUT_QUEUE_1: time-filtered-queue-q3
+      OUTPUT_QUEUE_1: aggregated-store-q3-queue
+      LOG_LEVEL: info
+  agreggator-semester-1:
+    environment:
+      INPUT_QUEUE_1: aggregated-store-q3-queue
+      OUTPUT_QUEUE_1: aggregated-semester-q3-queue
+      LOG_LEVEL: info
+  agreggator-semester-2:
+    environment:
+      INPUT_QUEUE_1: aggregated-store-q3-queue
+      OUTPUT_QUEUE_1: aggregated-semester-q3-queue
+      LOG_LEVEL: info
+  agreggator-semester-3:
+    environment:
+      INPUT_QUEUE_1: aggregated-store-q3-queue
+      OUTPUT_QUEUE_1: aggregated-semester-q3-queue
+      LOG_LEVEL: info
+  aggregator-month-1:
+    environment:
+      INPUT_QUEUE_1: year-filtered-queue-q2
+      OUTPUT_QUEUE_1: aggregated-month-queue
+      LOG_LEVEL: info
+  aggregator-month-2:
+    environment:
+      INPUT_QUEUE_1: year-filtered-queue-q2
+      OUTPUT_QUEUE_1: aggregated-month-queue
+      LOG_LEVEL: info
+  aggregator-month-3:
+    environment:
+      INPUT_QUEUE_1: year-filtered-queue-q2
+      OUTPUT_QUEUE_1: aggregated-month-queue
+      LOG_LEVEL: info
+  aggregator-quantity-profit-1:
+    environment:
+      INPUT_QUEUE_1: aggregated-month-queue
+      OUTPUT_QUEUE_1: products-results-queue
+      LOG_LEVEL: info
+  aggregator-quantity-profit-2:
+    environment:
+      INPUT_QUEUE_1: aggregated-month-queue
+      OUTPUT_QUEUE_1: products-results-queue
+      LOG_LEVEL: info
+  aggregator-quantity-profit-3:
+    environment:
+      INPUT_QUEUE_1: aggregated-month-queue
+      OUTPUT_QUEUE_1: products-results-queue
+      LOG_LEVEL: info
+  aggregator-store-q4-1:
+    environment:
+      INPUT_QUEUE_1: year-filtered-queue-q4
+      OUTPUT_QUEUE_1: aggregated-store-q4-queue
+      LOG_LEVEL: info
+  aggregator-store-q4-2:
+    environment:
+      INPUT_QUEUE_1: year-filtered-queue-q4
+      OUTPUT_QUEUE_1: aggregated-store-q4-queue
+      LOG_LEVEL: info
+  aggregator-store-q4-3:
+    environment:
+      INPUT_QUEUE_1: year-filtered-queue-q4
+      OUTPUT_QUEUE_1: aggregated-store-q4-queue
+      LOG_LEVEL: info
+  top-three-clients-1:
+    environment:
+      INPUT_QUEUE_1: aggregated-store-q4-queue
+      INPUT_QUEUE_2: users-queue
+      OUTPUT_QUEUE_1: top-clients-queue
+      LOG_LEVEL: info
+  top-three-clients-2:
+    environment:
+      INPUT_QUEUE_1: aggregated-store-q4-queue
+      INPUT_QUEUE_2: users-queue
+      OUTPUT_QUEUE_1: top-clients-queue
+      LOG_LEVEL: info
+  top-three-clients-3:
+    environment:
+      INPUT_QUEUE_1: aggregated-store-q4-queue
+      INPUT_QUEUE_2: users-queue
+      OUTPUT_QUEUE_1: top-clients-queue
+      LOG_LEVEL: info
+  join-menu-items-1:
+    environment:
+      INPUT_QUEUE_1: products-results-queue
+      INPUT_QUEUE_2: menu-items-queue-1
+      OUTPUT_QUEUE_1: results-queue
+      LOG_LEVEL: info
+  join-menu-items-2:
+    environment:
+      INPUT_QUEUE_1: products-results-queue
+      INPUT_QUEUE_2: menu-items-queue-2
+      OUTPUT_QUEUE_1: results-queue
+      LOG_LEVEL: info
+  join-menu-items-3:
+    environment:
+      INPUT_QUEUE_1: products-results-queue
+      INPUT_QUEUE_2: menu-items-queue-3
+      OUTPUT_QUEUE_1: results-queue
+      LOG_LEVEL: info
+  join-stores-q3-1:
+    environment:
+      INPUT_QUEUE_1: aggregated-semester-q3-queue
+      INPUT_QUEUE_2: stores-q3-queue-1
+      OUTPUT_QUEUE_1: results-queue
+      LOG_LEVEL: info
+  join-stores-q3-2:
+    environment:
+      INPUT_QUEUE_1: aggregated-semester-q3-queue
+      INPUT_QUEUE_2: stores-q3-queue-2
+      OUTPUT_QUEUE_1: results-queue
+      LOG_LEVEL: info
+  join-stores-q3-3:
+    environment:
+      INPUT_QUEUE_1: aggregated-semester-q3-queue
+      INPUT_QUEUE_2: stores-q3-queue-3
+      OUTPUT_QUEUE_1: results-queue
+      LOG_LEVEL: info
+  join-stores-q4-1:
+    environment:
+      INPUT_QUEUE_1: top-clients-queue
+      INPUT_QUEUE_2: stores-q4-queue-1
+      OUTPUT_QUEUE_1: results-queue
+      LOG_LEVEL: info
+  join-stores-q4-2:
+    environment:
+      INPUT_QUEUE_1: top-clients-queue
+      INPUT_QUEUE_2: stores-q4-queue-2
+      OUTPUT_QUEUE_1: results-queue
+      LOG_LEVEL: info
+  join-stores-q4-3:
+    environment:
+      INPUT_QUEUE_1: top-clients-queue
+      INPUT_QUEUE_2: stores-q4-queue-3
+      OUTPUT_QUEUE_1: results-queue
+      LOG_LEVEL: info
