@@ -20,6 +20,8 @@ class FileReader:
         self.max_chunk_size = max_chunk_size
         self.buffered_line = None
         self.is_eof = False
+        self.header = next(self.reader, None)
+        
 
     def get_chunk(self):
         """

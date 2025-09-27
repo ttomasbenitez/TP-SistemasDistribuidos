@@ -1,0 +1,4 @@
+data/
+.pytest_cache
+client/__pycache__
+tests/__pycache__
