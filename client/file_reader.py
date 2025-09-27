@@ -12,8 +12,6 @@ class FileReader:
         :param file_path: Ruta al archivo CSV.
         :param max_chunk_size: Tamaño máximo del chunk en bytes.
         """
-        if max_chunk_size <= 0:
-            raise ValueError("max_chunk_size debe ser un número positivo")
         try:
             self.file = open(file_path, 'r')
         except FileNotFoundError:
