@@ -29,25 +29,26 @@ class FileReader:
 
         :return: Lista de filas (listas) que componen el chunk.
         """
-        chunk = []
+        chunk = b''
         current_size = 0
 
         if self.buffered_line:
-            buffered_size = len(str(self.buffered_line).encode('utf-8'))
-            chunk.append(self.buffered_line)
+            buffered_size = len(self.buffered_line)
+            chunk += self.buffered_line_bytes
             current_size += buffered_size
             self.buffered_line = None
 
         for row in self.reader:
-            row_size = len(str(row).encode('utf-8'))
+            row_bytes = ','.join(row).encode('utf-8') + b'\n'
+            row_size = len(row_bytes)
             if current_size + row_size > self.max_chunk_size:
-                self.buffered_line = row
+                self.buffered_line = row_bytes
                 break
-            chunk.append(row)
+            chunk += row_bytes
             current_size += row_size
         else:
             self.is_eof = True
-
+            
         return chunk
 
     def close(self):
