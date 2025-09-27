@@ -1,4 +1,5 @@
-from messages.constants import MESSAGE_SIZE_BYTES
+from messages.constants import MESSAGE_SIZE_BYTES, MESSAGE_TYPE_MENU_ITEMS
+from packages.messages.menu_items import MenuItem
 class Message:
     """
     Clase para manejar mensajes entre el cliente y el gateway.
@@ -37,7 +38,7 @@ class Message:
         Serializa el mensaje en bytes.
         :return: Mensaje serializado en bytes.
         """
-        msg = f"{self.type};{self.request_id};{self.msg_num};{self.content}"
+        msg = f"{self.type};{self.request_id};{self.msg_num};{self.content}\n"
         msg = msg.encode('utf-8')
         msg = len(msg).to_bytes(MESSAGE_SIZE_BYTES, byteorder='big') + msg
         return msg
@@ -75,3 +76,7 @@ class Message:
         self.request_id = int(parts[1])
         self.msg_num = int(parts[2])
         self.content = parts[3]
+
+    def proccess_message(self):
+        if self.type == MESSAGE_TYPE_MENU_ITEMS:
+            return MenuItem.get_menu_items_from_bytes(self.content.encode('utf-8'))
