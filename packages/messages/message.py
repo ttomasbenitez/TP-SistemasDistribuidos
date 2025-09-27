@@ -1,4 +1,4 @@
-from messages.constants import MESSAGE_SIZE_BYTES, MESSAGE_TYPE_MENU_ITEMS
+from packages.messages.constants import MESSAGE_SIZE_BYTES, MESSAGE_TYPE_MENU_ITEMS
 from packages.messages.menu_items import MenuItem
 class Message:
     """

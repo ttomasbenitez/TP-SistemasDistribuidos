@@ -1,4 +1,4 @@
-from messages.constants import MESSAGE_CSV_MENU_ITEMS_AMOUNT
+from packages.messages.constants import MESSAGE_CSV_MENU_ITEMS_AMOUNT
 
 class MenuItem:
 
@@ -13,7 +13,7 @@ class MenuItem:
         :param data: Datos en bytes.
         :return: Objeto MenuItem.
         """
-        parts = data.decode('utf-8').split(';')
+        parts = data.decode('utf-8').split(',')
         if len(parts) != MESSAGE_CSV_MENU_ITEMS_AMOUNT:
             raise ValueError("Datos inválidos para MenuItem")
         item_id = int(parts[0])
@@ -39,4 +39,4 @@ class MenuItem:
         Serializa el objeto MenuItem a bytes.
         :return: Datos en bytes.
         """
-        return f"{self.item_id};{self.item_name};{self.price}\n".encode('utf-8')
+        return f"{self.item_id};{self.item_name};{self.price}\n"

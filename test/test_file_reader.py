@@ -18,7 +18,7 @@ def test_file_reader_menu_items():
     menu_items = __test_file_reader(file)
     
     for index, item in enumerate(menu_items):
-        parts = item.decode('utf-8').split(',')
+        parts = item.split(',')
         assert len(parts) == 7
         assert parts[0] == str(index + 1)
         
