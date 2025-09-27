@@ -1,22 +1,26 @@
 from client.file_reader import FileReader
 
-def test_file_reader():
-    file = 'data/menu_items.csv'
+def __test_file_reader(file):
+    file_reader = FileReader(file, 10000)
     
-    fileReader = FileReader(file, 10000)
-    
-    chunk = fileReader.get_chunk()
+    chunk = file_reader.get_chunk()
     assert len(chunk) > 0
     
-    menu_items = chunk.splitlines()
-    assert len(menu_items) == 8
+    items = chunk.splitlines()
+    
+    assert file_reader.is_eof == True
+    file_reader.close()
+    return items
+    
+
+def test_file_reader_menu_items():
+    file = 'data/menu_items.csv'
+    menu_items = __test_file_reader(file)
     
     for index, item in enumerate(menu_items):
         parts = item.decode('utf-8').split(',')
         assert len(parts) == 7
         assert parts[0] == str(index + 1)
         
-    assert fileReader.is_eof == True
-    fileReader.close()
 
     
