@@ -1,4 +1,4 @@
-from client.file_reader import FileReader
+from client.common.file_reader import FileReader
 
 def __test_file_reader(file):
     file_reader = FileReader(file, 10000)

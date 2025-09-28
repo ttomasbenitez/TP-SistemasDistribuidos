@@ -1,0 +1,32 @@
+services:
+  gateway:
+    container_name: gateway
+    image: gateway:latest
+    environment:
+      PORT: 3000
+      LOG_LEVEL: INFO
+      LISTEN_BACKLOG: '5'
+    networks:
+    - testing_net
+
+  client:
+    container_name: client
+    image: client:latest
+    environment:
+      GATEWAY_HOST: gateway
+      GATEWAY_PORT: 3000
+      LOG_LEVEL: INFO
+    depends_on:
+      - gateway
+    networks:
+    - testing_net
+    volumes:
+    - ./client/data/menu_items/menu_items.csv:/data/menu_items.csv:ro
+    - ./client/data/stores/stores.csv:/data/stores.csv:ro
+
+networks:
+  testing_net:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.25.125.0/24

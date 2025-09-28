@@ -3,7 +3,7 @@ import yaml
 
 REPLICATED_QUEUES = ["menu-items-queue", "stores-q3-queue", "stores-q4-queue", "users-queue"]
 CONFIG_FILE = "compose_config.json"
-COMPOSE_FILE = "docker-compose.yaml"
+COMPOSE_FILE = "docker-compose-dev.yaml"
 
 def load_json(file_path):
     with open(file_path) as f:
@@ -51,8 +51,11 @@ def generate_service_env(service, i, queue_consumers):
     if "EXCHANGE_NAME" in service:
         env_vars["EXCHANGE_NAME"] = service["EXCHANGE_NAME"]
 
-    if "log_level" in service:
-        env_vars["LOG_LEVEL"] = service["log_level"]
+    if "LOG_LEVEL" in service:
+        env_vars["LOG_LEVEL"] = service["LOG_LEVEL"]
+    
+    if "LISTEN_BACKLOG" in service:
+        env_vars["LISTEN_BACKLOG"] = str(service["LISTEN_BACKLOG"])
 
     return env_vars
 
