@@ -1,6 +1,6 @@
 from client.common.file_reader import FileReader
 from packages.messages.message import Message
-from packages.messages.constants import MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_STORES, MESSAGE_TYPE_TRANSACTION_ITEMS
+from packages.messages.constants import MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_STORES, MESSAGE_TYPE_TRANSACTION_ITEMS, MESSAGE_TYPE_TRANSACTIONS
 
 def __test_message(file, message_type):
     fileReader = FileReader(file, 10000)
@@ -51,3 +51,37 @@ def test_message_transaction_items():
     assert transaction_items[9].transaction_id == '64d81604-38c8-4e04-977c-80d8090df7ea'
     assert transaction_items[9].item_id == 8
     assert transaction_items[9].created_at == '2025-03-01 11:20:30'
+    
+def test_message_transactions():
+    file = 'test/data/transactions_202503.csv'
+    
+    transaction = __test_message(file, MESSAGE_TYPE_TRANSACTIONS)
+    assert len(transaction) == 258
+    
+    assert transaction[257].transaction_id == 'd13b4c92-d73c-4365-afc4-73e243fedff6'
+    assert transaction[257].store_id == 6
+    assert transaction[257].user_id == 1051249
+    assert transaction[257].final_amount == 19.0
+    assert transaction[257].created_at == '2025-03-01 15:55:32'
+    
+    # test store id null values
+    assert transaction[0].transaction_id == '2e0b6369-f809-4de3-a2b5-eb932efe2f7a'
+    assert transaction[0].store_id == None
+    assert transaction[0].user_id == 1454816
+    assert transaction[0].final_amount == 40
+    assert transaction[0].created_at == '2025-03-01 07:00:04'
+    
+    # test user id null values and final amount with decimal values
+    assert transaction[1].transaction_id == 'c712125c-e578-4376-b43e-466e1ac5ee60'
+    assert transaction[1].store_id == 4
+    assert transaction[1].user_id == None
+    assert transaction[1].final_amount == 38.0
+    assert transaction[1].created_at == '2025-03-01 15:45:44'
+
+    # test final amount null values
+    assert transaction[2].transaction_id == 'd947216d-4c88-4f9e-8ed9-7c47bea08baa'
+    assert transaction[2].store_id == 8
+    assert transaction[2].user_id == 499937
+    assert transaction[2].final_amount == None
+    assert transaction[2].created_at == '2025-03-01 15:45:47'
+ 
