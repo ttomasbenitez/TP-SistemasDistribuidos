@@ -1,5 +1,5 @@
 from packages.messages.constants import MESSAGE_CSV_TRANSACTION_ITEMS_AMOUNT
-from packages.messages.utils import get_items_from_bytes
+from packages.messages.utils import get_items_from_bytes, parse_int
 
 class TransactionItem:
     
@@ -19,7 +19,7 @@ class TransactionItem:
         if len(parts) != MESSAGE_CSV_TRANSACTION_ITEMS_AMOUNT:
             raise ValueError("Datos inválidos para TransactionItem")
         transaction_id = parts[0]
-        item_id = int(parts[1])
+        item_id = parse_int(parts[1])
         created_at = parts[5]
         return TransactionItem(transaction_id, item_id, created_at)
     

@@ -52,6 +52,11 @@ def test_message_transaction_items():
     assert transaction_items[9].item_id == 8
     assert transaction_items[9].created_at == '2025-03-01 11:20:30'
     
+    # test item id null values
+    assert transaction_items[0].transaction_id == '017c28a0-e36d-4a2e-be96-5ca5c608d0be'
+    assert transaction_items[0].item_id == None
+    assert transaction_items[0].created_at == '2025-03-01 11:20:26'
+    
 def test_message_transactions():
     file = 'test/data/transactions_202503.csv'
     
