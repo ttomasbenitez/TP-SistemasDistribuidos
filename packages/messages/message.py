@@ -4,11 +4,13 @@ from packages.messages.constants import (
     MESSAGE_TYPE_STORES,
     MESSAGE_TYPE_TRANSACTION_ITEMS,
     MESSAGE_TYPE_TRANSACTIONS,
+    MESSAGE_TYPE_USERS,
 )         
 from packages.messages.menu_item import MenuItem
 from packages.messages.store import Store
 from packages.messages.transaction_item import TransactionItem
 from packages.messages.transaction import Transaction
+from packages.messages.user import User
 
 class Message:
     """
@@ -106,3 +108,5 @@ class Message:
             return TransactionItem.get_transaction_items_from_bytes(encoded_content)
         if self.type == MESSAGE_TYPE_TRANSACTIONS:
             return Transaction.get_transactions_from_bytes(encoded_content)
+        if self.type == MESSAGE_TYPE_USERS:
+            return User.get_users_from_bytes(encoded_content)

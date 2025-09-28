@@ -1,6 +1,6 @@
 from client.common.file_reader import FileReader
 from packages.messages.message import Message
-from packages.messages.constants import MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_STORES, MESSAGE_TYPE_TRANSACTION_ITEMS, MESSAGE_TYPE_TRANSACTIONS
+from packages.messages.constants import MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_STORES, MESSAGE_TYPE_TRANSACTION_ITEMS, MESSAGE_TYPE_TRANSACTIONS, MESSAGE_TYPE_USERS
 
 def __test_message(file, message_type):
     fileReader = FileReader(file, 10000)
@@ -90,3 +90,13 @@ def test_message_transactions():
     assert transaction[2].final_amount == None
     assert transaction[2].created_at == '2025-03-01 15:45:47'
  
+ 
+def test_users():
+    file = 'test/data/users_202503.csv'
+    
+    users = __test_message(file, MESSAGE_TYPE_USERS)
+    assert len(users) == 14
+    assert users[0].id == 1472011
+    assert users[0].birthdate == "1966-09-05"
+    
+    
