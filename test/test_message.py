@@ -12,10 +12,10 @@ def __test_message(file, message_type):
     assert message_length == len(serialized_message) - 4
     
     serialized_message = serialized_message[4:]
-    message.__deserialize__(serialized_message)
-    assert message.type == message_type
-    assert message.request_id == 1
-    assert message.msg_num == 1
+    new_message = Message.__deserialize__(serialized_message)
+    assert new_message.type == message_type
+    assert new_message.request_id == 1
+    assert new_message.msg_num == 1
     
     items = message.proccess_message()
     return items
