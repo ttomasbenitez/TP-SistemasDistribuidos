@@ -18,7 +18,7 @@ class MenuItem:
             raise ValueError("Datos inválidos para MenuItem")
         item_id = int(parts[0])
         item_name = parts[1]
-        price = parts[3]
+        price = float(parts[3])
         return MenuItem(item_id, item_name, price)
     
     def get_menu_items_from_bytes(data: bytes):

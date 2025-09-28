@@ -1,6 +1,4 @@
 data/
 .pytest_cache
-client/__pycache__
-tests/__pycache__
-packages/messages/__pycache__/
-packages/__pycache__/
+*/__pycache__/
+*/*/__pycache__/

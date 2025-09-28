@@ -14,7 +14,7 @@ def __test_file_reader(file):
     
 
 def test_file_reader_menu_items():
-    file = 'data/menu_items.csv'
+    file = 'test/data/menu_items.csv'
     menu_items = __test_file_reader(file)
     
     for index, item in enumerate(menu_items):

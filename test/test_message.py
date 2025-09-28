@@ -3,7 +3,7 @@ from packages.messages.message import Message
 from packages.messages.constants import MESSAGE_TYPE_MENU_ITEMS
 
 def test_message_menu_items():
-    file = 'data/menu_items.csv'
+    file = 'test/data/menu_items.csv'
     
     fileReader = FileReader(file, 10000)
     chunk = fileReader.get_chunk()
@@ -21,5 +21,8 @@ def test_message_menu_items():
     
     menu_items_list = message.proccess_message()
     assert len(menu_items_list) == 8
+    assert menu_items_list[0].item_id == 1
+    assert menu_items_list[0].item_name == "Espresso"
+    assert menu_items_list[0].price == 6.0
     
     
