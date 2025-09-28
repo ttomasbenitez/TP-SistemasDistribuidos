@@ -1,5 +1,5 @@
 from packages.messages.constants import MESSAGE_CSV_STORES_AMOUNT
-from packages.messages.utils import get_items_from_bytes
+from packages.messages.utils import get_items_from_bytes, parse_int
 
 class Store: 
     """
@@ -19,7 +19,7 @@ class Store:
         parts = data.decode('utf-8').split(',')
         if len(parts) != MESSAGE_CSV_STORES_AMOUNT:
             raise ValueError("Datos inválidos para Store")
-        store_id = int(parts[0])
+        store_id = parse_int(parts[0])
         store_name = parts[1]
         return Store(store_id, store_name)
     

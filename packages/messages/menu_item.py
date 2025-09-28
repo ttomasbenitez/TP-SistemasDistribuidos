@@ -1,5 +1,5 @@
 from packages.messages.constants import MESSAGE_CSV_MENU_ITEMS_AMOUNT
-from packages.messages.utils import get_items_from_bytes
+from packages.messages.utils import get_items_from_bytes, parse_int, parse_float
 
 class MenuItem:
     """ 
@@ -20,9 +20,9 @@ class MenuItem:
         parts = data.decode('utf-8').split(',')
         if len(parts) != MESSAGE_CSV_MENU_ITEMS_AMOUNT:
             raise ValueError("Datos inválidos para MenuItem")
-        item_id = int(parts[0])
+        item_id = parse_int(parts[0])
         item_name = parts[1]
-        price = float(parts[3])
+        price = parse_float(parts[3])
         return MenuItem(item_id, item_name, price)
     
     def get_menu_items_from_bytes(data: bytes):
