@@ -21,8 +21,8 @@ def test_message_menu_items():
     
     menu_items_list = message.proccess_message()
     assert len(menu_items_list) == 8
-    assert menu_items_list[0].item_id == 1
-    assert menu_items_list[0].item_name == "Espresso"
+    assert menu_items_list[0].id == 1
+    assert menu_items_list[0].name == "Espresso"
     assert menu_items_list[0].price == 6.0
     
     

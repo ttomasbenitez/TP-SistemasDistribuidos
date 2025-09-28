@@ -3,8 +3,8 @@ from packages.messages.constants import MESSAGE_CSV_MENU_ITEMS_AMOUNT
 class MenuItem:
 
     def __init__(self, item_id, item_name, price):
-        self.item_id = item_id
-        self.item_name = item_name
+        self.id = item_id
+        self.name = item_name
         self.price = price
 
     def __deserialize__(data: bytes):
@@ -39,4 +39,4 @@ class MenuItem:
         Serializa el objeto MenuItem a bytes.
         :return: Datos en bytes.
         """
-        return f"{self.item_id};{self.item_name};{self.price}\n"
+        return f"{self.id};{self.name};{self.price}\n"

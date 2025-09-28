@@ -1,5 +1,5 @@
 from packages.messages.constants import MESSAGE_SIZE_BYTES, MESSAGE_TYPE_MENU_ITEMS
-from packages.messages.menu_items import MenuItem
+from packages.messages.menu_item import MenuItem
 class Message:
     """
     Clase para manejar mensajes entre el cliente y el gateway.
