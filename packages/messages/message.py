@@ -1,5 +1,7 @@
-from packages.messages.constants import MESSAGE_SIZE_BYTES, MESSAGE_TYPE_MENU_ITEMS
+from packages.messages.constants import MESSAGE_SIZE_BYTES, MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_STORES
 from packages.messages.menu_item import MenuItem
+from packages.messages.store import Store
+
 class Message:
     """
     Clase para manejar mensajes entre el cliente y el gateway.
@@ -78,5 +80,14 @@ class Message:
         self.content = parts[3]
 
     def proccess_message(self):
+        """ 
+        Procesea el mensaje basado en su tipo.
+        :return: 
+            - si el tipo es MESSAGE_TYPE_MENU_ITEMS, retorna una lista de MenuItem.
+            - si el tipo es MESSAGE_TYPE_STORES, retorna una lista de Store.
+        
+        """
         if self.type == MESSAGE_TYPE_MENU_ITEMS:
             return MenuItem.get_menu_items_from_bytes(self.content.encode('utf-8'))
+        if self.type == MESSAGE_TYPE_STORES:
+            return Store.get_stores_from_bytes(self.content.encode('utf-8'))

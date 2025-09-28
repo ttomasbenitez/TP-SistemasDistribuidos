@@ -1,6 +1,9 @@
 from packages.messages.constants import MESSAGE_CSV_MENU_ITEMS_AMOUNT
 
 class MenuItem:
+    """ 
+    Clase para manejar items del menú.
+    """
 
     def __init__(self, item_id, item_name, price):
         self.id = item_id

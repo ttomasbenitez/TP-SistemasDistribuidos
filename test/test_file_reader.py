@@ -23,4 +23,11 @@ def test_file_reader_menu_items():
         assert parts[0] == str(index + 1)
         
 
+def test_file_reader_stores():
+    file = 'test/data/stores.csv'
+    orders = __test_file_reader(file)
     
+    for index, order in enumerate(orders):
+        parts = order.split(',')
+        assert len(parts) == 8
+        assert parts[0] == str(index + 1)
