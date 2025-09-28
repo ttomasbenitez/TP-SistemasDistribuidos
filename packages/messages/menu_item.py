@@ -1,4 +1,5 @@
 from packages.messages.constants import MESSAGE_CSV_MENU_ITEMS_AMOUNT
+from packages.messages.utils import get_items_from_bytes
 
 class MenuItem:
     """ 
@@ -10,7 +11,7 @@ class MenuItem:
         self.name = item_name
         self.price = price
 
-    def __deserialize__(data: bytes):
+    def deserialize(data: bytes):
         """
         Crea un objeto MenuItem a partir de bytes.
         :param data: Datos en bytes.
@@ -30,12 +31,7 @@ class MenuItem:
         :param data: Datos en bytes.
         :return: Lista de objetos MenuItem.
         """
-        items = []
-        lines = data.decode('utf-8').split('\n')
-        for line in lines:
-            if line.strip():
-                items.append(MenuItem.__deserialize__(line.encode('utf-8')))
-        return items
+        return get_items_from_bytes(data, MenuItem)
     
     def serialize(self):
         """

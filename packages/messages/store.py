@@ -1,4 +1,5 @@
 from packages.messages.constants import MESSAGE_CSV_STORES_AMOUNT
+from packages.messages.utils import get_items_from_bytes
 
 class Store: 
     """
@@ -9,7 +10,7 @@ class Store:
         self.id = store_id
         self.name = store_name
 
-    def __deserialize__(data: bytes):
+    def deserialize(data: bytes):
         """
         Crea un objeto Store a partir de bytes.
         :param data: Datos en bytes.
@@ -28,12 +29,7 @@ class Store:
         :param data: Datos en bytes.
         :return: Lista de objetos Store.
         """
-        items = []
-        lines = data.decode('utf-8').split('\n')
-        for line in lines:
-            if line.strip():
-                items.append(Store.__deserialize__(line.encode('utf-8')))
-        return items
+        return get_items_from_bytes(data, Store)
     
     def serialize(self):
         """
