@@ -12,3 +12,25 @@ def get_items_from_bytes(data: bytes, item_class):
         if line.strip():
             items.append(item_class.deserialize(line.encode('utf-8')))
     return items
+
+def parse_int(part):
+    """
+    Parsea un entero de una cadena, devolviendo None si la cadena está vacía o no es válida.
+    :param part: Cadena a parsear.
+    :return: Entero o None.
+    """
+    try:
+        return int(part)
+    except (ValueError, TypeError):
+        return None
+    
+def parse_float(part):
+    """
+    Parsea un float de una cadena, devolviendo None si la cadena está vacía o no es válida.
+    :param part: Cadena a parsear.
+    :return: Float o None.
+    """
+    try:
+        return float(part)
+    except (ValueError, TypeError):
+        return None

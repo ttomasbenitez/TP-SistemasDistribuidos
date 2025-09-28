@@ -1,5 +1,5 @@
 from packages.messages.constants import MESSAGE_CSV_TRANSACTIONS_AMOUNT
-from packages.messages.utils import get_items_from_bytes
+from packages.messages.utils import get_items_from_bytes, parse_int, parse_float
 
 class Transaction:
     
@@ -21,9 +21,9 @@ class Transaction:
         if len(parts) != MESSAGE_CSV_TRANSACTIONS_AMOUNT:
             raise ValueError("Datos inválidos para Transaction")
         transaction_id = parts[0]
-        store_id = int(parts[1]) if parts[1] and parts[1].strip() else None
-        user_id = int(float(parts[4])) if parts[4] and parts[4].strip() else None
-        final_amount = float(parts[7]) if parts[7] and parts[7].replace('.','',1).isdigit() else None
+        store_id = parse_int(parts[1])
+        user_id = parse_int(parse_float(parts[4]))
+        final_amount = parse_float(parts[7])
         created_at = parts[8]
         return Transaction(transaction_id, store_id, user_id, final_amount, created_at)
     
