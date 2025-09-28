@@ -1,6 +1,7 @@
-from packages.messages.constants import MESSAGE_SIZE_BYTES, MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_STORES
+from packages.messages.constants import MESSAGE_SIZE_BYTES, MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_STORES, MESSAGE_TYPE_TRANSACTION_ITEMS
 from packages.messages.menu_item import MenuItem
 from packages.messages.store import Store
+from packages.messages.transaction_item import TransactionItem
 
 class Message:
     """
@@ -92,3 +93,5 @@ class Message:
             return MenuItem.get_menu_items_from_bytes(self.content.encode('utf-8'))
         if self.type == MESSAGE_TYPE_STORES:
             return Store.get_stores_from_bytes(self.content.encode('utf-8'))
+        if self.type == MESSAGE_TYPE_TRANSACTION_ITEMS:
+            return TransactionItem.get_transaction_items_from_bytes(self.content.encode('utf-8'))

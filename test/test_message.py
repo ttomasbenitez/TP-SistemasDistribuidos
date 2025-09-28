@@ -1,10 +1,12 @@
 from client.common.file_reader import FileReader
 from packages.messages.message import Message
-from packages.messages.constants import MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_STORES
+from packages.messages.constants import MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_STORES, MESSAGE_TYPE_TRANSACTION_ITEMS
 
 def __test_message(file, message_type):
     fileReader = FileReader(file, 10000)
-    chunk = fileReader.get_chunk()
+    chunk = ''
+    while not fileReader.is_eof:
+        chunk += fileReader.get_chunk()
     
     message =  Message(1,message_type, 1, chunk)
     serialized_message = message.__serialize__()
@@ -39,3 +41,13 @@ def test_message_stores():
     assert stores[0].name == "G Coffee @ USJ 89q"
     assert stores[9].id == 10
     assert stores[9].name == "G Coffee @ Taman Damansara"
+    
+def test_message_transaction_items():
+    file = 'test/data/transaction_items_202503.csv'
+    
+    transaction_items = __test_message(file, MESSAGE_TYPE_TRANSACTION_ITEMS)
+    assert len(transaction_items) == 165
+    
+    assert transaction_items[9].transaction_id == '64d81604-38c8-4e04-977c-80d8090df7ea'
+    assert transaction_items[9].item_id == 8
+    assert transaction_items[9].created_at == '2025-03-01 11:20:30'

@@ -34,7 +34,7 @@ class FileReader:
 
         if self.buffered_line:
             buffered_size = len(self.buffered_line)
-            chunk += self.buffered_line_bytes
+            chunk += self.buffered_line
             current_size += buffered_size
             self.buffered_line = None
 
