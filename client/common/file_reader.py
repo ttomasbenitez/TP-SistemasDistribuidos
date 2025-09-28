@@ -49,7 +49,7 @@ class FileReader:
         else:
             self.is_eof = True
             
-        return chunk
+        return chunk.decode('utf-8')
 
     def close(self):
         """

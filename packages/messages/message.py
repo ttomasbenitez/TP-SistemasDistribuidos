@@ -1,5 +1,7 @@
-from messages.constants import MESSAGE_SIZE_BYTES, MESSAGE_TYPE_MENU_ITEMS
-from packages.messages.menu_items import MenuItem
+from packages.messages.constants import MESSAGE_SIZE_BYTES, MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_STORES
+from packages.messages.menu_item import MenuItem
+from packages.messages.store import Store
+
 class Message:
     """
     Clase para manejar mensajes entre el cliente y el gateway.
@@ -43,7 +45,7 @@ class Message:
         msg = len(msg).to_bytes(MESSAGE_SIZE_BYTES, byteorder='big') + msg
         return msg
     
-    def read_message(self, socket):
+    def read_message(socket):
         """
         Lee un mensaje desde el socket y lo deserializa. Evita short reads.
         :param socket: Socket desde el cual se lee el mensaje.
@@ -63,20 +65,30 @@ class Message:
                 raise RuntimeError("Socket connection broken")
             raw_msg += chunk
 
-        self.__deserialize__(raw_msg)
+        return Message.__deserialize__(raw_msg)
     
-    def __deserialize__(self, raw_msg):
+    def __deserialize__(raw_msg):
         """
         Deserializa el mensaje desde bytes.
         :param raw_msg: Mensaje en bytes.
         """
         raw_msg = raw_msg.decode('utf-8')
         parts = raw_msg.split(';', 3)
-        self.type = int(parts[0])
-        self.request_id = int(parts[1])
-        self.msg_num = int(parts[2])
-        self.content = parts[3]
+        type = int(parts[0])
+        request_id = int(parts[1])
+        msg_num = int(parts[2])
+        content = parts[3]
+        return Message(request_id, type, msg_num, content)
 
     def proccess_message(self):
+        """ 
+        Procesea el mensaje basado en su tipo.
+        :return: 
+            - si el tipo es MESSAGE_TYPE_MENU_ITEMS, retorna una lista de MenuItem.
+            - si el tipo es MESSAGE_TYPE_STORES, retorna una lista de Store.
+        
+        """
         if self.type == MESSAGE_TYPE_MENU_ITEMS:
             return MenuItem.get_menu_items_from_bytes(self.content.encode('utf-8'))
+        if self.type == MESSAGE_TYPE_STORES:
+            return Store.get_stores_from_bytes(self.content.encode('utf-8'))

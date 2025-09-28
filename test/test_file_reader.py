@@ -14,13 +14,20 @@ def __test_file_reader(file):
     
 
 def test_file_reader_menu_items():
-    file = 'data/menu_items.csv'
+    file = 'test/data/menu_items.csv'
     menu_items = __test_file_reader(file)
     
     for index, item in enumerate(menu_items):
-        parts = item.decode('utf-8').split(',')
+        parts = item.split(',')
         assert len(parts) == 7
         assert parts[0] == str(index + 1)
         
 
+def test_file_reader_stores():
+    file = 'test/data/stores.csv'
+    orders = __test_file_reader(file)
     
+    for index, order in enumerate(orders):
+        parts = order.split(',')
+        assert len(parts) == 8
+        assert parts[0] == str(index + 1)

@@ -4,7 +4,7 @@ build:
 	docker build -t $(IMAGE_NAME) -f Dockerfile ..
 
 test: build
-	docker run --rm -v "$$PWD/..":/app -w /app $(IMAGE_NAME) pytest -s tests/file_reader.py
+	docker run --rm -v "$$PWD/..":/app -w /app $(IMAGE_NAME) pytest -s test
 
 shell: build
 	docker run --rm -it -v "$$PWD/..":/app -w /app $(IMAGE_NAME) bash
