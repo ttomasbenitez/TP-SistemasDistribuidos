@@ -1,4 +1,4 @@
-from client.file_reader import FileReader
+from client.common.file_reader import FileReader
 from packages.messages.message import Message
 from packages.messages.constants import MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_STORES
 
