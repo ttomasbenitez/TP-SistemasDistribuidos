@@ -34,7 +34,7 @@ class Gateway:
             try:
                 client_sock = self.__accept_new_connection()
                 self._client_socket = client_sock
-                self.__receive_request()
+                self.__receive_data()
             except OSError as e:
                 if self._running:
                     logging.error(f'action: accept_connections | result: fail | error: {e}')
@@ -55,9 +55,12 @@ class Gateway:
             message = Message.read_message(self._client_socket)
             if message.type == MESSAGE_TYPE_EOF:
                 all_received = True
-            
-
-
+            logging.info(f'action: message_received | result: success')
+            logging.info(f'action: process_request | result: success | request_id: {message.request_id} | type: {message.type} | msg_num: {message.msg_num}')
+            logging.info(f'action: message_content | content: {message.content}')
+            self._exchange.send(message.__serialize__(), 'stores')
+            logging.info(f'action: send message via exchange')
+    
     #def __receive_bet_data(self, sock):
     #    """
     #    Receives bet data from the client. Returns a list of Bet objects or None if no data is received.

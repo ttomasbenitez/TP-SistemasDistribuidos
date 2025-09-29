@@ -35,13 +35,13 @@ class Client:
         """
         try:
             self.__send_stores_data()
-            self.__send_menu_items_data()
+            #self.__send_menu_items_data()
             logging.info(f'action: send_request | result: success')
         except Exception as e:
             logging.error(f'action: send_request | result: fail | error: {e}')
 
     def __send_stores_data(self):
-        file_reader = FileReader(os.getenv('STORES_FILE_PATH'))
+        file_reader = FileReader(os.getenv('STORES_FILE_PATH'), int(os.getenv('MAX_BATCH_SIZE')))
         while file_reader.has_more_data():
             data = file_reader.get_chunk()
             Message(0, MESSAGE_TYPE_STORES, 0, data).send_message(self._socket)
@@ -50,7 +50,7 @@ class Client:
         logging.info(f'action: send_stores_data | result: success')
 
     def __send_menu_items_data(self):
-        file_reader = FileReader(os.getenv('MENU_ITEMS_FILE_PATH'))
+        file_reader = FileReader(os.getenv('MENU_ITEMS_FILE_PATH'), int(os.getenv('MAX_BATCH_SIZE')))
         while file_reader.has_more_data():
             data = file_reader.get_chunk()
             Message(0, MESSAGE_TYPE_MENU_ITEMS  , 0, data).send_message(self._socket)

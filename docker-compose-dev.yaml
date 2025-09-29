@@ -7,6 +7,13 @@ services:
     ports:
     - 5672:5672
     - 15672:15672
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+  
   gateway:
     container_name: gateway
     image: gateway:latest
@@ -27,8 +34,23 @@ services:
       OUTPUT_QUEUE_10: menu-items-queue-3
       OUTPUT_QUEUE_11: users-queue
       EXCHANGE_NAME: gateway-exchange
+    depends_on:
+      rabbitmq:
+        condition: service_healthy   
     networks:
     - testing_net
+
+  filter-year:
+    container_name: filter-year
+    image: filter:latest
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: batches-queue
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
 
   client:
     container_name: client

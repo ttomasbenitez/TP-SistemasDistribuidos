@@ -60,6 +60,7 @@ def main():
                   f"listen_backlog: {listen_backlog} | logging_level: {logging_level}")
     
     queues_dict = create_queues_dict()
+    print(queues_dict)
     exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["exchange_name"], queues_dict)
 
     # Initialize gateway and start gateway loop

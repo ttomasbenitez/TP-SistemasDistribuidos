@@ -52,7 +52,7 @@ class MessageMiddleware(ABC):
 class MessageMiddlewareQueue(MessageMiddleware):
     def __init__(self, host, queue_name):
         self.queue_name = queue_name
-        self.connection = pika.BlockingConnection(pika.ConnectionParameters(host))
+        self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=host, heartbeat=600))
         self.channel = self.connection.channel()
         self.channel.queue_declare(queue=queue_name, durable=True)
 
@@ -98,13 +98,8 @@ class MessageMiddlewareExchange(MessageMiddleware):
     def stop_consuming(self):
         self.connection.close()
 
-    def send(self, message):
-        # Si hay route_keys, enviar a cada una
-        if self.route_keys:
-            for key in self.route_keys:
-                self.channel.basic_publish(exchange=self.exchange_name, routing_key=key, body=message)
-        else:
-            self.channel.basic_publish(exchange=self.exchange_name, routing_key='', body=message)
+    def send(self, message, routing_key):
+        self.channel.basic_publish(exchange=self.exchange_name, routing_key=routing_key, body=message)
 
     def close(self):
         self.connection.close()
