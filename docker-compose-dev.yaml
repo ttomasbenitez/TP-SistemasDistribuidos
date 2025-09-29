@@ -33,6 +33,7 @@ services:
       OUTPUT_QUEUE_9: menu-items-queue-2
       OUTPUT_QUEUE_10: menu-items-queue-3
       OUTPUT_QUEUE_11: users-queue
+      OUTPUT_QUEUE_12: batches-queue
       EXCHANGE_NAME: gateway-exchange
     depends_on:
       rabbitmq:

@@ -23,7 +23,6 @@ class Worker(ABC):
     def __on_message__(self, raw):
         pass
     
-    @abstractmethod  
     def stop(self):
         self._running = False
         try:

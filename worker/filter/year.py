@@ -1,5 +1,7 @@
 from worker import Worker 
 from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
+import logging
+from pkg.message.message import Message
 
 class FilterYearNode(Worker):
     
@@ -11,7 +13,12 @@ class FilterYearNode(Worker):
         
     def __on_message__(self, message):
         try:
-            items = message.process_meesage()
+            logging.info("Procesando mensaje")
+            logging.info(f"{message}")
+            message = Message.__deserialize__(message)
+            items = message.process_message()
+            logging.info("Mensaje procesado")
+            logging.info(f"{items}")
             new_chunk = b''
             for item in items:
                 year = item.get_year()
@@ -20,8 +27,8 @@ class FilterYearNode(Worker):
             if new_chunk:
                 new_message = message.update_content(new_chunk)
                 serialized = new_message.serialize()
-                self.out_queue.send(serialized)
-                self.out_exchange.send(serialized)
+                #self.out_queue.send(serialized)
+                #self.out_exchange.send(serialized)
         except Exception as e:
             print(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
             

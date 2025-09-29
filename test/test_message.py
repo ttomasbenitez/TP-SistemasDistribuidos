@@ -20,7 +20,7 @@ def __test_message(file, message_type):
     assert new_message.request_id == 1
     assert new_message.msg_num == 1
     
-    items = message.proccess_message()
+    items = message.process_message()
     return items
 
 def test_message_menu_items():

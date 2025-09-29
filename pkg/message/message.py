@@ -89,7 +89,7 @@ class Message:
         content = parts[3]
         return Message(request_id, type, msg_num, content)
 
-    def proccess_message(self):
+    def process_message(self):
         """ 
         Procesea el mensaje basado en su tipo.
         :return: si el tipo es 

@@ -58,7 +58,7 @@ class MessageMiddlewareQueue(MessageMiddleware):
 
     def start_consuming(self, on_message_callback):
         def callback(ch, method, properties, body):
-            on_message_callback(body.decode())
+            on_message_callback(body)
         self.channel.basic_consume(queue=self.queue_name, on_message_callback=callback, auto_ack=True)
         self.channel.start_consuming()
 
