@@ -4,7 +4,7 @@ import socket
 import logging
 import signal
 from common.file_reader import FileReader
-from packages.messages.message import Message
+from pkg.message.message import Message
 
 class Client:
     def __init__(self, gateway_host: str, gateway_port: int, file_reader: FileReader):

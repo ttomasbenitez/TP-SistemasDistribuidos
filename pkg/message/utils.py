@@ -1,3 +1,4 @@
+import datetime
 
 def get_items_from_bytes(data: bytes, item_class):
     """
@@ -32,5 +33,16 @@ def parse_float(part):
     """
     try:
         return float(part)
+    except (ValueError, TypeError):
+        return None
+    
+def parse_date(part):
+    """
+    Parsea una fecha de una cadena en formato ISO, devolviendo None si la cadena está vacía o no es válida.
+    :param part: Cadena a parsear.
+    :return: datetime.date o None. 
+    """
+    try:
+        return datetime.datetime.fromisoformat(part)
     except (ValueError, TypeError):
         return None

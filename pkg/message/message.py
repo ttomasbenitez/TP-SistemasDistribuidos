@@ -1,4 +1,4 @@
-from packages.messages.constants import (
+from pkg.message.constants import (
     MESSAGE_SIZE_BYTES,
     MESSAGE_TYPE_MENU_ITEMS,
     MESSAGE_TYPE_STORES,
@@ -6,11 +6,11 @@ from packages.messages.constants import (
     MESSAGE_TYPE_TRANSACTIONS,
     MESSAGE_TYPE_USERS,
 )         
-from packages.messages.menu_item import MenuItem
-from packages.messages.store import Store
-from packages.messages.transaction_item import TransactionItem
-from packages.messages.transaction import Transaction
-from packages.messages.user import User
+from pkg.message.menu_item import MenuItem
+from pkg.message.store import Store
+from pkg.message.transaction_item import TransactionItem
+from pkg.message.transaction import Transaction
+from pkg.message.user import User
 
 class Message:
     """

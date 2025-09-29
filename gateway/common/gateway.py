@@ -1,7 +1,7 @@
 import socket
 import logging
 import signal
-from packages.messages.message import Message
+from pkg.message.message import Message
 
 class ConnectionClosedException(Exception):
     """Exception raised when a client connection is closed unexpectedly."""

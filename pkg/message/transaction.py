@@ -1,6 +1,5 @@
-from packages.messages.constants import MESSAGE_CSV_TRANSACTIONS_AMOUNT
-from packages.messages.utils import get_items_from_bytes, parse_int, parse_float
-
+from pkg.message.constants import MESSAGE_CSV_TRANSACTIONS_AMOUNT
+from pkg.message.utils import get_items_from_bytes, parse_int, parse_float, parse_date
 class Transaction:
     
     def __init__(self, transaction_id, store_id, user_id, final_amount, created_at):
@@ -24,7 +23,7 @@ class Transaction:
         store_id = parse_int(parts[1])
         user_id = parse_int(parse_float(parts[4]))
         final_amount = parse_float(parts[7])
-        created_at = parts[8]
+        created_at = parse_date(parts[8])
         return Transaction(transaction_id, store_id, user_id, final_amount, created_at)
     
     def get_transactions_from_bytes(data: bytes):

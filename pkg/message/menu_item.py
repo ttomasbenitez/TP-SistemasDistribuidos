@@ -1,5 +1,5 @@
-from packages.messages.constants import MESSAGE_CSV_MENU_ITEMS_AMOUNT
-from packages.messages.utils import get_items_from_bytes, parse_int, parse_float
+from pkg.message.constants import MESSAGE_CSV_MENU_ITEMS_AMOUNT
+from pkg.message.utils import get_items_from_bytes, parse_int, parse_float
 
 class MenuItem:
     """ 
