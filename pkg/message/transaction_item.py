@@ -1,5 +1,5 @@
-from packages.messages.constants import MESSAGE_CSV_TRANSACTION_ITEMS_AMOUNT
-from packages.messages.utils import get_items_from_bytes, parse_int
+from pkg.message.constants import MESSAGE_CSV_TRANSACTION_ITEMS_AMOUNT
+from pkg.message.utils import get_items_from_bytes, parse_int, parse_date
 
 class TransactionItem:
     
@@ -20,7 +20,7 @@ class TransactionItem:
             raise ValueError("Datos inválidos para TransactionItem")
         transaction_id = parts[0]
         item_id = parse_int(parts[1])
-        created_at = parts[5]
+        created_at = parse_date(parts[5])
         return TransactionItem(transaction_id, item_id, created_at)
     
     def get_transaction_items_from_bytes(data: bytes):
@@ -36,4 +36,16 @@ class TransactionItem:
         Serializa el objeto TransactionItem a bytes.
         :return: Datos en bytes.
         """
-        return f"{self.transaction_id};{self.item_id};{self.created_at}\n"
+        return f"{self.transaction_id};{self.item_id};{self.created_at}\n".encode('utf-8')
+    
+    def get_year(self):
+        """
+        Obtiene el año de la transaccion
+        :return: Año de registro o None si no está disponible.
+        """
+        if self.created_at:
+            try:
+                return self.created_at.year
+            except AttributeError:
+                return None
+        return None

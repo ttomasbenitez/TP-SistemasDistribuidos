@@ -1,8 +1,8 @@
 FROM python:3.11-slim
 COPY client /client
-COPY packages /packages
+COPY pkg /pkg
 
-# Agregar /packages al PYTHONPATH
-ENV PYTHONPATH="/packages:${PYTHONPATH}"
+# Agregar /pkg al PYTHONPATH
+ENV PYTHONPATH="/pkg:${PYTHONPATH}"
 
 ENTRYPOINT ["python3", "/client/main.py"]

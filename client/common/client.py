@@ -5,8 +5,9 @@ import logging
 import signal
 import os
 from common.file_reader import FileReader
-from packages.messages.message import Message
-from packages.messages.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_STORES
+from pkg.message.message import Message
+from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_STORES
+from pkg.message.message import Message
 
 class Client:
     def __init__(self, gateway_host: str, gateway_port: int):

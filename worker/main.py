@@ -3,7 +3,7 @@
 import logging
 import os
 from Middleware.middleware import MessageMiddlewareQueue
-from filters.common.year_filter import FilterYearsNode
+from filter.year import FilterYearNode
 
 
 def initialize_config():
@@ -34,10 +34,11 @@ def main():
     initialize_log(config_params["logging_level"])
 
     input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue"])
-
-    # Initialize filter
-    filter = FilterYearsNode(input_queue, None, allowed_years={2024, 2025})
-    filter.start()
+    # output_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["output_queue_1"])
+    # output_exchange = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["output_exchange_filter_year"])
+    
+    # filter = FilterYearNode(input_queue, output_queue, output_exchange, {2024, 2025})
+    # filter.start()
 
 def initialize_log(logging_level):
     """

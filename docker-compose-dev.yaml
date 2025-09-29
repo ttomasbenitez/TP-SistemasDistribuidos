@@ -67,8 +67,8 @@ services:
     networks:
     - testing_net
     volumes:
-    - ./client/data/menu_items/menu_items.csv:/data/menu_items.csv:ro
-    - ./client/data/stores/stores.csv:/data/stores.csv:ro
+    - ./client/data/menu_items/menu_items.csv:/data/menu_items.csv
+    - ./client/data/stores/stores.csv:/data/stores.csv
 
 networks:
   testing_net:

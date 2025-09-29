@@ -1,4 +1,4 @@
-from packages.messages.constants import (
+from pkg.message.constants import (
     MESSAGE_SIZE_BYTES,
     MESSAGE_TYPE_MENU_ITEMS,
     MESSAGE_TYPE_STORES,
@@ -6,11 +6,11 @@ from packages.messages.constants import (
     MESSAGE_TYPE_TRANSACTIONS,
     MESSAGE_TYPE_USERS,
 )         
-from packages.messages.menu_item import MenuItem
-from packages.messages.store import Store
-from packages.messages.transaction_item import TransactionItem
-from packages.messages.transaction import Transaction
-from packages.messages.user import User
+from pkg.message.menu_item import MenuItem
+from pkg.message.store import Store
+from pkg.message.transaction_item import TransactionItem
+from pkg.message.transaction import Transaction
+from pkg.message.user import User
 
 class Message:
     """
@@ -35,7 +35,7 @@ class Message:
         Envía el mensaje a través del socket.
         :param socket: Socket a través del cual se envía el mensaje.
         """
-        msg = self.__serialize__()
+        msg = self.serialize()
         total_sent = 0
         msg_length = len(msg)
 
@@ -45,13 +45,12 @@ class Message:
                 raise RuntimeError("Socket connection broken")
             total_sent += sent
 
-    def __serialize__(self):
+    def serialize(self):
         """
         Serializa el mensaje en bytes.
         :return: Mensaje serializado en bytes.
         """
-        msg = f"{self.type};{self.request_id};{self.msg_num};{self.content}\n"
-        msg = msg.encode('utf-8')
+        msg = f"{self.type};{self.request_id};{self.msg_num};{self.content}\n".encode('utf-8')
         msg = len(msg).to_bytes(MESSAGE_SIZE_BYTES, byteorder='big') + msg
         return msg
     
@@ -110,3 +109,10 @@ class Message:
             return Transaction.get_transactions_from_bytes(encoded_content)
         if self.type == MESSAGE_TYPE_USERS:
             return User.get_users_from_bytes(encoded_content)
+        
+    def update_content(self, new_content):
+        """
+        Actualiza el contenido del mensaje.
+        :param new_content: Nuevo contenido del mensaje.
+        """
+        self.content = new_content
