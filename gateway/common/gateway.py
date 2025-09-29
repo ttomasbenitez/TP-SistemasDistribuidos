@@ -44,56 +44,16 @@ class Gateway:
 
         self.__handle_shutdown(None, None)
 
-    def __receive_request(self):
-        message = Message.read_message(self._client_socket)
-        logging.info(f'action: message_received | result: success')
-        logging.info(f'action: process_request | result: success | request_id: {message.request_id} | type: {message.type} | msg_num: {message.msg_num}')
-        logging.info(f'action: message_content | content: {message.content}')
-
     def __receive_data(self):
         all_received = False
         while not all_received:
             message = Message.read_message(self._client_socket)
             if message.type == MESSAGE_TYPE_EOF:
                 all_received = True
-            logging.info(f'action: message_received | result: success')
-            logging.info(f'action: process_request | result: success | request_id: {message.request_id} | type: {message.type} | msg_num: {message.msg_num}')
-            logging.info(f'action: message_content | content: {message.content}')
-            self._exchange.send(message.serialize(), 'data')
-            logging.info(f'action: send message via exchange')
+            logging.info(f'action: receive_data | result: success | request_id: {message.request_id} | type: {message.type} | msg_num: {message.msg_num}')
+            self._exchange.send(message.serialize(), str(message.type))
+            logging.info(f'action: send message via exchange | result: success | type: {message.type}')
     
-    #def __receive_bet_data(self, sock):
-    #    """
-    #    Receives bet data from the client. Returns a list of Bet objects or None if no data is received.
-    #    Ensures no short reads by receiving the entire message.
-    #    """
-    #    msg_type = self.__recv_all(sock, MESS_TYPE_BYTES)
-    #    if msg_type == END_MESSAGE_TYPE:
-    #        logging.debug(f'action: END_MESS_RECEIVED | result: success')   
-    #        return None
-    #    
-    #    header = self.__recv_all(sock, MESS_LENGTH_BYTES)
-    #    message_length = int.from_bytes(header[0:], "big")
-    #    if message_length == 0:
-    #        return None
-#
-    #    message = self.__recv_all(sock, message_length)
-    #    return self.__parse_bet_data(message)
-
-    #def __send_winner_to_client(self, client_sock, winner_bet):
-    #    """
-    #    Sends a single winner bet to the client.
-    #    Uses sendall to handle short writes automatically.
-    #    """
-    #    message = DATA_MESSAGE_TYPE + f"{winner_bet.document}\n".encode('utf-8')
-    #    client_sock.sendall(message)
-
-    #def __send_end_message(self, client_sock):
-    #    """
-    #    Send end message to client.
-    #    """
-    #    client_sock.sendall(END_MESSAGE_TYPE)
-
     def __accept_new_connection(self):
         """
         Accepts new client connections and returns the client socket.

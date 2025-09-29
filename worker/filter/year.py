@@ -14,11 +14,9 @@ class FilterYearNode(Worker):
     def __on_message__(self, message):
         try:
             logging.info("Procesando mensaje")
-            logging.info(f"{message}")
             message = Message.__deserialize__(message)
             items = message.process_message()
             logging.info("Mensaje procesado")
-            logging.info(f"{items}")
             new_chunk = b''
             for item in items:
                 year = item.get_year()

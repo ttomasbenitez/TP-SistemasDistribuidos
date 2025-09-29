@@ -85,12 +85,18 @@ class MessageMiddlewareExchange(MessageMiddleware):
         # Diccionario que guarda cola -> {"queue": objeto Queue, "routing_key": routing_key}
         self.queues = {}
 
-        for queue_name, routing_key in queues_dict.items():
+        for queue_name, routing_keys in queues_dict.items():
             # Crear la cola
             queue = MessageMiddlewareQueue(host, queue_name)
             # Bindearla al exchange con la routing key correspondiente
-            self.channel.queue_bind(exchange=self.exchange_name, queue=queue_name, routing_key=routing_key)
-            self.queues[queue_name] = {"queue": queue, "routing_key": routing_key}
+            # Bindear la cola al exchange por cada routing key si es lista
+            if isinstance(routing_keys, list):
+                for key in routing_keys:
+                    self.channel.queue_bind(exchange=self.exchange_name, queue=queue_name, routing_key=key)
+            else:
+                self.channel.queue_bind(exchange=self.exchange_name, queue=queue_name, routing_key=routing_keys)
+
+            self.queues[queue_name] = {"queue": queue, "routing_key": routing_keys}
 
     def start_consuming(self, on_message_callback):
         pass

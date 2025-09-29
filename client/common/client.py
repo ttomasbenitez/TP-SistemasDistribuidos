@@ -6,8 +6,9 @@ import signal
 import os
 from common.file_reader import FileReader
 from pkg.message.message import Message
-from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_STORES
+from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_STORES, MESSAGE_TYPE_USERS, MESSAGE_TYPE_TRANSACTIONS, MESSAGE_TYPE_TRANSACTION_ITEMS
 from pkg.message.message import Message
+from pathlib import Path
 
 class Client:
     def __init__(self, gateway_host: str, gateway_port: int):
@@ -29,35 +30,45 @@ class Client:
 
         self.__handle_shutdown(None, None)
 
-
     def __send_request(self):
         """
         Sends a request to the gateway.
         """
         try:
-            self.__send_stores_data()
-            #self.__send_menu_items_data()
+            self.__send_data()
+            self.__send_end_of_data()
             logging.info(f'action: send_request | result: success')
         except Exception as e:
             logging.error(f'action: send_request | result: fail | error: {e}')
 
-    def __send_stores_data(self):
-        file_reader = FileReader(os.getenv('STORES_FILE_PATH'), int(os.getenv('MAX_BATCH_SIZE')))
-        while file_reader.has_more_data():
-            data = file_reader.get_chunk()
-            Message(0, MESSAGE_TYPE_STORES, 0, data).send_message(self._socket)
-        file_reader.close()
-        Message(0, MESSAGE_TYPE_EOF, 0, 0).send_message(self._socket)
-        logging.info(f'action: send_stores_data | result: success')
+    def __send_data(self):
+        self.__send_folder_data(os.getenv('STORES_FOLDER_PATH'), MESSAGE_TYPE_STORES)
+        self.__send_folder_data(os.getenv('MENU_ITEMS_FOLDER_PATH'), MESSAGE_TYPE_MENU_ITEMS)
+        self.__send_folder_data(os.getenv('USERS_FOLDER_PATH'), MESSAGE_TYPE_USERS)
+        self.__send_folder_data(os.getenv('TRANSACTIONS_FOLDER_PATH'), MESSAGE_TYPE_TRANSACTIONS)
+        self.__send_folder_data(os.getenv('TRANSACTION_ITEMS_FOLDER_PATH'), MESSAGE_TYPE_TRANSACTION_ITEMS)
 
-    def __send_menu_items_data(self):
-        file_reader = FileReader(os.getenv('MENU_ITEMS_FILE_PATH'), int(os.getenv('MAX_BATCH_SIZE')))
-        while file_reader.has_more_data():
-            data = file_reader.get_chunk()
-            Message(0, MESSAGE_TYPE_MENU_ITEMS  , 0, data).send_message(self._socket)
-        file_reader.close()
-        Message(0, MESSAGE_TYPE_EOF, 0, 0).send_message(self._socket)
-        logging.info(f'action: send_menu_items_data | result: success')
+    def __send_folder_data(self, folder_path, message_type):
+        folder = Path(folder_path)
+        for file_path in folder.glob("*.csv"):
+            file_reader = FileReader(file_path, int(os.getenv('MAX_BATCH_SIZE')))
+            while file_reader.has_more_data():
+                data = file_reader.get_chunk()
+                Message(0, message_type, 0, data).send_message(self._socket)
+            file_reader.close()
+
+        logging.info(f'action: send_data_folder | folder: {folder_path} | result: success')
+
+    def __send_end_of_data(self):
+        """
+        Sends an EOF message to the gateway to indicate the end of data transmission.
+        """
+        try:
+            eof_message = Message(0, MESSAGE_TYPE_EOF, 0, 0)
+            eof_message.send_message(self._socket)
+            logging.info(f'action: send_eof | result: success')
+        except Exception as e:
+            logging.error(f'action: send_eof | result: fail | error: {e}')
 
     def __handle_shutdown(self, signum, frame):
         """

@@ -60,16 +60,22 @@ services:
       GATEWAY_HOST: gateway
       GATEWAY_PORT: 3000
       LOG_LEVEL: INFO
-      STORES_FILE_PATH: data/stores.csv
-      MENU_ITEMS_FILE_PATH: data/menu_items.csv
+      STORES_FOLDER_PATH: data/stores/
+      MENU_ITEMS_FOLDER_PATH: data/menu_items/
+      USERS_FOLDER_PATH: data/users/
+      TRANSACTIONS_FOLDER_PATH: data/transactions/
+      TRANSACTION_ITEMS_FOLDER_PATH: data/transaction_items/
       MAX_BATCH_SIZE: 8024
     depends_on:
       - gateway
     networks:
     - testing_net
     volumes:
-    - ./client/data/menu_items/menu_items.csv:/data/menu_items.csv
-    - ./client/data/stores/stores.csv:/data/stores.csv
+    - ./client/data/menu_items/:/data/menu_items/
+    - ./client/data/stores/:/data/stores/
+    - ./client/data/users/:/data/users/
+    - ./client/data/transactions/:/data/transactions/
+    - ./client/data/transaction_items/:/data/transaction_items/
 
 networks:
   testing_net:

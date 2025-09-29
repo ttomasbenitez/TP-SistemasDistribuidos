@@ -4,6 +4,7 @@ from common.gateway import Gateway
 import logging
 import os
 from Middleware.middleware import MessageMiddlewareExchange
+from pkg.message.constants import MESSAGE_TYPE_USERS, MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_STORES, MESSAGE_TYPE_TRANSACTIONS, MESSAGE_TYPE_TRANSACTION_ITEMS
 
 
 def initialize_config():
@@ -35,13 +36,13 @@ def create_queues_dict():
     for key, queue_name in os.environ.items():
         if key.startswith("OUTPUT_QUEUE_"):
             if queue_name.startswith("users"):
-                routing_key = "users"
+                routing_key = str(MESSAGE_TYPE_USERS)
             elif queue_name.startswith("menu"):
-                routing_key = "menu_items"
+                routing_key = str(MESSAGE_TYPE_MENU_ITEMS)
             elif queue_name.startswith("stores"):
-                routing_key = "stores"
+                routing_key = str(MESSAGE_TYPE_STORES)
             else:
-                routing_key = "data"
+                routing_key = [str(MESSAGE_TYPE_TRANSACTIONS), str(MESSAGE_TYPE_TRANSACTION_ITEMS)]
             
             queues_dict[queue_name] = routing_key
     return queues_dict
@@ -60,7 +61,6 @@ def main():
                   f"listen_backlog: {listen_backlog} | logging_level: {logging_level}")
     
     queues_dict = create_queues_dict()
-    print(queues_dict)
     exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["exchange_name"], queues_dict)
 
     # Initialize gateway and start gateway loop
