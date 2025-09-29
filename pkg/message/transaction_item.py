@@ -36,4 +36,16 @@ class TransactionItem:
         Serializa el objeto TransactionItem a bytes.
         :return: Datos en bytes.
         """
-        return f"{self.transaction_id};{self.item_id};{self.created_at}\n"
+        return f"{self.transaction_id};{self.item_id};{self.created_at}\n".encode('utf-8')
+    
+    def get_year(self):
+        """
+        Obtiene el año de la transaccion
+        :return: Año de registro o None si no está disponible.
+        """
+        if self.created_at:
+            try:
+                return self.created_at.year
+            except AttributeError:
+                return None
+        return None

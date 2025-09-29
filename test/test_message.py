@@ -10,7 +10,7 @@ def __test_message(file, message_type):
         chunk += fileReader.get_chunk()
     
     message =  Message(1,message_type, 1, chunk)
-    serialized_message = message.__serialize__()
+    serialized_message = message.serialize()
     message_length = int.from_bytes(serialized_message[0:4], byteorder='big')
     assert message_length == len(serialized_message) - 4
     

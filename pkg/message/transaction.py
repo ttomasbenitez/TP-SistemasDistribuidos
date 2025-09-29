@@ -39,4 +39,16 @@ class Transaction:
         Serializa el objeto Transaction a bytes.
         :return: Datos en bytes.
         """
-        return f"{self.transaction_id};{self.store_id};${self.user_id};{self.final_amount};{self.created_at}\n"
+        return f"{self.transaction_id};{self.store_id};${self.user_id};{self.final_amount};{self.created_at}\n".encode('utf-8')
+    
+    def get_year(self):
+        """
+        Obtiene el año de la transaccion
+        :return: Año de registro o None si no está disponible.
+        """
+        if self.created_at:
+            try:
+                return self.created_at.year
+            except AttributeError:
+                return None
+        return None

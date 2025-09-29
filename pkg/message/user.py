@@ -38,4 +38,17 @@ class User:
         Serializa el objeto User a bytes.
         :return: Datos en bytes.
         """
-        return f"{self.id};{self.birthdate};{self.registered_at}\n"
+        return f"{self.id};{self.birthdate};{self.registered_at}\n".encode('utf-8')
+    
+    
+    def get_year(self):
+        """
+        Obtiene el año de registro del usuario.
+        :return: Año de registro o None si no está disponible.
+        """
+        if self.registered_at:
+            try:
+                return self.registered_at.year
+            except AttributeError:
+                return None
+        return None
