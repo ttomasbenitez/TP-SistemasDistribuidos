@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import pika
 
 class MessageMiddlewareMessageError(Exception):
     pass
@@ -48,11 +49,65 @@ class MessageMiddleware(ABC):
 	def delete(self):
 		pass
 
+class MessageMiddlewareQueue(MessageMiddleware):
+    def __init__(self, host, queue_name):
+        self.queue_name = queue_name
+        self.connection = pika.BlockingConnection(pika.ConnectionParameters(host))
+        self.channel = self.connection.channel()
+        self.channel.queue_declare(queue=queue_name, durable=True)
+
+    def start_consuming(self, on_message_callback):
+        def callback(ch, method, properties, body):
+            on_message_callback(body.decode())
+        self.channel.basic_consume(queue=self.queue_name, on_message_callback=callback, auto_ack=True)
+        self.channel.start_consuming()
+
+    def stop_consuming(self):
+        self.connection.close()
+
+    def send(self, message):
+        self.channel.basic_publish(exchange='', routing_key=self.queue_name, body=message)
+
+    def close(self):
+        self.connection.close()
+
+    def delete(self):
+        self.channel.queue_delete(queue=self.queue_name)
 
 class MessageMiddlewareExchange(MessageMiddleware):
-	def __init__(self, host, exchange_name, route_keys):
-		pass
+    def __init__(self, host, exchange_name, queues_dict):
+        self.exchange_name = exchange_name
+        self.connection = pika.BlockingConnection(pika.ConnectionParameters(host))
+        self.channel = self.connection.channel()
+        self.channel.exchange_declare(exchange=exchange_name, exchange_type='direct', durable=True)
+        self.route_keys = list(queues_dict.values())
 
-class MessageMiddlewareQueue(MessageMiddleware):
-	def __init__(self, host, queue_name):
-		pass
+        # Diccionario que guarda cola -> {"queue": objeto Queue, "routing_key": routing_key}
+        self.queues = {}
+
+        for queue_name, routing_key in queues_dict.items():
+            # Crear la cola
+            queue = MessageMiddlewareQueue(host, queue_name)
+            # Bindearla al exchange con la routing key correspondiente
+            self.channel.queue_bind(exchange=self.exchange_name, queue=queue_name, routing_key=routing_key)
+            self.queues[queue_name] = {"queue": queue, "routing_key": routing_key}
+
+    def start_consuming(self, on_message_callback):
+        pass
+
+    def stop_consuming(self):
+        self.connection.close()
+
+    def send(self, message):
+        # Si hay route_keys, enviar a cada una
+        if self.route_keys:
+            for key in self.route_keys:
+                self.channel.basic_publish(exchange=self.exchange_name, routing_key=key, body=message)
+        else:
+            self.channel.basic_publish(exchange=self.exchange_name, routing_key='', body=message)
+
+    def close(self):
+        self.connection.close()
+
+    def delete(self):
+        self.channel.exchange_delete(exchange=self.exchange_name)

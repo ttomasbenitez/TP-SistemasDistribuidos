@@ -2,13 +2,15 @@ import socket
 import logging
 import signal
 from packages.messages.message import Message
+from packages.messages.constants import MESSAGE_TYPE_EOF
+from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
 
 class ConnectionClosedException(Exception):
     """Exception raised when a client connection is closed unexpectedly."""
     pass
 
 class Gateway:
-    def __init__(self, port, listen_backlog):
+    def __init__(self, port, listen_backlog, exchange):
         """
         Initializes the gateway, binds the socket to the given port, and sets up shared resources and locks.
         """
@@ -17,7 +19,8 @@ class Gateway:
         self._gateway_socket.bind(('', port))
         self._gateway_socket.listen(listen_backlog)
         self._running = True
-        self._client_socket = []
+        self._client_socket = None
+        self._exchange = exchange 
     
         signal.signal(signal.SIGTERM, self.__handle_shutdown)
         signal.signal(signal.SIGINT, self.__handle_shutdown)
@@ -41,9 +44,18 @@ class Gateway:
         self.__handle_shutdown(None, None)
 
     def __receive_request(self):
-        Message().read_message(self._client_socket)
+        message = Message.read_message(self._client_socket)
         logging.info(f'action: message_received | result: success')
-        logging.info(f'action: process_request | result: success')
+        logging.info(f'action: process_request | result: success | request_id: {message.request_id} | type: {message.type} | msg_num: {message.msg_num}')
+        logging.info(f'action: message_content | content: {message.content}')
+
+    def __receive_data(self):
+        all_received = False
+        while not all_received:
+            message = Message.read_message(self._client_socket)
+            if message.type == MESSAGE_TYPE_EOF:
+                all_received = True
+            
 
 
     #def __receive_bet_data(self, sock):

@@ -33,12 +33,11 @@ def main():
     logging_level = config_params["logging_level"]
     gateway_host = config_params["gateway_host"]
     gateway_port = config_params["gateway_port"]
-    file_reader = FileReader('data/stores.csv', 8000)
 
     initialize_log(logging_level)
 
     # Initialize client
-    client = Client(gateway_host, gateway_port, file_reader)
+    client = Client(gateway_host, gateway_port)
     client.run()
 
 def initialize_log(logging_level):

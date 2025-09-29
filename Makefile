@@ -12,6 +12,10 @@ up: docker-image
 	docker compose -f docker-compose-dev.yaml up -d --build
 .PHONY: up
 
+run: 
+	docker compose -f docker-compose-dev.yaml up --build
+.PHONY: run
+
 down:
 	docker compose -f docker-compose-dev.yaml stop -t 1
 	docker compose -f docker-compose-dev.yaml down

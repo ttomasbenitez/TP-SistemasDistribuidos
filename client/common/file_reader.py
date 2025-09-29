@@ -50,6 +50,9 @@ class FileReader:
             self.is_eof = True
             
         return chunk.decode('utf-8')
+    
+    def has_more_data(self):
+        return not self.is_eof
 
     def close(self):
         """

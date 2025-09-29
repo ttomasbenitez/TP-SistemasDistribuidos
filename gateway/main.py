@@ -3,6 +3,7 @@
 from common.gateway import Gateway
 import logging
 import os
+from Middleware.middleware import MessageMiddlewareExchange
 
 
 def initialize_config():
@@ -20,12 +21,30 @@ def initialize_config():
     config_params["port"] = int(os.getenv('PORT'))
     config_params["listen_backlog"] = int(os.getenv('LISTEN_BACKLOG'))
     config_params["logging_level"] = os.getenv('LOGGING_LEVEL', 'INFO')
+    config_params["exchange_name"] = os.getenv('EXCHANGE_NAME')
+    config_params["rabbitmq_host"] = os.getenv('RABBITMQ_HOST')
 
-    if config_params["port"] is None or config_params["listen_backlog"] is None:
+    if config_params["port"] is None or config_params["listen_backlog"] is None or config_params["exchange_name"] is None or config_params["rabbitmq_host"] is None:
         raise ValueError("Expected value not found. Aborting gateway.")
 
     return config_params
 
+def create_queues_dict():
+    queues_dict = {}
+
+    for key, queue_name in os.environ.items():
+        if key.startswith("OUTPUT_QUEUE_"):
+            if queue_name.startswith("users"):
+                routing_key = "users"
+            elif queue_name.startswith("menu"):
+                routing_key = "menu_items"
+            elif queue_name.startswith("stores"):
+                routing_key = "stores"
+            else:
+                routing_key = "data"
+            
+            queues_dict[queue_name] = routing_key
+    return queues_dict
 
 def main():
     config_params = initialize_config()
@@ -39,9 +58,12 @@ def main():
     # of the component
     logging.debug(f"action: config | result: success | port: {port} | "
                   f"listen_backlog: {listen_backlog} | logging_level: {logging_level}")
+    
+    queues_dict = create_queues_dict()
+    exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["exchange_name"], queues_dict)
 
     # Initialize gateway and start gateway loop
-    gateway = Gateway(port, listen_backlog)
+    gateway = Gateway(port, listen_backlog, exchange)
     gateway.run()
 
 def initialize_log(logging_level):

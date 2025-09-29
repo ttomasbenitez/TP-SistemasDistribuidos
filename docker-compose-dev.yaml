@@ -1,4 +1,12 @@
 services:
+  rabbitmq:
+    container_name: rabbitmq
+    image: rabbitmq:3-management
+    networks:
+    - testing_net
+    ports:
+    - 5672:5672
+    - 15672:15672
   gateway:
     container_name: gateway
     image: gateway:latest
@@ -6,6 +14,19 @@ services:
       PORT: 3000
       LOG_LEVEL: INFO
       LISTEN_BACKLOG: '5'
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: results-queue
+      OUTPUT_QUEUE_2: stores-q3-queue-1
+      OUTPUT_QUEUE_3: stores-q3-queue-2
+      OUTPUT_QUEUE_4: stores-q3-queue-3
+      OUTPUT_QUEUE_5: stores-q4-queue-1
+      OUTPUT_QUEUE_6: stores-q4-queue-2
+      OUTPUT_QUEUE_7: stores-q4-queue-3
+      OUTPUT_QUEUE_8: menu-items-queue-1
+      OUTPUT_QUEUE_9: menu-items-queue-2
+      OUTPUT_QUEUE_10: menu-items-queue-3
+      OUTPUT_QUEUE_11: users-queue
+      EXCHANGE_NAME: gateway-exchange
     networks:
     - testing_net
 
@@ -16,6 +37,9 @@ services:
       GATEWAY_HOST: gateway
       GATEWAY_PORT: 3000
       LOG_LEVEL: INFO
+      STORES_FILE_PATH: data/stores.csv
+      MENU_ITEMS_FILE_PATH: data/menu_items.csv
+      MAX_BATCH_SIZE: 8024
     depends_on:
       - gateway
     networks:
