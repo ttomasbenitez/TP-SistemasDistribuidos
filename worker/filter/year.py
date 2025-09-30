@@ -2,7 +2,7 @@ from worker import Worker
 from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
 import logging
 from pkg.message.message import Message
-from utils.utils import initialize_log
+from utils.custom_logging import initialize_log
 import os
 
 class FilterYearNode(Worker):
