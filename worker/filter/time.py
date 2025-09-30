@@ -4,40 +4,30 @@ import logging
 from pkg.message.message import Message
 from utils.custom_logging import initialize_log
 import os
-from pkg.message.constants import MESSAGE_TYPE_TRANSACTIONS, MESSAGE_TYPE_TRANSACTION_ITEMS
+from pkg.message.constants import MESSAGE_TYPE_TRANSACTIONS
 
-class FilterYearNode(Worker):
+class FilterTimeNode(Worker):
     
-    def __init__(self, in_queue: MessageMiddlewareQueue, out_queue: MessageMiddlewareQueue, out_exchange: MessageMiddlewareExchange, years_set):
+    def __init__(self, in_queue: MessageMiddlewareQueue, out_exchange: MessageMiddlewareExchange, time_set):
         super().__init__(in_queue)
-        self.out_queue = out_queue
         self.out_exchange = out_exchange
-        self.years = years_set
+        self.time = time_set
         
     def __on_message__(self, message):
         try:
-            logging.info(f"Recibo mensaje")
+            logging.info(f"Procesando mensajeeee {message}")
             message = Message.read_from_bytes(message)
-            items = message.process_message_from_csv()
-            logging.info(f"Proceso mensaje | request_id: {message.request_id} | type: {message.type}")
-            new_chunk = '' 
-            for item in items:
-                year = item.get_year()
-                if year in self.years:
-                    new_chunk += item.serialize()
-            if new_chunk:
-                message.update_content(new_chunk)
-                serialized = message.serialize()
-                self.out_queue.send(serialized)
-                self.out_exchange.send(serialized, str(message.type))
-                logging.info(f"Filtro correctamente | request_id: {message.request_id} | type: {message.type}")
+            logging.info(f"Mensaje leído | request_id: {message.request_id} | type: {message.type} | content: {message.content}")
+            items = message.process_message()
+            logging.info("Mensaje procesado")
+            logging.info(f"Primer item: {items}")
+
         except Exception as e:
             logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
             
     def close(self):
         try:
             self.in_middleware.close()
-            self.out_queue.close()
             self.out_exchange.close()
         except Exception as e:
             print(f"Error al cerrar: {type(e).__name__}: {e}")
@@ -56,8 +46,7 @@ def initialize_config():
         "input_queue": os.getenv('INPUT_QUEUE_1'),
         "output_queue_1": os.getenv('OUTPUT_QUEUE_1'),
         "output_queue_2": os.getenv('OUTPUT_QUEUE_2'),
-        "output_queue_3": os.getenv('OUTPUT_QUEUE_3'),
-        "output_exchange_filter_year": os.getenv('EXCHANGE_NAME'),
+        "output_exchange_filter_time": os.getenv('EXCHANGE_NAME'),
         "logging_level": os.getenv('LOG_LEVEL', 'INFO'),
     }
 
@@ -67,8 +56,7 @@ def initialize_config():
         "input_queue",
         "output_queue_1",
         "output_queue_2",
-        "output_queue_3",
-        "output_exchange_filter_year",
+        "output_exchange_filter_time",
     ]
 
     missing_keys = [key for key in required_keys if config_params[key] is None]
@@ -77,20 +65,17 @@ def initialize_config():
     
     return config_params
 
-
 def main():
     config_params = initialize_config()
 
     initialize_log(config_params["logging_level"])
 
     input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue"])
-    output_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["output_queue_1"])
-    output_exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["output_exchange_filter_year"], 
+    output_exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["output_exchange_filter_time"], 
                                         {config_params["output_queue_1"]: str(MESSAGE_TYPE_TRANSACTIONS), 
-                                        config_params["output_queue_2"]: str(MESSAGE_TYPE_TRANSACTIONS), 
-                                        config_params["output_queue_3"]: str(MESSAGE_TYPE_TRANSACTION_ITEMS)})
+                                        config_params["output_queue_2"]: str(MESSAGE_TYPE_TRANSACTIONS)})
     
-    filter = FilterYearNode(input_queue, output_queue, output_exchange, {2024, 2025})
+    filter = FilterTimeNode(input_queue, output_exchange, {6, 23})
     filter.start()
 
 if __name__ == "__main__":

@@ -48,6 +48,26 @@ services:
     environment:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: batches-queue
+      OUTPUT_QUEUE_1: year-filtered-queue-q1-q3
+      OUTPUT_QUEUE_2: year-filtered-queue-q4
+      OUTPUT_QUEUE_3: ear-filtered-queue-q2
+      EXCHANGE_NAME: year-filtered-exchange
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
+  
+  filter-time:
+    container_name: filter-time
+    image: filter:latest
+    command: "/worker/filter/time.py"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: year-filtered-queue-q1-q3
+      OUTPUT_QUEUE_1: time-filtered-queue-q1
+      OUTPUT_QUEUE_2: time-filtered-queue-q3
+      EXCHANGE_NAME: time-filtered-exchange
       LOG_LEVEL: INFO
     networks:
     - testing_net
@@ -79,7 +99,7 @@ services:
       USERS_FOLDER_PATH: data/users/
       TRANSACTIONS_FOLDER_PATH: data/transactions/
       TRANSACTION_ITEMS_FOLDER_PATH: data/transaction_items/
-      MAX_BATCH_SIZE: 8024
+      MAX_BATCH_SIZE: 100000
     depends_on:
       - gateway
     networks:

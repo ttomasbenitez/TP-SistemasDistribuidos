@@ -29,7 +29,7 @@ class FileReader:
 
         :return: Lista de filas (listas) que componen el chunk.
         """
-        chunk = b''
+        chunk = ''
         current_size = 0
 
         if self.buffered_line:
@@ -39,7 +39,7 @@ class FileReader:
             self.buffered_line = None
 
         for row in self.reader:
-            row_bytes = ','.join(row).encode('utf-8') + b'\n'
+            row_bytes = ','.join(row) + '\n'
             row_size = len(row_bytes)
             if current_size + row_size > self.max_chunk_size:
                 self.buffered_line = row_bytes
@@ -49,7 +49,7 @@ class FileReader:
         else:
             self.is_eof = True
             
-        return chunk.decode('utf-8')
+        return chunk
     
     def has_more_data(self):
         return not self.is_eof

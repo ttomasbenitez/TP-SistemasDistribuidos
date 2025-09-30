@@ -1,5 +1,5 @@
 from pkg.message.constants import MESSAGE_CSV_TRANSACTION_ITEMS_AMOUNT
-from pkg.message.utils import get_items_from_bytes, parse_int, parse_date
+from pkg.message.utils import get_items_from_csv_bytes, get_items_from_bytes, parse_int, parse_date
 
 class TransactionItem:
     
@@ -8,14 +8,14 @@ class TransactionItem:
         self.item_id = item_id
         self.created_at = created_at
         
-    def deserialize(data: bytes):
+    def deserialize_from_csv(data: bytes):
         """ 
         Crea un objeto TransactionItem a partir de bytes.
         :param data: Datos en bytes.
         :return: Objeto TransactionItem.
         """
         
-        parts = data.decode('utf-8').split(',')
+        parts = data.split(',')
         if len(parts) != MESSAGE_CSV_TRANSACTION_ITEMS_AMOUNT:
             raise ValueError("Datos inválidos para TransactionItem")
         transaction_id = parts[0]
@@ -23,12 +23,27 @@ class TransactionItem:
         created_at = parse_date(parts[5])
         return TransactionItem(transaction_id, item_id, created_at)
     
-    def get_transaction_items_from_bytes(data: bytes):
+    def deserialize(data: bytes):
+        """ 
+        Crea un objeto TransactionItem a partir de bytes.
+        :param data: Datos en bytes.
+        :return: Objeto TransactionItem.
+        """
+        
+        parts = data.split(';')
+        transaction_id = parts[0]
+        item_id = parse_int(parts[1])
+        created_at = parse_date(parts[2])
+        return TransactionItem(transaction_id, item_id, created_at)
+    
+    def get_transaction_items_from_bytes(data: bytes, type):
         """
         Crea una lista de objetos TransactionItem a partir de bytes.
         :param data: Datos en bytes.
         :return: Lista de objetos TransactionItem.
         """
+        if type == 'csv': 
+            return get_items_from_csv_bytes(data, TransactionItem)
         return get_items_from_bytes(data, TransactionItem)
     
     def serialize(self):
@@ -36,7 +51,7 @@ class TransactionItem:
         Serializa el objeto TransactionItem a bytes.
         :return: Datos en bytes.
         """
-        return f"{self.transaction_id};{self.item_id};{self.created_at}\n".encode('utf-8')
+        return f"{self.transaction_id};{self.item_id};{self.created_at}\n"
     
     def get_year(self):
         """

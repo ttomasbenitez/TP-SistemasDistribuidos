@@ -50,7 +50,7 @@ class Message:
         Serializa el mensaje en bytes.
         :return: Mensaje serializado en bytes.
         """
-        msg = f"{self.type};{self.request_id};{self.msg_num};{self.content}\n".encode('utf-8')
+        msg = f"{self.type};{self.request_id};{self.msg_num};{self.content}".encode('utf-8')
         msg = len(msg).to_bytes(MESSAGE_SIZE_BYTES, byteorder='big') + msg
         return msg
     
@@ -76,6 +76,16 @@ class Message:
 
         return Message.__deserialize__(raw_msg)
     
+    def read_from_bytes(data: bytes):
+        """
+        Lee un mensaje desde bytes y lo deserializa.
+        :param data: Datos en bytes.
+        """
+        message_length = int.from_bytes(data[0:MESSAGE_SIZE_BYTES], byteorder='big')
+        chunk = b''
+        chunk += data[MESSAGE_SIZE_BYTES:MESSAGE_SIZE_BYTES + message_length]
+        return Message.__deserialize__(chunk)
+    
     def __deserialize__(raw_msg):
         """
         Deserializa el mensaje desde bytes.
@@ -88,7 +98,27 @@ class Message:
         msg_num = int(parts[2])
         content = parts[3]
         return Message(request_id, type, msg_num, content)
+    
+    def __deserialize_from_bytes__(data: bytes):
+        """
+        Deserializa el mensaje desde bytes.
+        :param data: Datos en bytes.
+        """
+        message_length = int.from_bytes(data[0:MESSAGE_SIZE_BYTES], byteorder='big')
+        raw_msg = data[MESSAGE_SIZE_BYTES:MESSAGE_SIZE_BYTES + message_length]
+        return Message.__deserialize__(raw_msg)
 
+    def process_message_from_csv(self):
+        """ 
+        Procesea el mensaje basado en su tipo.
+        :return: si el tipo es 
+            - MESSAGE_TYPE_MENU_ITEMS, retorna una lista de MenuItem.
+            - MESSAGE_TYPE_STORES, retorna una lista de Store.
+            - MESSAGE_TYPE_TRANSACTION_ITEMS, retorna una lista de TransactionItem.
+            - MESSAGE_TYPE_TRANSACTIONS, retorna una lista de Transaction.
+        """
+        return self.__process_message_by_type('csv')
+        
     def process_message(self):
         """ 
         Procesea el mensaje basado en su tipo.
@@ -98,17 +128,28 @@ class Message:
             - MESSAGE_TYPE_TRANSACTION_ITEMS, retorna una lista de TransactionItem.
             - MESSAGE_TYPE_TRANSACTIONS, retorna una lista de Transaction.
         """
-        encoded_content = self.content.encode('utf-8')
+        return self.__process_message_by_type('')
+        
+    def __process_message_by_type(self, type):
+        """ 
+        Procesea el mensaje basado en su tipo.
+        :return: si el tipo es 
+            - MESSAGE_TYPE_MENU_ITEMS, retorna una lista de MenuItem.
+            - MESSAGE_TYPE_STORES, retorna una lista de Store.
+            - MESSAGE_TYPE_TRANSACTION_ITEMS, retorna una lista de TransactionItem.
+            - MESSAGE_TYPE_TRANSACTIONS, retorna una lista de Transaction.
+        """
         if self.type == MESSAGE_TYPE_MENU_ITEMS:
-            return MenuItem.get_menu_items_from_bytes(encoded_content)
+            return MenuItem.get_menu_items_from_bytes(self.content, type)
         if self.type == MESSAGE_TYPE_STORES:
-            return Store.get_stores_from_bytes(encoded_content)
+            return Store.get_stores_from_bytes(self.content, type)
         if self.type == MESSAGE_TYPE_TRANSACTION_ITEMS:
-            return TransactionItem.get_transaction_items_from_bytes(encoded_content)
+            return TransactionItem.get_transaction_items_from_bytes(self.content, type)
         if self.type == MESSAGE_TYPE_TRANSACTIONS:
-            return Transaction.get_transactions_from_bytes(encoded_content)
+            return Transaction.get_transactions_from_bytes(self.content, type)
         if self.type == MESSAGE_TYPE_USERS:
-            return User.get_users_from_bytes(encoded_content)
+            return User.get_users_from_bytes(self.content, type)
+        
         
     def update_content(self, new_content):
         """
