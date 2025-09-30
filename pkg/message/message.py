@@ -157,3 +157,16 @@ class Message:
         :param new_content: Nuevo contenido del mensaje.
         """
         self.content = new_content
+
+    def new_from_original(self, new_content):
+        """
+        Crea un nuevo mensaje basado en este, pero con contenido actualizado.
+        :param new_content: Contenido del nuevo mensaje.
+        :return: Nuevo objeto Message independiente.
+        """
+        return Message(
+            request_id=self.request_id,
+            type=self.type,
+            msg_num=self.msg_num,
+            content=new_content
+        )

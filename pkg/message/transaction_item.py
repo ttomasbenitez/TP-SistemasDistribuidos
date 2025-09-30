@@ -1,11 +1,12 @@
 from pkg.message.constants import MESSAGE_CSV_TRANSACTION_ITEMS_AMOUNT
-from pkg.message.utils import get_items_from_csv_bytes, get_items_from_bytes, parse_int, parse_date
+from pkg.message.utils import get_items_from_csv_bytes, get_items_from_bytes, parse_int, parse_date, parse_float
 
 class TransactionItem:
     
-    def __init__(self, id, item_id, created_at):
-        self.transaction_id = id
+    def __init__(self, item_id, quantity, subtotal, created_at):
         self.item_id = item_id
+        self.quantity = quantity
+        self.subtotal = subtotal
         self.created_at = created_at
         
     def deserialize_from_csv(data: bytes):
@@ -18,10 +19,11 @@ class TransactionItem:
         parts = data.split(',')
         if len(parts) != MESSAGE_CSV_TRANSACTION_ITEMS_AMOUNT:
             raise ValueError("Datos inválidos para TransactionItem")
-        transaction_id = parts[0]
         item_id = parse_int(parts[1])
+        quantity = parse_int(parts[2])
+        subtotal = parse_float(parts[4])
         created_at = parse_date(parts[5])
-        return TransactionItem(transaction_id, item_id, created_at)
+        return TransactionItem(item_id, quantity, subtotal, created_at)
     
     def deserialize(data: bytes):
         """ 
@@ -29,12 +31,12 @@ class TransactionItem:
         :param data: Datos en bytes.
         :return: Objeto TransactionItem.
         """
-        
         parts = data.split(';')
-        transaction_id = parts[0]
-        item_id = parse_int(parts[1])
-        created_at = parse_date(parts[2])
-        return TransactionItem(transaction_id, item_id, created_at)
+        item_id = parse_int(parts[0])
+        quantity = parse_int(parts[1])
+        subtotal = parse_float(parts[2])
+        created_at = parse_date(parts[3])
+        return TransactionItem(item_id, quantity, subtotal, created_at)
     
     def get_transaction_items_from_bytes(data: bytes, type):
         """
@@ -51,7 +53,7 @@ class TransactionItem:
         Serializa el objeto TransactionItem a bytes.
         :return: Datos en bytes.
         """
-        return f"{self.transaction_id};{self.item_id};{self.created_at}\n"
+        return f"{self.item_id};{self.quantity};{self.subtotal};{self.created_at}\n"
     
     def get_year(self):
         """
@@ -61,6 +63,18 @@ class TransactionItem:
         if self.created_at:
             try:
                 return self.created_at.year
+            except AttributeError:
+                return None
+        return None
+    
+    def get_month(self):
+        """
+        Obtiene el mes de la transaccion
+        :return: mes de registro o None si no está disponible.
+        """
+        if self.created_at:
+            try:
+                return self.created_at.month
             except AttributeError:
                 return None
         return None
