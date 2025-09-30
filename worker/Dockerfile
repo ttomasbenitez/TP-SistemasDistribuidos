@@ -11,4 +11,4 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt
 ENV PYTHONPATH="/pkg:${PYTHONPATH}"
 ENV PYTHONPATH="/Middleware:${PYTHONPATH}"
 
-ENTRYPOINT ["python3", "/worker/main.py"]
+ENTRYPOINT ["python3"]

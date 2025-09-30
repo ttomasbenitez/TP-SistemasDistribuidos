@@ -44,9 +44,23 @@ services:
   filter-year:
     container_name: filter-year
     image: filter:latest
+    command: "/worker/filter/year.py"
     environment:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: batches-queue
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
+
+  aggregator-month:
+    container_name: aggregator-month
+    image: filter:latest
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: q2-year-filtered-queue
+      OUTPUT_QUEUE_1: aggregated-month-queue
       LOG_LEVEL: INFO
     networks:
     - testing_net
