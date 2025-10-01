@@ -93,10 +93,17 @@ class Message:
         if self.type == MESSAGE_TYPE_USERS:
             return User.get_users_from_bytes(self.content, type)
         
-        
     def update_content(self, new_content):
         """
         Actualiza el contenido del mensaje.
         :param new_content: Nuevo contenido del mensaje.
         """
         self.content = new_content
+
+    def new_from_original(self, new_content):
+        """
+        Crea un nuevo mensaje basado en este, pero con contenido actualizado.
+        :param new_content: Contenido del nuevo mensaje.
+        :return: Nuevo objeto Message independiente.
+        """
+        return Message(self.request_id, self.type, self.msg_num, new_content)
