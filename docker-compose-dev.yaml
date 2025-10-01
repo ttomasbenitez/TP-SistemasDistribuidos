@@ -129,6 +129,34 @@ services:
   #   depends_on:
   #   - aggregator-quantity-profit
 
+  join-stores-q3:
+    container_name: joiner-stores-q3
+    image: worker:latest
+    command: "/worker/joiner/q3_stores_joiner.py"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: aggregated-semester-q3-queue
+      INPUT_QUEUE_2: stores-q3-queue
+      OUTPUT_QUEUE_1: results-queue
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - aggregator-semester
+
+  aggregator-semester:
+    container_name: aggregator-semester
+    image: worker:latest
+    command: "/worker/aggregator/semester_aggregator.py"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE: time-filtered-queue-q1
+      OUTPUT_QUEUE: aggregated-semester-q3-queue
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
   # agreggator-semester:
   #   container_name: aggregator-semester
   #   image: worker:latest
