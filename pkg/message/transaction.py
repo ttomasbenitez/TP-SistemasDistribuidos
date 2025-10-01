@@ -35,7 +35,7 @@ class Transaction:
         parts = data.split(';')
         transaction_id = parts[0]
         store_id = parse_int(parts[1])
-        user_id = parse_int(parse_float(parts[2]))
+        user_id = parts[2]
         final_amount = parse_float(parts[3])
         created_at = parse_date(parts[4])
         return Transaction(transaction_id, store_id, user_id, final_amount, created_at)
@@ -68,3 +68,40 @@ class Transaction:
             except AttributeError:
                 return None
         return None
+    
+    def get_semester(self):
+        """
+        Obtiene el semestre de la transaccion
+        :return: Semestre de registro o None si no está disponible.
+        """
+        if self.created_at:
+            try:
+                month = self.created_at.month
+                if month <= 6:
+                    return 1
+                else:
+                    return 2
+            except AttributeError:
+                return None
+        return None
+    
+    def get_store(self):
+        """
+        Obtiene el id de la tienda
+        :return: id de la tienda
+        """
+        return self.store_id
+    
+    def get_final_amount(self):
+        """
+        Obtiene el monto final de la transaccion
+        :return: monto final de la transaccion
+        """
+        return self.final_amount
+    
+    def get_time(self):
+        """
+        Obtiene el horario de la transaccion
+        :return: horario de la transaccion
+        """
+        return self.created_at.time()

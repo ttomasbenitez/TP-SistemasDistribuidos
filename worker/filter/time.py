@@ -15,12 +15,27 @@ class FilterTimeNode(Worker):
         
     def __on_message__(self, message):
         try:
-            logging.info(f"Procesando mensajeeee {message}")
+            logging.info(f"\n\nProcesando mensaje\n\n")
             message = Message.read_from_bytes(message)
-            logging.info(f"Mensaje leído | request_id: {message.request_id} | type: {message.type} | content: {message.content}")
+            # logging.info(f"Mensaje leído | request_id: {message.request_id} | type: {message.type} | content: {message.content}")
             items = message.process_message()
             logging.info("Mensaje procesado")
-            logging.info(f"Primer item: {items}")
+            logging.info(f"Primer item: {items[0]}")
+            new_chunk = '' 
+            for item in items:
+                item_time = item.get_time()
+                # logging.info(f"Item time: {item_time}")
+                time = item_time.hour
+                if time > min(self.time) and time < max(self.time):
+                    new_chunk += item.serialize()
+                    # logging.info(f"Filtro correctamente | request_id: {message.request_id} | type: {message.type}")
+                else:
+                    logging.info(f"Time {time} is outside the range. Discarding message.")
+            if new_chunk:
+                message.update_content(new_chunk)
+                serialized = message.serialize()
+                self.out_exchange.send(serialized, str(message.type))
+                logging.info(f"Envio correctamente | request_id: {message.request_id} | type: {message.type}")
 
         except Exception as e:
             logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")

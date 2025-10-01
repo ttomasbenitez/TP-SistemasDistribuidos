@@ -1,4 +1,5 @@
 import datetime
+import logging
 
 def get_items_from_csv_bytes(data: bytes, item_class):
     """
@@ -23,6 +24,7 @@ def get_items_from_bytes(data: bytes, item_class):
     """
     items = []
     lines = data.rstrip('\n').split('\n')
+    
     for line in lines:
         if line.strip():
             items.append(item_class.deserialize(line))

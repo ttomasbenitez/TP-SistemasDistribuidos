@@ -117,6 +117,34 @@ services:
     depends_on:
     - aggregator-quantity-profit
 
+  agreggator-semester:
+    container_name: aggregator-semester
+    image: filter:latest
+    command: "/worker/aggregator/semester_aggregator.py"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE: time-filtered-queue-q1
+      OUTPUT_QUEUE: aggregated-semester-q3-queue
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
+
+  aggregator-store-q3:
+    container_name: aggregator-store-q3
+    image: filter:latest
+    command: "/worker/aggregator/store_aggregator.py"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE: time-filtered-queue-q3
+      OUTPUT_QUEUE: aggregated-store-q3-queue
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
+
   client:
     container_name: client
     image: client:latest

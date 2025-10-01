@@ -78,3 +78,10 @@ class TransactionItem:
             except AttributeError:
                 return None
         return None
+    
+    def get_time(self):
+        """
+        Obtiene el horario de la transaccion
+        :return: horario de la transaccion
+        """
+        return self.created_at.time()
