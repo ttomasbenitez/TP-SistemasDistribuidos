@@ -1,7 +1,8 @@
 from worker import Worker 
-from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
+from Middleware.middleware import MessageMiddlewareQueue
 import logging
 from pkg.message.message import Message
+from pkg.message.constants import MESSAGE_TYPE_EOF
 from utils.custom_logging import initialize_log
 import os
 
@@ -15,13 +16,20 @@ class AggregatorMonth(Worker):
         try:
             logging.info("Procesando mensaje")
             message = Message.read_from_bytes(message)
-            items = message.process_message()
+            if message.type == MESSAGE_TYPE_EOF:
+                self.__received_EOF__(message)
+                return
             
+            items = message.process_message()
             groups = self._group_items_by_month(items)
             self._send_groups(message, groups)
         except Exception as e:
             print(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
     
+    def __received_EOF__(self, message):
+        self.out_queue.send(message.serialize())
+        logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")
+
     def _group_items_by_month(self, items):
         groups = {}
         for item in items:

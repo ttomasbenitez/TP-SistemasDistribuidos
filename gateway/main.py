@@ -4,7 +4,7 @@ from common.gateway import Gateway
 import logging
 import os
 from Middleware.middleware import MessageMiddlewareExchange
-from pkg.message.constants import MESSAGE_TYPE_USERS, MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_STORES, MESSAGE_TYPE_TRANSACTIONS, MESSAGE_TYPE_TRANSACTION_ITEMS
+from pkg.message.constants import MESSAGE_TYPE_USERS, MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_STORES, MESSAGE_TYPE_TRANSACTIONS, MESSAGE_TYPE_TRANSACTION_ITEMS, MESSAGE_TYPE_EOF
 
 
 def initialize_config():
@@ -36,13 +36,13 @@ def create_queues_dict():
     for key, queue_name in os.environ.items():
         if key.startswith("OUTPUT_QUEUE_"):
             if queue_name.startswith("users"):
-                routing_key = str(MESSAGE_TYPE_USERS)
+                routing_key = [str(MESSAGE_TYPE_USERS), str(MESSAGE_TYPE_EOF)]
             elif queue_name.startswith("menu"):
-                routing_key = str(MESSAGE_TYPE_MENU_ITEMS)
+                routing_key = [str(MESSAGE_TYPE_MENU_ITEMS), str(MESSAGE_TYPE_EOF)]
             elif queue_name.startswith("stores"):
-                routing_key = str(MESSAGE_TYPE_STORES)
+                routing_key = [str(MESSAGE_TYPE_STORES), str(MESSAGE_TYPE_EOF)]
             else:
-                routing_key = [str(MESSAGE_TYPE_TRANSACTIONS), str(MESSAGE_TYPE_TRANSACTION_ITEMS)]
+                routing_key = [str(MESSAGE_TYPE_TRANSACTIONS), str(MESSAGE_TYPE_TRANSACTION_ITEMS), str(MESSAGE_TYPE_EOF)]
             
             queues_dict[queue_name] = routing_key
     return queues_dict

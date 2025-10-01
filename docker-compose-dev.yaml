@@ -102,10 +102,10 @@ services:
     depends_on:
     - aggregator-month
 
-  join-menu-items:
-    container_name: join-menu-items
+  joiner-menu-items:
+    container_name: joiner-menu-items
     image: worker:latest
-    command: "/worker/join/menu_items_1.py"
+    command: "/worker/joiner/menu_items.py"
     environment:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: products-results-queue

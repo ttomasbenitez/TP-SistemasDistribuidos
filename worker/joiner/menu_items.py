@@ -1,5 +1,5 @@
 from worker import Worker 
-from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
+from Middleware.middleware import MessageMiddlewareQueue
 import logging
 from pkg.message.message import Message
 from utils.custom_logging import initialize_log
@@ -15,9 +15,9 @@ class QuantityAndProfit(Worker):
     def __on_message__(self, message):
         try:
             logging.info("Procesando mensaje")
-            message = Message.__deserialize__(message)
+            message = Message.read_from_bytes(message)
+            logging.info(f"Mensaje: {message}")
             items = message.process_message()
-            logging.info("Mensaje procesado")
             new_chunk = b''
             for item in items:
                 year = item.get_year()

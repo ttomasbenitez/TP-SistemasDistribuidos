@@ -1,35 +1,65 @@
 from worker import Worker 
-from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
+from Middleware.middleware import MessageMiddlewareQueue
 import logging
 from pkg.message.message import Message
+from pkg.message.transaction_item import TransactionItem
+from pkg.message.constants import MESSAGE_TYPE_TRANSACTION_ITEMS, MESSAGE_TYPE_EOF
 from utils.custom_logging import initialize_log
 import os
+from collections import defaultdict
+from datetime import datetime
 
 class QuantityAndProfit(Worker):
     
     def __init__(self, in_queue: MessageMiddlewareQueue, out_queue: MessageMiddlewareQueue):
         super().__init__(in_queue)
         self.out_queue = out_queue
+        # Diccionario de tres niveles: year -> month -> item_id -> {"quantity", "subtotal"}
+        self.data = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {"quantity": 0, "subtotal": 0.0})))
         
     def __on_message__(self, message):
         try:
             logging.info("Procesando mensaje")
-            message = Message.__deserialize__(message)
+            message = Message.read_from_bytes(message)
+            if message.type == MESSAGE_TYPE_EOF:
+                self._send_messages_per_item()
+                self.__received_EOF__(message)
+                return
             items = message.process_message()
-            logging.info("Mensaje procesado")
-            new_chunk = b''
-            for item in items:
-                year = item.get_year()
-                if year in self.years:
-                    new_chunk += item.serialize()
-            if new_chunk:
-                new_message = message.update_content(new_chunk)
-                serialized = new_message.serialize()
-                #self.out_queue.send(serialized)
-                #self.out_exchange.send(serialized)
+            self._accumulate_items(items)
         except Exception as e:
             print(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
+
+    def __received_EOF__(self, message):
+        self.out_queue.send(message.serialize(), str(message.type))
+        logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")
             
+    def _accumulate_items(self, items):
+        """
+        Acumula cantidad y subtotal por año, mes y producto
+        """
+        for item in items:
+            year = item.created_at.year
+            month = item.get_month()
+            stats = self.data[item.item_id][year][month]
+            stats["quantity"] += item.quantity
+            stats["subtotal"] += item.subtotal
+    
+    def _send_messages_per_item(self):
+
+        for item_id, year_dict in self.data.items():
+            new_items = []
+            for year, months in year_dict.items():
+                for month, stats in months.items():
+                    temp_item = TransactionItem(item_id, stats["quantity"], stats["subtotal"], datetime(year, month, 1))
+                    new_items.append(temp_item)
+
+            content = ''.join(item.serialize() for item in new_items)
+            logging.info(f"Content: {content}")
+            serialized_message = Message(0, MESSAGE_TYPE_TRANSACTION_ITEMS, 0, content).serialize()
+            self.out_queue.send(serialized_message)
+            logging.info(f"Enviado resumen item_id {item_id} con {len(new_items)} registros")
+
     def close(self):
         try:
             self.in_queue.close()

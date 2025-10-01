@@ -4,13 +4,12 @@ import logging
 from pkg.message.message import Message
 from utils.custom_logging import initialize_log
 import os
-from pkg.message.constants import MESSAGE_TYPE_TRANSACTIONS, MESSAGE_TYPE_TRANSACTION_ITEMS
+from pkg.message.constants import MESSAGE_TYPE_TRANSACTIONS, MESSAGE_TYPE_TRANSACTION_ITEMS, MESSAGE_TYPE_EOF
 
 class FilterYearNode(Worker):
     
-    def __init__(self, in_queue: MessageMiddlewareQueue, out_queue: MessageMiddlewareQueue, out_exchange: MessageMiddlewareExchange, years_set):
+    def __init__(self, in_queue: MessageMiddlewareQueue, out_exchange: MessageMiddlewareExchange, years_set):
         super().__init__(in_queue)
-        self.out_queue = out_queue
         self.out_exchange = out_exchange
         self.years = years_set
         
@@ -18,6 +17,10 @@ class FilterYearNode(Worker):
         try:
             logging.info(f"Recibo mensaje")
             message = Message.read_from_bytes(message)
+            if message.type == MESSAGE_TYPE_EOF:
+                self.__received_EOF__(message)
+                return
+    
             items = message.process_message_from_csv()
             logging.info(f"Proceso mensaje | request_id: {message.request_id} | type: {message.type}")
             new_chunk = '' 
@@ -28,16 +31,18 @@ class FilterYearNode(Worker):
             if new_chunk:
                 message.update_content(new_chunk)
                 serialized = message.serialize()
-                self.out_queue.send(serialized)
                 self.out_exchange.send(serialized, str(message.type))
                 logging.info(f"Filtro correctamente | request_id: {message.request_id} | type: {message.type}")
         except Exception as e:
             logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
             
+    def __received_EOF__(self, message):
+        self.out_exchange.send(message.serialize(), str(message.type))
+        logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")
+
     def close(self):
         try:
             self.in_middleware.close()
-            self.out_queue.close()
             self.out_exchange.close()
         except Exception as e:
             print(f"Error al cerrar: {type(e).__name__}: {e}")
@@ -84,13 +89,12 @@ def main():
     initialize_log(config_params["logging_level"])
 
     input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue"])
-    output_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["output_queue_1"])
     output_exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["output_exchange_filter_year"], 
-                                        {config_params["output_queue_1"]: str(MESSAGE_TYPE_TRANSACTIONS), 
-                                        config_params["output_queue_2"]: str(MESSAGE_TYPE_TRANSACTIONS), 
-                                        config_params["output_queue_3"]: str(MESSAGE_TYPE_TRANSACTION_ITEMS)})
+                                        {config_params["output_queue_1"]: [str(MESSAGE_TYPE_TRANSACTIONS), str(MESSAGE_TYPE_EOF)], 
+                                        config_params["output_queue_2"]: [str(MESSAGE_TYPE_TRANSACTIONS), str(MESSAGE_TYPE_EOF)], 
+                                        config_params["output_queue_3"]: [str(MESSAGE_TYPE_TRANSACTION_ITEMS), str(MESSAGE_TYPE_EOF)]})
     
-    filter = FilterYearNode(input_queue, output_queue, output_exchange, {2024, 2025})
+    filter = FilterYearNode(input_queue, output_exchange, {2024, 2025})
     filter.start()
 
 if __name__ == "__main__":
