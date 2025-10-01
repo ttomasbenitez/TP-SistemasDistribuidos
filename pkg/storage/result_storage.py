@@ -27,7 +27,7 @@ class QueryBuf:
             data = json.load(f)
         formatter = FormatResults(message)
         new_data = formatter.format_chunk()
-        key = str(message.type)
+        key = str(message.query_num)
         if key not in data:
             data[key] = {}
             
