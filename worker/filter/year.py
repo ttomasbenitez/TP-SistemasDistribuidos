@@ -16,11 +16,7 @@ class FilterYearNode(Worker):
     def __on_message__(self, message):
         try:
             logging.info(f"Recibo mensaje")
-            message = Message.read_from_bytes(message)
-            if message.type == MESSAGE_TYPE_EOF:
-                self.__received_EOF__(message)
-                return
-    
+            message = Message.read_from_bytes(message)    
             items = message.process_message_from_csv()
             logging.info(f"Proceso mensaje | request_id: {message.request_id} | type: {message.type}")
             new_chunk = '' 
@@ -66,7 +62,6 @@ def initialize_config():
         "logging_level": os.getenv('LOG_LEVEL', 'INFO'),
     }
 
-    # Claves requeridas
     required_keys = [
         "rabbitmq_host",
         "input_queue",

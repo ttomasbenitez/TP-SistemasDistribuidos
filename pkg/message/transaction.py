@@ -105,3 +105,10 @@ class Transaction:
         :return: horario de la transaccion
         """
         return self.created_at.time()
+    
+    def get_amount(self):
+        """
+        Obtiene el monto final de la transaccion
+        :return: monto final de la transaccion
+        """
+        return self.final_amount

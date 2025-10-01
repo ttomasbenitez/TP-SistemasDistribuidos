@@ -1,17 +1,17 @@
 from worker import Worker 
-from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
+from Middleware.middleware import MessageMiddlewareQueue
 import logging
 from pkg.message.message import Message
 from utils.custom_logging import initialize_log
 import os
 from pkg.message.constants import MESSAGE_TYPE_TRANSACTIONS
 
-class FilterTimeNode(Worker):
+class FilterAmountNode(Worker):
     
-    def __init__(self, in_queue: MessageMiddlewareQueue, out_exchange: MessageMiddlewareExchange, time_set):
+    def __init__(self, in_queue: MessageMiddlewareQueue, out_queue: MessageMiddlewareQueue, amount_to_filter: int):
         super().__init__(in_queue)
-        self.out_exchange = out_exchange
-        self.time = time_set
+        self.out_queue = out_queue
+        self.amount_to_filter = amount_to_filter
         
     def __on_message__(self, message):
         try:
@@ -20,29 +20,28 @@ class FilterTimeNode(Worker):
             items = message.process_message()
             new_chunk = '' 
             for item in items:
-                item_time = item.get_time()
-                time = item_time.hour
-                if time > min(self.time) and time < max(self.time):
+                amount = item.get_amount()
+                if amount >= self.amount_to_filter:
                     new_chunk += item.serialize()
                 else:
-                    logging.info(f"Tiempo {time} fuera del rango permitido | request_id: {message.request_id} | type: {message.type}")
+                    logging.info(f"Amount {amount} fuera del rango permitido | request_id: {message.request_id} | type: {message.type}")
             if new_chunk:
                 message.update_content(new_chunk)
                 serialized = message.serialize()
-                self.out_exchange.send(serialized, str(message.type))
+                self.out_queue.send(serialized)
                 logging.info(f"Envio correctamente | request_id: {message.request_id} | type: {message.type}")
 
         except Exception as e:
             logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
     
     def __received_EOF__(self, message):
-        self.out_exchange.send(message.serialize(), str(message.type))
+        self.out_queue.send(message.serialize(), str(message.type))
         logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")
             
     def close(self):
         try:
             self.in_middleware.close()
-            self.out_exchange.close()
+            self.out_queue.close()
         except Exception as e:
             logging.error(f"Error al cerrar: {type(e).__name__}: {e}")
 
@@ -58,18 +57,14 @@ def initialize_config():
     config_params = {
         "rabbitmq_host": os.getenv('RABBITMQ_HOST'),
         "input_queue": os.getenv('INPUT_QUEUE_1'),
-        "output_queue_1": os.getenv('OUTPUT_QUEUE_1'),
-        "output_queue_2": os.getenv('OUTPUT_QUEUE_2'),
-        "output_exchange_filter_time": os.getenv('EXCHANGE_NAME'),
+        "output_queue": os.getenv('OUTPUT_QUEUE_1'),
         "logging_level": os.getenv('LOG_LEVEL', 'INFO'),
     }
 
     required_keys = [
         "rabbitmq_host",
         "input_queue",
-        "output_queue_1",
-        "output_queue_2",
-        "output_exchange_filter_time",
+        "output_queue",
     ]
 
     missing_keys = [key for key in required_keys if config_params[key] is None]
@@ -84,11 +79,9 @@ def main():
     initialize_log(config_params["logging_level"])
 
     input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue"])
-    output_exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["output_exchange_filter_time"], 
-                                        {config_params["output_queue_1"]: str(MESSAGE_TYPE_TRANSACTIONS), 
-                                        config_params["output_queue_2"]: str(MESSAGE_TYPE_TRANSACTIONS)})
+    output_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["output_queue"])
     
-    filter = FilterTimeNode(input_queue, output_exchange, {6, 23})
+    filter = FilterAmountNode(input_queue, output_queue, 75)
     filter.start()
 
 if __name__ == "__main__":
