@@ -15,7 +15,7 @@ class FilterAmountNode(Worker):
         
     def __on_message__(self, message):
         try:
-            message = Message.read_from_bytes(message)
+            message = Message.deserialize(message)
             logging.info(f"Mensaje leído | request_id: {message.request_id} | type: {message.type}")
             items = message.process_message()
             new_chunk = '' 
@@ -23,8 +23,7 @@ class FilterAmountNode(Worker):
                 amount = item.get_amount()
                 if amount >= self.amount_to_filter:
                     new_chunk += item.serialize()
-                else:
-                    logging.info(f"Amount {amount} fuera del rango permitido | request_id: {message.request_id} | type: {message.type}")
+            
             if new_chunk:
                 message.update_content(new_chunk)
                 serialized = message.serialize()

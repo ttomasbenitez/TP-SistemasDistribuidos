@@ -15,7 +15,7 @@ class FilterTimeNode(Worker):
         
     def __on_message__(self, message):
         try:
-            message = Message.read_from_bytes(message)
+            message = Message.deserialize(message)
             logging.info(f"Mensaje leído | request_id: {message.request_id} | type: {message.type}")
             items = message.process_message()
             if message.type == MESSAGE_TYPE_EOF:
@@ -31,8 +31,7 @@ class FilterTimeNode(Worker):
                 time = item_time.hour
                 if time > min(self.time) and time < max(self.time):
                     new_chunk += item.serialize()
-                else:
-                    logging.info(f"Tiempo {time} fuera del rango permitido | request_id: {message.request_id} | type: {message.type}")
+            
             if new_chunk:
                 message.update_content(new_chunk)
                 serialized = message.serialize()

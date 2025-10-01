@@ -20,7 +20,7 @@ class QuantityAndProfit(Worker):
     def __on_message__(self, message):
         try:
             logging.info("Procesando mensaje")
-            message = Message.read_from_bytes(message)
+            message = Message.deserialize(message)
             if message.type == MESSAGE_TYPE_EOF:
                 self._send_messages_per_item()
                 self.__received_EOF__(message)

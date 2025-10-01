@@ -15,7 +15,7 @@ def __test_message(file, message_type):
     assert message_length == len(serialized_message) - 4
     
     serialized_message = serialized_message[4:]
-    new_message = Message.__deserialize__(serialized_message)
+    new_message = Message.deserialize(serialized_message)
     assert new_message.type == message_type
     assert new_message.request_id == 1
     assert new_message.msg_num == 1

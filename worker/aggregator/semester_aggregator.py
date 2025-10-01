@@ -19,7 +19,7 @@ class SemesterAggregator(Worker):
     def __on_message__(self, message):
         try:
             logging.info(f"Recibo mensaje")
-            message = Message.read_from_bytes(message)
+            message = Message.deserialize(message)
             if message.type == MESSAGE_TYPE_EOF:
                 self.__received_EOF__(message)
                 return

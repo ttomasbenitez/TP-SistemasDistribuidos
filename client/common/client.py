@@ -8,6 +8,7 @@ from common.file_reader import FileReader
 from pkg.message.message import Message
 from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_STORES, MESSAGE_TYPE_USERS, MESSAGE_TYPE_TRANSACTIONS, MESSAGE_TYPE_TRANSACTION_ITEMS
 from pkg.message.message import Message
+from pkg.message.protocol import Protocol
 from pathlib import Path
 
 class Client:
@@ -16,6 +17,7 @@ class Client:
         self._gateway_host = gateway_host
         self._gateway_port = gateway_port
         self._socket.bind(('', 0))
+        self._protocol = None
     
         signal.signal(signal.SIGTERM, self.__handle_shutdown)
         signal.signal(signal.SIGINT, self.__handle_shutdown)
@@ -23,11 +25,13 @@ class Client:
     def run(self):
         try:
             self._socket.connect((self._gateway_host, self._gateway_port))
+            self._protocol = Protocol(self._socket)
             logging.info(f'action: connect | result: success | gateway address: {self._gateway_host}:{self._gateway_port}')
             self.__send_request()
+            self.__wait_for_results()
         except Exception as e:
             logging.error(f'action: connect | result: fail | error: {e}')
-
+            
         self.__handle_shutdown(None, None)
 
     def __send_request(self):
@@ -54,7 +58,7 @@ class Client:
             file_reader = FileReader(file_path, int(os.getenv('MAX_BATCH_SIZE')))
             while file_reader.has_more_data():
                 data = file_reader.get_chunk()
-                Message(0, message_type, 0, data).send_message(self._socket)
+                self._protocol.send_message(Message(0, message_type, 0, data).serialize())
             file_reader.close()
 
         logging.info(f'action: send_data_folder | folder: {folder_path} | result: success')
@@ -64,8 +68,7 @@ class Client:
         Sends an EOF message to the gateway to indicate the end of data transmission.
         """
         try:
-            eof_message = Message(0, MESSAGE_TYPE_EOF, 0, 0)
-            eof_message.send_message(self._socket)
+            self._protocol.send_message(Message(0, MESSAGE_TYPE_EOF, 0, 0).serialize())
             logging.info(f'action: send_eof | result: success')
         except Exception as e:
             logging.error(f'action: send_eof | result: fail | error: {e}')
@@ -75,5 +78,16 @@ class Client:
         Closes gateway connection and shuts down the client.
         """
     
-        self._socket.close()
+        self._protocol.close()
         logging.info(f'action: client shutdown | result: success')
+        
+    def __wait_for_results(self):
+        while True:
+            try:
+                message = self._protocol.read_message()
+                if not message:
+                    break
+                logging.info(f'action: receive_message | result: success | data: {message.content} | message type: {message.type}')
+            except Exception as e:
+                logging.error(f'action: receive_message | result: fail | error: {e}')
+                break

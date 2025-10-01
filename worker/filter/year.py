@@ -15,12 +15,11 @@ class FilterYearNode(Worker):
         
     def __on_message__(self, message):
         try:
-            logging.info(f"Recibo mensaje")
-            message = Message.read_from_bytes(message)    
+            message = Message.deserialize(message)    
             if message.type == MESSAGE_TYPE_EOF:
                 self.__received_EOF__(message)
                 return
-            items = message.process_message_from_csv()
+            items = message.process_message()
             logging.info(f"Proceso mensaje | request_id: {message.request_id} | type: {message.type}")
             new_chunk = '' 
             for item in items:

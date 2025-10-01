@@ -47,7 +47,7 @@ class JoinerMenuItems:
         queue.start_consuming(self._on_message)
 
     def _on_message(self, message):
-        message = Message.read_from_bytes(message)
+        message = Message.deserialize(message)
 
         if message.type == MESSAGE_TYPE_EOF:
             with self.received_eofs.get_lock():

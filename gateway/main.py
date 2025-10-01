@@ -3,7 +3,7 @@
 from common.gateway import Gateway
 import logging
 import os
-from Middleware.middleware import MessageMiddlewareExchange
+from Middleware.middleware import MessageMiddlewareExchange, MessageMiddlewareQueue
 from pkg.message.constants import MESSAGE_TYPE_USERS, MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_STORES, MESSAGE_TYPE_TRANSACTIONS, MESSAGE_TYPE_TRANSACTION_ITEMS, MESSAGE_TYPE_EOF
 
 
@@ -24,6 +24,7 @@ def initialize_config():
     config_params["logging_level"] = os.getenv('LOGGING_LEVEL', 'INFO')
     config_params["exchange_name"] = os.getenv('EXCHANGE_NAME')
     config_params["rabbitmq_host"] = os.getenv('RABBITMQ_HOST')
+    config_params["input_queue"] = os.getenv('INPUT_QUEUE_1')
 
     if config_params["port"] is None or config_params["listen_backlog"] is None or config_params["exchange_name"] is None or config_params["rabbitmq_host"] is None:
         raise ValueError("Expected value not found. Aborting gateway.")
@@ -62,9 +63,10 @@ def main():
     
     queues_dict = create_queues_dict()
     exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["exchange_name"], queues_dict)
+    in_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue"])
 
     # Initialize gateway and start gateway loop
-    gateway = Gateway(port, listen_backlog, exchange)
+    gateway = Gateway(port, listen_backlog, exchange, in_queue)
     gateway.run()
 
 def initialize_log(logging_level):
