@@ -17,6 +17,9 @@ class FilterYearNode(Worker):
         try:
             logging.info(f"Recibo mensaje")
             message = Message.read_from_bytes(message)    
+            if message.type == MESSAGE_TYPE_EOF:
+                self.__received_EOF__(message)
+                return
             items = message.process_message_from_csv()
             logging.info(f"Proceso mensaje | request_id: {message.request_id} | type: {message.type}")
             new_chunk = '' 
@@ -42,6 +45,10 @@ class FilterYearNode(Worker):
             self.out_exchange.close()
         except Exception as e:
             print(f"Error al cerrar: {type(e).__name__}: {e}")
+
+    def __received_EOF__(self, message):
+        self.out_exchange.send(message.serialize(), str(message.type))
+        logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")
 
 def initialize_config():
     """ Parse env variables to find program config params

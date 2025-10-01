@@ -4,7 +4,7 @@ import logging
 from pkg.message.message import Message
 from utils.custom_logging import initialize_log
 import os
-from pkg.message.constants import MESSAGE_TYPE_TRANSACTIONS
+from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_TRANSACTIONS
 
 class FilterTimeNode(Worker):
     
@@ -18,6 +18,13 @@ class FilterTimeNode(Worker):
             message = Message.read_from_bytes(message)
             logging.info(f"Mensaje leído | request_id: {message.request_id} | type: {message.type}")
             items = message.process_message()
+            if message.type == MESSAGE_TYPE_EOF:
+                self.__received_EOF__(message)
+                return
+            if not items:
+                logging.info(f"No hay items en el mensaje | request_id: {message.request_id} | type: {message.type}")
+                return
+            logging.info(f"Mensaje procesado | request_id: {message.request_id} | type: {message.type}")
             new_chunk = '' 
             for item in items:
                 item_time = item.get_time()

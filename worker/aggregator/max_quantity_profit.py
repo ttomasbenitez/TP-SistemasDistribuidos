@@ -26,7 +26,8 @@ class QuantityAndProfit(Worker):
                 self.__received_EOF__(message)
                 return
             items = message.process_message()
-            self._accumulate_items(items)
+            if items:
+                self._accumulate_items(items)
         except Exception as e:
             print(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
 

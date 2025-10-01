@@ -4,7 +4,7 @@ import logging
 from pkg.message.message import Message
 from utils.custom_logging import initialize_log
 import os
-from pkg.message.constants import MESSAGE_TYPE_TRANSACTIONS, MESSAGE_TYPE_TRANSACTION_ITEMS
+from pkg.message.constants import MESSAGE_TYPE_TRANSACTIONS, MESSAGE_TYPE_TRANSACTION_ITEMS, MESSAGE_TYPE_EOF
 
 class StoreAggregator(Worker):
 
@@ -16,6 +16,9 @@ class StoreAggregator(Worker):
         try:
             logging.info(f"Recibo mensaje")
             message = Message.read_from_bytes(message)
+            if message.type == MESSAGE_TYPE_EOF:
+                self.__received_EOF__(message)
+                return
             items = message.process_message()
             logging.info(f"Proceso mensaje | request_id: {message.request_id} | type: {message.type}")
             for item in items:
@@ -39,6 +42,10 @@ class StoreAggregator(Worker):
             self.out_queue.close()
         except Exception as e:
             print(f"Error al cerrar: {type(e).__name__}: {e}")
+
+    def __received_EOF__(self, message):
+        self.out_queue.send(message.serialize())
+        logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")
 
 def initialize_config():
     """ Parse env variables to find program config params
