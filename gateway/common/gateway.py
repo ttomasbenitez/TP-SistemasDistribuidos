@@ -2,9 +2,10 @@ import socket
 import logging
 import signal
 from pkg.message.message import Message
-from pkg.message.constants import MESSAGE_TYPE_EOF
+from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_MENU_ITEMS
 from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
 from pkg.message.message import Message
+from pkg.message.menu_item import MenuItem
 
 class ConnectionClosedException(Exception):
     """Exception raised when a client connection is closed unexpectedly."""
@@ -50,6 +51,12 @@ class Gateway:
             message = Message.read_message(self._client_socket)
             if message.type == MESSAGE_TYPE_EOF:
                 all_received = True
+            elif message.type == MESSAGE_TYPE_MENU_ITEMS:
+                items = message.process_message_from_csv()
+                dropped_columns_chunks = ''
+                for item in items:
+                    dropped_columns_chunks += item.serialize()
+                message.update_content(dropped_columns_chunks)
             logging.info(f'action: receive_data | result: success | request_id: {message.request_id} | type: {message.type} | msg_num: {message.msg_num}')
             self._exchange.send(message.serialize(), str(message.type))
             logging.info(f'action: send message via exchange | result: success | type: {message.type}')

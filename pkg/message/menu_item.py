@@ -6,10 +6,9 @@ class MenuItem:
     Clase para manejar items del menú.
     """
 
-    def __init__(self, item_id, item_name, price):
+    def __init__(self, item_id, item_name):
         self.id = item_id
         self.name = item_name
-        self.price = price
 
     def deserialize_from_csv(data: bytes):
         """
@@ -22,8 +21,7 @@ class MenuItem:
             raise ValueError("Datos inválidos para MenuItem")
         item_id = parse_int(parts[0])
         item_name = parts[1]
-        price = parse_float(parts[3])
-        return MenuItem(item_id, item_name, price)
+        return MenuItem(item_id, item_name)
     
     def deserialize(data: bytes):
         """
@@ -34,8 +32,7 @@ class MenuItem:
         parts = data.split(';')
         item_id = parse_int(parts[0])
         item_name = parts[1]
-        price = parse_float(parts[2])
-        return MenuItem(item_id, item_name, price)
+        return MenuItem(item_id, item_name)
     
     def get_menu_items_from_bytes(data: bytes, type):
         """
@@ -52,4 +49,10 @@ class MenuItem:
         Serializa el objeto MenuItem a bytes.
         :return: Datos en bytes.
         """
-        return f"{self.id};{self.name};{self.price}\n"
+        return f"{self.id};{self.name}\n"
+    
+    def get_id(self):
+        return self.id
+    
+    def get_name(self):
+        return self.name

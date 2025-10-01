@@ -32,7 +32,7 @@ class QuantityAndProfit(Worker):
             print(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
 
     def __received_EOF__(self, message):
-        self.out_queue.send(message.serialize(), str(message.type))
+        self.out_queue.send(message.serialize())
         logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")
             
     def _accumulate_items(self, items):
@@ -56,7 +56,6 @@ class QuantityAndProfit(Worker):
                     new_items.append(temp_item)
 
             content = ''.join(item.serialize() for item in new_items)
-            logging.info(f"Content: {content}")
             serialized_message = Message(0, MESSAGE_TYPE_TRANSACTION_ITEMS, 0, content).serialize()
             self.out_queue.send(serialized_message)
             logging.info(f"Enviado resumen item_id {item_id} con {len(new_items)} registros")

@@ -29,11 +29,9 @@ services:
       OUTPUT_QUEUE_5: stores-q4-queue-1
       OUTPUT_QUEUE_6: stores-q4-queue-2
       OUTPUT_QUEUE_7: stores-q4-queue-3
-      OUTPUT_QUEUE_8: menu-items-queue-1
-      OUTPUT_QUEUE_9: menu-items-queue-2
-      OUTPUT_QUEUE_10: menu-items-queue-3
-      OUTPUT_QUEUE_11: users-queue
-      OUTPUT_QUEUE_12: batches-queue
+      OUTPUT_QUEUE_8: menu-items-queue
+      OUTPUT_QUEUE_9: users-queue
+      OUTPUT_QUEUE_10: batches-queue
       EXCHANGE_NAME: gateway-exchange
     depends_on:
       rabbitmq:
