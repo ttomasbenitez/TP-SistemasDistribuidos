@@ -1,5 +1,4 @@
 import datetime
-import logging
 
 def get_items_from_csv_bytes(data: bytes, item_class):
     """
@@ -39,7 +38,7 @@ def parse_int(part):
     try:
         return int(part)
     except (ValueError, TypeError):
-        return None
+        return ''
     
 def parse_float(part):
     """
@@ -50,7 +49,7 @@ def parse_float(part):
     try:
         return float(part)
     except (ValueError, TypeError):
-        return None
+        return ''
     
 def parse_date(part):
     """
@@ -61,4 +60,4 @@ def parse_date(part):
     try:
         return datetime.datetime.fromisoformat(part)
     except (ValueError, TypeError):
-        return None
+        return ''

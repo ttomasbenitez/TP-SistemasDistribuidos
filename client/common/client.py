@@ -9,6 +9,7 @@ from pkg.message.message import Message
 from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_STORES, MESSAGE_TYPE_USERS, MESSAGE_TYPE_TRANSACTIONS, MESSAGE_TYPE_TRANSACTION_ITEMS
 from pkg.message.message import Message
 from pkg.message.protocol import Protocol
+from pkg.storage.result_storage import ResultStorage
 from pathlib import Path
 
 class Client:
@@ -77,17 +78,21 @@ class Client:
         """
         Closes gateway connection and shuts down the client.
         """
-    
         self._protocol.close()
         logging.info(f'action: client shutdown | result: success')
         
     def __wait_for_results(self):
+        results_storage = ResultStorage()
+        message = self._protocol.read_message()
+        logging.info(f'action: receive_message | result: success | message type: {message.type}')
+        results_storage.start_run(message.request_id)
         while True:
             try:
                 message = self._protocol.read_message()
                 if not message:
                     break
-                logging.info(f'action: receive_message | result: success | data: {message.content} | message type: {message.type}')
+                results_storage.add_chunk(message)
+                logging.info(f'action: receive_message | result: success | message type: {message.type}')
             except Exception as e:
                 logging.error(f'action: receive_message | result: fail | error: {e}')
                 break

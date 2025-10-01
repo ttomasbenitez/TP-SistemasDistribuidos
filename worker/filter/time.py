@@ -16,7 +16,6 @@ class FilterTimeNode(Worker):
     def __on_message__(self, message):
         try:
             message = Message.deserialize(message)
-            logging.info(f"Mensaje leído | request_id: {message.request_id} | type: {message.type}")
             items = message.process_message()
             if message.type == MESSAGE_TYPE_EOF:
                 self.__received_EOF__(message)
@@ -24,7 +23,6 @@ class FilterTimeNode(Worker):
             if not items:
                 logging.info(f"No hay items en el mensaje | request_id: {message.request_id} | type: {message.type}")
                 return
-            logging.info(f"Mensaje procesado | request_id: {message.request_id} | type: {message.type}")
             new_chunk = '' 
             for item in items:
                 item_time = item.get_time()
@@ -36,7 +34,6 @@ class FilterTimeNode(Worker):
                 message.update_content(new_chunk)
                 serialized = message.serialize()
                 self.out_exchange.send(serialized, str(message.type))
-                logging.info(f"Envio correctamente | request_id: {message.request_id} | type: {message.type}")
 
         except Exception as e:
             logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")

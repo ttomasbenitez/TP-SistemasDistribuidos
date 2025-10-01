@@ -3,7 +3,7 @@ import logging
 import signal
 import threading
 from pkg.message.message import Message
-from pkg.message.constants import MESSAGE_TYPE_EOF
+from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_REQUEST_ID
 from Middleware.middleware import MessageMiddlewareExchange, MessageMiddlewareQueue
 from pkg.message.protocol import Protocol
 
@@ -16,7 +16,7 @@ class Gateway:
         """
         Initializes the gateway, binds the socket to the given port, and sets up shared resources and locks.
         """
-        # Initialize gateway socket
+        
         self._gateway_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._gateway_socket.bind(('', port))
         self._gateway_socket.listen(listen_backlog)
@@ -84,6 +84,7 @@ class Gateway:
             return
 
         self._results_started = True
+        self._client_protocol.send_message(Message(0, MESSAGE_TYPE_REQUEST_ID, 0, '').serialize())
 
         def _consume():
             try:
@@ -96,7 +97,6 @@ class Gateway:
         self._consumer_thread.start()
     
     def __on_result_message(self, message):
-        logging.info(f'action: RECIBI RESULTADO LO ENVIO AL CLIENTE | result: success {message}')
         self._client_protocol.send_message(message)
         
     def __handle_shutdown(self, signum, frame):
@@ -108,14 +108,12 @@ class Gateway:
         if self._consumer_thread and self._consumer_thread.is_alive():
             self._consumer_thread.join(timeout=2)
 
-        # cerrar cliente
         try:
             if self._client_protocol:
                 self._client_protocol.close()
         except Exception:
             pass
 
-        # cerrar socket
         try:
             self._gateway_socket.close()
         except Exception:
