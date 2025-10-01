@@ -35,7 +35,7 @@ class Transaction:
         parts = data.split(';')
         transaction_id = parts[0]
         store_id = parse_int(parts[1])
-        user_id = parts[2]
+        user_id = parse_int(parts[2])
         final_amount = parse_float(parts[3])
         created_at = parse_date(parts[4])
         return Transaction(transaction_id, store_id, user_id, final_amount, created_at)
@@ -55,7 +55,7 @@ class Transaction:
         Serializa el objeto Transaction a bytes.
         :return: Datos en bytes.
         """
-        return f"{self.transaction_id};{self.store_id};${self.user_id};{self.final_amount};{self.created_at}\n"
+        return f"{self.transaction_id};{self.store_id};{self.user_id};{self.final_amount};{self.created_at}\n"
     
     def get_year(self):
         """
@@ -106,9 +106,3 @@ class Transaction:
         """
         return self.created_at.time()
     
-    def get_amount(self):
-        """
-        Obtiene el monto final de la transaccion
-        :return: monto final de la transaccion
-        """
-        return self.final_amount
