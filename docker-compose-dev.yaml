@@ -1,0 +1,189 @@
+services:
+  rabbitmq:
+    container_name: rabbitmq
+    image: rabbitmq:3-management
+    networks:
+    - testing_net
+    ports:
+    - 5672:5672
+    - 15672:15672
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+  
+  gateway:
+    container_name: gateway
+    image: gateway:latest
+    environment:
+      PORT: 3000
+      LOG_LEVEL: INFO
+      LISTEN_BACKLOG: '5'
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: results-queue
+      OUTPUT_QUEUE_2: stores-q3-queue-1
+      OUTPUT_QUEUE_3: stores-q3-queue-2
+      OUTPUT_QUEUE_4: stores-q3-queue-3
+      OUTPUT_QUEUE_5: stores-q4-queue-1
+      OUTPUT_QUEUE_6: stores-q4-queue-2
+      OUTPUT_QUEUE_7: stores-q4-queue-3
+      OUTPUT_QUEUE_8: menu-items-queue
+      OUTPUT_QUEUE_9: users-queue
+      OUTPUT_QUEUE_10: batches-queue
+      EXCHANGE_NAME: gateway-exchange
+    depends_on:
+      rabbitmq:
+        condition: service_healthy   
+    networks:
+    - testing_net
+
+  filter-year:
+    container_name: filter-year
+    image: worker:latest
+    command: "/worker/filter/year.py"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: batches-queue
+      OUTPUT_QUEUE_1: year-filtered-queue-q1-q3
+      OUTPUT_QUEUE_2: year-filtered-queue-q4
+      OUTPUT_QUEUE_3: year-filtered-queue-q2
+      EXCHANGE_NAME: year-filtered-exchange
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
+  
+  filter-time:
+    container_name: filter-time
+    image: worker:latest
+    command: "/worker/filter/time.py"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: year-filtered-queue-q1-q3
+      OUTPUT_QUEUE_1: time-filtered-queue-q1
+      OUTPUT_QUEUE_2: time-filtered-queue-q3
+      EXCHANGE_NAME: time-filtered-exchange
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
+
+  filter-amount:
+    container_name: filter-amount
+    image: worker:latest
+    command: "/worker/filter/amount.py"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: time-filtered-queue-q1
+      OUTPUT_QUEUE_1: results-queue
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
+
+  aggregator-month:
+    container_name: aggregator-month
+    image: worker:latest
+    command: "/worker/aggregator/month.py"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: year-filtered-queue-q2
+      OUTPUT_QUEUE_1: aggregated-month-queue
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - filter-year
+
+  aggregator-quantity-profit:
+    container_name: aggregator-quantity-profit
+    image: worker:latest
+    command: "/worker/aggregator/max_quantity_profit.py"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: aggregated-month-queue
+      OUTPUT_QUEUE_1: products-results-queue
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - aggregator-month
+
+  joiner-menu-items:
+    container_name: joiner-menu-items
+    image: worker:latest
+    command: "/worker/joiner/menu_items.py"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: products-results-queue
+      INPUT_QUEUE_2: menu-items-queue
+      OUTPUT_QUEUE_1: results-queue
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - aggregator-quantity-profit
+
+  agreggator-semester:
+    container_name: aggregator-semester
+    image: worker:latest
+    command: "/worker/aggregator/semester_aggregator.py"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE: time-filtered-queue-q1
+      OUTPUT_QUEUE: aggregated-semester-q3-queue
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
+
+  aggregator-store-q3:
+    container_name: aggregator-store-q3
+    image: worker:latest
+    command: "/worker/aggregator/store_aggregator.py"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE: time-filtered-queue-q3
+      OUTPUT_QUEUE: aggregated-store-q3-queue
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
+
+  client:
+    container_name: client
+    image: client:latest
+    environment:
+      GATEWAY_HOST: gateway
+      GATEWAY_PORT: 3000
+      LOG_LEVEL: INFO
+      STORES_FOLDER_PATH: data/stores/
+      MENU_ITEMS_FOLDER_PATH: data/menu_items/
+      USERS_FOLDER_PATH: data/users/
+      TRANSACTIONS_FOLDER_PATH: data/transactions/
+      TRANSACTION_ITEMS_FOLDER_PATH: data/transaction_items/
+      MAX_BATCH_SIZE: 100000
+    depends_on:
+      - gateway
+    networks:
+    - testing_net
+    volumes:
+    - ./client/data/menu_items/:/data/menu_items/
+    - ./client/data/stores/:/data/stores/
+    - ./client/data/users/:/data/users/
+    - ./client/data/transactions/:/data/transactions/
+    - ./client/data/transaction_items/:/data/transaction_items/
+
+networks:
+  testing_net:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.25.125.0/24

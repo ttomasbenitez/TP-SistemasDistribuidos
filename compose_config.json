@@ -8,7 +8,8 @@
         },
         {
             "name": "gateway",
-            "log_level": "info",
+            "LOG_LEVEL": "info",
+            "LISTEN_BACKLOG": 5,
             "PORT": 3000,
             "input_queues": {
                 "INPUT_QUEUE_1": "results-queue"
