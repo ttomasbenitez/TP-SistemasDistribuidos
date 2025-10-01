@@ -86,15 +86,50 @@ services:
     depends_on:
     - gateway
 
-  aggregator-month:
-    container_name: aggregator-month
+#  aggregator-month:
+#    container_name: aggregator-month
+#    image: worker:latest
+#    command: "/worker/aggregator/month.py"
+#    environment:
+#      RABBITMQ_HOST: rabbitmq
+#      INPUT_QUEUE_1: year-filtered-queue-q2
+#      OUTPUT_QUEUE_1: aggregated-month-queue
+#      LOG_LEVEL: INFO
+#      EXPECTED_ACKS: 0 #Cantidad de réplicas sin contar este nodo.
+#    networks:
+#    - testing_net
+#    depends_on:
+#    - filter-year
+#
+  aggregator-month-1:
+    container_name: aggregator-month-1
     image: worker:latest
     command: "/worker/aggregator/month.py"
     environment:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: year-filtered-queue-q2
+      INPUT_QUEUE_2: EOF-aggregator-month-2-1
       OUTPUT_QUEUE_1: aggregated-month-queue
+      OUTPUT_QUEUE_2: EOF-aggregator-month-1-2
       LOG_LEVEL: INFO
+      EXPECTED_ACKS: 1 #Cantidad de réplicas sin contar este nodo.
+    networks:
+    - testing_net
+    depends_on:
+    - filter-year
+
+  aggregator-month-2:
+    container_name: aggregator-month-2
+    image: worker:latest
+    command: "/worker/aggregator/month.py"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: year-filtered-queue-q2
+      INPUT_QUEUE_2: EOF-aggregator-month-1-2
+      OUTPUT_QUEUE_1: aggregated-month-queue
+      OUTPUT_QUEUE_2: EOF-aggregator-month-2-1
+      LOG_LEVEL: INFO
+      EXPECTED_ACKS: 1 #Cantidad de réplicas sin contar este nodo.
     networks:
     - testing_net
     depends_on:
@@ -112,7 +147,7 @@ services:
     networks:
     - testing_net
     depends_on:
-    - aggregator-month
+    - gateway
 
   joiner-menu-items:
     container_name: joiner-menu-items
@@ -151,6 +186,20 @@ services:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE: time-filtered-queue-q3
       OUTPUT_QUEUE: aggregated-store-q3-queue
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
+
+  aggregator-store-q4:
+    container_name: aggregator-store-q4
+    image: worker:latest
+    command: "/worker/aggregator/store_aggregator.py"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: time-filtered-queue-q3
+      OUTPUT_QUEUE_1: aggregated-store-q3-queue
       LOG_LEVEL: INFO
     networks:
     - testing_net

@@ -87,6 +87,7 @@ class Client:
                 message = self._protocol.read_message()
                 if not message:
                     break
+                logging.info(f'MESSAGE TYPE: {message.type}')
                 logging.info(f'action: receive_message | result: success | data: {message.content} | message type: {message.type}')
             except Exception as e:
                 logging.error(f'action: receive_message | result: fail | error: {e}')

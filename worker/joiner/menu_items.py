@@ -31,7 +31,7 @@ class JoinerMenuItems:
         ]
 
     def start(self):
-        # Creamos un proceso por cada cola
+        # Creamos un proceso por cada input queue
         processes = []
         for name, queue in self.queues:
             logging.info(f"Starting process for queue: {name}")
