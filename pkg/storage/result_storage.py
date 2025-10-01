@@ -3,7 +3,6 @@ import os
 from typing import Dict
 from pkg.message.message import Message
 from pkg.storage.format_results import FormatResults
-import logging
 
 class QueryBuf:
     
@@ -61,7 +60,6 @@ class ResultStorage:
         self._runs.pop(run_id, None)
 
     def add_chunk(self, message: Message):
-        
         rb = self._runs.get(message.request_id)
         if not rb:
             return
