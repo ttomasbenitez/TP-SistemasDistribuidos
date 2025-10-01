@@ -6,11 +6,11 @@ class FormatResults:
     def __init__(self, message):
         self.message = message
         
-    def format_chunk(self):
+    def pre_process_chunk(self):
         items = self.message.process_message()
-        formatted_data = {}
+        formatted_data = []
         for item in items:
-            formatted_data[item.transaction_id] = item.get_final_amount()
+            formatted_data.append(item.pre_process())
             
         return formatted_data
             

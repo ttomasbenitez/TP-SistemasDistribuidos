@@ -2,9 +2,10 @@ from worker import Worker
 from Middleware.middleware import MessageMiddlewareQueue
 import logging
 from pkg.message.message import Message
+from pkg.message.q1_result import Q1Result
 from utils.custom_logging import initialize_log
 import os
-from pkg.message.constants import MESSAGE_TYPE_EOF, QUERY_1
+from pkg.message.constants import MESSAGE_TYPE_EOF, QUERY_1, MESSAGE_TYPE_QUERY_1_RESULT
 
 class FilterAmountNode(Worker):
     
@@ -16,7 +17,6 @@ class FilterAmountNode(Worker):
     def __on_message__(self, message):
         try:
             message = Message.deserialize(message)
-            message.set_query_num(QUERY_1)
             items = message.process_message()
             if message.type == MESSAGE_TYPE_EOF:
                 self.__received_EOF__(message)
@@ -28,11 +28,11 @@ class FilterAmountNode(Worker):
             for item in items:
                 amount = item.get_final_amount()
                 if amount >= self.amount_to_filter:
-                    new_chunk += item.serialize()
+                    new_chunk += Q1Result(item.transaction_id, amount).serialize()
             
             if new_chunk:
-                message.update_content(new_chunk)
-                serialized = message.serialize()
+                new_message = Message(message.request_id, MESSAGE_TYPE_QUERY_1_RESULT, message.msg_num, new_chunk)
+                serialized = new_message.serialize()
                 self.out_queue.send(serialized)
         except Exception as e:
             logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")

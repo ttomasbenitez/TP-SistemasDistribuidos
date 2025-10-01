@@ -78,7 +78,6 @@ class Client:
         """
         Closes gateway connection and shuts down the client.
         """
-    
         self._protocol.close()
         logging.info(f'action: client shutdown | result: success')
         

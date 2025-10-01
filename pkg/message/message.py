@@ -1,23 +1,24 @@
 from pkg.message.constants import (
-    MESSAGE_SIZE_BYTES,
     MESSAGE_TYPE_MENU_ITEMS,
     MESSAGE_TYPE_STORES,
     MESSAGE_TYPE_TRANSACTION_ITEMS,
     MESSAGE_TYPE_TRANSACTIONS,
     MESSAGE_TYPE_USERS,
+    MESSAGE_TYPE_QUERY_1_RESULT,
 )         
 from pkg.message.menu_item import MenuItem
 from pkg.message.store import Store
 from pkg.message.transaction_item import TransactionItem
 from pkg.message.transaction import Transaction
 from pkg.message.user import User
+from pkg.message.q1_result import Q1Result
 
 class Message:
     """
     Clase para manejar mensajes entre el cliente y el gateway.
     """
 
-    def __init__(self, request_id, type, msg_num, content, query_num = ''):
+    def __init__(self, request_id, type, msg_num, content):
         """
         Inicializa el mensaje.
         :param request_id: ID de la solicitud.
@@ -29,14 +30,13 @@ class Message:
         self.type = type
         self.msg_num = msg_num
         self.content = content
-        self.query_num = query_num
 
     def serialize(self):
         """
         Serializa el mensaje en bytes.
         :return: Mensaje serializado en bytes.
         """
-        msg = f"{self.type};{self.request_id};{self.msg_num};{self.query_num};{self.content}".encode('utf-8')
+        msg = f"{self.type};{self.request_id};{self.msg_num};{self.content}".encode('utf-8')
         return msg
     
     def deserialize(raw_msg):
@@ -45,13 +45,12 @@ class Message:
         :param raw_msg: Mensaje en bytes.
         """
         raw_msg = raw_msg.decode('utf-8')
-        parts = raw_msg.split(';', 4)
+        parts = raw_msg.split(';', 3)
         type = int(parts[0])
         request_id = int(parts[1])
         msg_num = int(parts[2])
-        query_num = parts[3]
-        content = parts[4]
-        return Message(request_id, type, msg_num, content, query_num)
+        content = parts[3]
+        return Message(request_id, type, msg_num, content)
 
     def process_message_from_csv(self):
         """ 
@@ -94,6 +93,8 @@ class Message:
             return Transaction.get_transactions_from_bytes(self.content, type)
         if self.type == MESSAGE_TYPE_USERS:
             return User.get_users_from_bytes(self.content, type)
+        if self.type == MESSAGE_TYPE_QUERY_1_RESULT:
+            return Q1Result.get_q1_result_from_bytes(self.content)
         
     def update_content(self, new_content):
         """
@@ -108,11 +109,4 @@ class Message:
         :param new_content: Contenido del nuevo mensaje.
         :return: Nuevo objeto Message independiente.
         """
-        return Message(self.request_id, self.type, self.msg_num, new_content, self.query_num)
-    
-    def set_query_num(self, query_num):
-        """
-        Define el número de consulta del mensaje.
-        :param query_num: Número de consulta.
-        """
-        self.query_num = query_num
+        return Message(self.request_id, self.type, self.msg_num, new_content)

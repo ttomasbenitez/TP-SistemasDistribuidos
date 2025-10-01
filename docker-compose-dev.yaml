@@ -86,76 +86,76 @@ services:
     depends_on:
     - gateway
 
-  aggregator-month:
-    container_name: aggregator-month
-    image: worker:latest
-    command: "/worker/aggregator/month.py"
-    environment:
-      RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE_1: year-filtered-queue-q2
-      OUTPUT_QUEUE_1: aggregated-month-queue
-      LOG_LEVEL: INFO
-    networks:
-    - testing_net
-    depends_on:
-    - filter-year
+  # aggregator-month:
+  #   container_name: aggregator-month
+  #   image: worker:latest
+  #   command: "/worker/aggregator/month.py"
+  #   environment:
+  #     RABBITMQ_HOST: rabbitmq
+  #     INPUT_QUEUE_1: year-filtered-queue-q2
+  #     OUTPUT_QUEUE_1: aggregated-month-queue
+  #     LOG_LEVEL: INFO
+  #   networks:
+  #   - testing_net
+  #   depends_on:
+  #   - filter-year
 
-  aggregator-quantity-profit:
-    container_name: aggregator-quantity-profit
-    image: worker:latest
-    command: "/worker/aggregator/max_quantity_profit.py"
-    environment:
-      RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE_1: aggregated-month-queue
-      OUTPUT_QUEUE_1: products-results-queue
-      LOG_LEVEL: INFO
-    networks:
-    - testing_net
-    depends_on:
-    - aggregator-month
+  # aggregator-quantity-profit:
+  #   container_name: aggregator-quantity-profit
+  #   image: worker:latest
+  #   command: "/worker/aggregator/max_quantity_profit.py"
+  #   environment:
+  #     RABBITMQ_HOST: rabbitmq
+  #     INPUT_QUEUE_1: aggregated-month-queue
+  #     OUTPUT_QUEUE_1: products-results-queue
+  #     LOG_LEVEL: INFO
+  #   networks:
+  #   - testing_net
+  #   depends_on:
+  #   - aggregator-month
 
-  joiner-menu-items:
-    container_name: joiner-menu-items
-    image: worker:latest
-    command: "/worker/joiner/menu_items.py"
-    environment:
-      RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE_1: products-results-queue
-      INPUT_QUEUE_2: menu-items-queue
-      OUTPUT_QUEUE_1: results-queue
-      LOG_LEVEL: INFO
-    networks:
-    - testing_net
-    depends_on:
-    - aggregator-quantity-profit
+  # joiner-menu-items:
+  #   container_name: joiner-menu-items
+  #   image: worker:latest
+  #   command: "/worker/joiner/menu_items.py"
+  #   environment:
+  #     RABBITMQ_HOST: rabbitmq
+  #     INPUT_QUEUE_1: products-results-queue
+  #     INPUT_QUEUE_2: menu-items-queue
+  #     OUTPUT_QUEUE_1: results-queue
+  #     LOG_LEVEL: INFO
+  #   networks:
+  #   - testing_net
+  #   depends_on:
+  #   - aggregator-quantity-profit
 
-  agreggator-semester:
-    container_name: aggregator-semester
-    image: worker:latest
-    command: "/worker/aggregator/semester_aggregator.py"
-    environment:
-      RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE: time-filtered-queue-q1
-      OUTPUT_QUEUE: aggregated-semester-q3-queue
-      LOG_LEVEL: INFO
-    networks:
-    - testing_net
-    depends_on:
-    - gateway
+  # agreggator-semester:
+  #   container_name: aggregator-semester
+  #   image: worker:latest
+  #   command: "/worker/aggregator/semester_aggregator.py"
+  #   environment:
+  #     RABBITMQ_HOST: rabbitmq
+  #     INPUT_QUEUE: time-filtered-queue-q1
+  #     OUTPUT_QUEUE: aggregated-semester-q3-queue
+  #     LOG_LEVEL: INFO
+  #   networks:
+  #   - testing_net
+  #   depends_on:
+  #   - gateway
 
-  aggregator-store-q3:
-    container_name: aggregator-store-q3
-    image: worker:latest
-    command: "/worker/aggregator/store_aggregator.py"
-    environment:
-      RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE: time-filtered-queue-q3
-      OUTPUT_QUEUE: aggregated-store-q3-queue
-      LOG_LEVEL: INFO
-    networks:
-    - testing_net
-    depends_on:
-    - gateway
+  # aggregator-store-q3:
+  #   container_name: aggregator-store-q3
+  #   image: worker:latest
+  #   command: "/worker/aggregator/store_aggregator.py"
+  #   environment:
+  #     RABBITMQ_HOST: rabbitmq
+  #     INPUT_QUEUE: time-filtered-queue-q3
+  #     OUTPUT_QUEUE: aggregated-store-q3-queue
+  #     LOG_LEVEL: INFO
+  #   networks:
+  #   - testing_net
+  #   depends_on:
+  #   - gateway
 
   client:
     container_name: client

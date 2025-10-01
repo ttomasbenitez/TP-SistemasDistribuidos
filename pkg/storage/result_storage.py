@@ -10,31 +10,12 @@ class QueryBuf:
         self.file_path = file_path
         self.eof = False
 
-        d = os.path.dirname(self.file_path)
-        if d:
-            os.makedirs(d, exist_ok=True)
-
-        try:
-            with open(self.file_path, 'r', encoding='utf-8') as f:
-                json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            with open(self.file_path, 'w', encoding='utf-8') as f:
-                json.dump({}, f)
-
     def append(self, message: Message):
-        
-        with open(self.file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
         formatter = FormatResults(message)
-        new_data = formatter.format_chunk()
-        key = str(message.query_num)
-        if key not in data:
-            data[key] = {}
-            
-        data.setdefault(key, {}).update(new_data)
-
-        with open(self.file_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+        data = formatter.pre_process_chunk()
+        with open(self.file_path, "a", encoding="utf-8") as f:
+            for dataItem in data:
+                f.write(json.dumps(dataItem, ensure_ascii=False) + "\n")
 
 class RunBuf:
     
@@ -64,7 +45,7 @@ class ResultStorage:
         if not rb:
             return
         if message.type not in rb.queries:
-            rb.queries[message.type] = QueryBuf(f"storage/client-{message.request_id}.json")
+            rb.queries[message.type] = QueryBuf(f"storage/client-{message.request_id}.ndjson")
         q = rb.queries[message.type]
         if not q.eof:
             q.append(message)
