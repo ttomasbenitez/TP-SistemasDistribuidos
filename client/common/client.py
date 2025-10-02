@@ -82,9 +82,9 @@ class Client:
         logging.info(f'action: client shutdown | result: success')
         
     def __wait_for_results(self):
-        results_storage = ResultStorage()
         message = self._protocol.read_message()
         logging.info(f'action: receive_message | result: success | message type: {message.type}')
+        results_storage = ResultStorage(f"storage/client-{message.request_id}.ndjson")
         results_storage.start_run(message.request_id)
         while True:
             try:

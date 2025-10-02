@@ -23,15 +23,10 @@ services:
       LISTEN_BACKLOG: '5'
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: results-queue
-      OUTPUT_QUEUE_2: stores-q3-queue-1
-      OUTPUT_QUEUE_3: stores-q3-queue-2
-      OUTPUT_QUEUE_4: stores-q3-queue-3
-      OUTPUT_QUEUE_5: stores-q4-queue-1
-      OUTPUT_QUEUE_6: stores-q4-queue-2
-      OUTPUT_QUEUE_7: stores-q4-queue-3
-      OUTPUT_QUEUE_8: menu-items-queue
-      OUTPUT_QUEUE_9: users-queue
-      OUTPUT_QUEUE_10: batches-queue
+      OUTPUT_QUEUE_1: stores-queue
+      OUTPUT_QUEUE_2: menu-items-queue
+      OUTPUT_QUEUE_3: users-queue
+      OUTPUT_QUEUE_4: batches-queue
       EXCHANGE_NAME: gateway-exchange
     depends_on:
       rabbitmq:
@@ -100,34 +95,34 @@ services:
     depends_on:
     - filter-year
 
-  aggregator-quantity-profit:
-    container_name: aggregator-quantity-profit
-    image: worker:latest
-    command: "/worker/aggregator/max_quantity_profit.py"
-    environment:
-      RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE_1: aggregated-month-queue
-      OUTPUT_QUEUE_1: products-results-queue
-      LOG_LEVEL: INFO
-    networks:
-    - testing_net
-    depends_on:
-    - aggregator-month
+  # aggregator-quantity-profit:
+  #   container_name: aggregator-quantity-profit
+  #   image: worker:latest
+  #   command: "/worker/aggregator/max_quantity_profit.py"
+  #   environment:
+  #     RABBITMQ_HOST: rabbitmq
+  #     INPUT_QUEUE_1: aggregated-month-queue
+  #     OUTPUT_QUEUE_1: products-results-queue
+  #     LOG_LEVEL: INFO
+  #   networks:
+  #   - testing_net
+  #   depends_on:
+  #   - aggregator-month
 
-  joiner-menu-items:
-    container_name: joiner-menu-items
-    image: worker:latest
-    command: "/worker/joiner/menu_items.py"
-    environment:
-      RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE_1: products-results-queue
-      INPUT_QUEUE_2: menu-items-queue
-      OUTPUT_QUEUE_1: results-queue
-      LOG_LEVEL: INFO
-    networks:
-    - testing_net
-    depends_on:
-    - aggregator-quantity-profit
+  # joiner-menu-items:
+    # container_name: joiner-menu-items
+    # image: worker:latest
+    # command: "/worker/joiner/menu_items.py"
+    # environment:
+    #   RABBITMQ_HOST: rabbitmq
+    #   INPUT_QUEUE_1: products-results-queue
+    #   INPUT_QUEUE_2: menu-items-queue
+    #   OUTPUT_QUEUE_1: results-queue
+    #   LOG_LEVEL: INFO
+    # networks:
+    # - testing_net
+    # depends_on:
+    # - aggregator-quantity-profit
 
   join-stores-q3:
     container_name: joiner-stores-q3
@@ -136,8 +131,9 @@ services:
     environment:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-semester-q3-queue
-      INPUT_QUEUE_2: stores-q3-queue
+      INPUT_QUEUE_2: stores-queue
       OUTPUT_QUEUE_1: results-queue
+      EXCHANGE_NAME: joiner-stores-q3-exchange
       LOG_LEVEL: INFO
     networks:
     - testing_net
@@ -145,20 +141,6 @@ services:
     - aggregator-semester
 
   aggregator-semester:
-    container_name: aggregator-semester
-    image: worker:latest
-    command: "/worker/aggregator/semester_aggregator.py"
-    environment:
-      RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE: time-filtered-queue-q1
-      OUTPUT_QUEUE: aggregated-semester-q3-queue
-      LOG_LEVEL: INFO
-    networks:
-    - testing_net
-    depends_on:
-    - gateway
-    
-  agreggator-semester:
     container_name: aggregator-semester
     image: worker:latest
     command: "/worker/aggregator/semester_aggregator.py"

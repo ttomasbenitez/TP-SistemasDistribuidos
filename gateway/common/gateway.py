@@ -3,7 +3,7 @@ import logging
 import signal
 import threading
 from pkg.message.message import Message
-from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_REQUEST_ID
+from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_REQUEST_ID, MESSAGE_TYPE_QUERY_3_RESULT
 from Middleware.middleware import MessageMiddlewareExchange, MessageMiddlewareQueue
 from pkg.message.protocol import Protocol
 
@@ -88,7 +88,6 @@ class Gateway:
 
         def _consume():
             try:
-                # BLOQUEANTE, corre en este hilo
                 self._in_queue.start_consuming(self.__on_result_message)
             except Exception as e:
                 logging.error(f"action: consume_messages | result: fail | error: {e}")
@@ -97,7 +96,11 @@ class Gateway:
         self._consumer_thread.start()
     
     def __on_result_message(self, message):
-        self._client_protocol.send_message(message)
+        process = Message.deserialize(message)
+        if process.type == MESSAGE_TYPE_QUERY_3_RESULT:
+            logging.info(f"RECIBIENDO MENSAJE DE RESULTADOS Q3:")
+        else:
+            self._client_protocol.send_message(message)
         
     def __handle_shutdown(self, signum, frame):
         """

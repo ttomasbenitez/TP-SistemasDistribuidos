@@ -30,8 +30,9 @@ class ResultStorage:
       storage.add_chunk(run_id, "Q1", chunk_bytes)
       storage.mark_eof(run_id, "Q1")
     """
-    def __init__(self):
+    def __init__(self, file_path):
         self._runs: Dict[str, RunBuf] = {}
+        self.file_path = file_path
 
     def start_run(self, client_id: str):
        if client_id not in self._runs:
@@ -45,7 +46,7 @@ class ResultStorage:
         if not rb:
             return
         if message.type not in rb.queries:
-            rb.queries[message.type] = QueryBuf(f"storage/client-{message.request_id}.ndjson")
+            rb.queries[message.type] = QueryBuf(self.file_path)
         q = rb.queries[message.type]
         if not q.eof:
             q.append(message)
