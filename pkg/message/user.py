@@ -6,10 +6,9 @@ class User:
     Clase para manejar tiendas.
     """
     
-    def __init__(self, user_id, birthdate, registered_at):
+    def __init__(self, user_id, birthdate):
         self.id = user_id
         self.birthdate = birthdate
-        self.registered_at = registered_at
 
     def deserialize_from_csv(data: bytes):
         """
@@ -22,8 +21,7 @@ class User:
             raise ValueError("Datos inválidos para User")
         user_id = parse_int(parts[0])
         birthdate = parts[2]
-        registered_at = parse_date(parts[3])
-        return User(user_id, birthdate, registered_at)
+        return User(user_id, birthdate)
     
     def deserialize(data: bytes):
         """
@@ -34,8 +32,7 @@ class User:
         parts = data.split(';')
         user_id = parse_int(parts[0])
         birthdate = parts[1]
-        registered_at = parse_date(parts[2])
-        return User(user_id, birthdate, registered_at)
+        return User(user_id, birthdate)
     
     def get_users_from_bytes(data: bytes, type):
         """
@@ -52,17 +49,19 @@ class User:
         Serializa el objeto User a bytes.
         :return: Datos en bytes.
         """
-        return f"{self.id};{self.birthdate};{self.registered_at}\n"
+        return f"{self.id};{self.birthdate}\n"
     
     
-    def get_year(self):
+    def get_user_id(self):
         """
         Obtiene el año de registro del usuario.
         :return: Año de registro o None si no está disponible.
         """
-        if self.registered_at:
-            try:
-                return self.registered_at.year
-            except AttributeError:
-                return None
-        return None
+        return self.id
+    
+    def get_birthdate(self):
+        """
+        Obtiene la fecha de nacimiento del usuario.
+        :return: Fecha de nacimiento o None si no está disponible.
+        """
+        return self.birthdate

@@ -10,7 +10,7 @@ docker-image:
 .PHONY: docker-image
 
 up: docker-image
-	docker compose -f docker-compose-dev.yaml up -d --build
+	docker compose -f docker-compose-dev.yaml up -d --build --remove-orphans
 .PHONY: up
 
 run: 
