@@ -19,7 +19,7 @@ class Q4IntermediateResult:
         birthdate = parts[0]
         store_id = parse_int(parts[1])
         purchases_qty = parse_int(parts[2])
-        return Q4IntermediateResult(birthdate, store_id, purchases_qty)
+        return Q4IntermediateResult(store_id, birthdate, purchases_qty)
     
     def get_q4_result_from_bytes(data: bytes):
         """
