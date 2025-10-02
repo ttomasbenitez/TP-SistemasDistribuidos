@@ -106,3 +106,10 @@ class Transaction:
         """
         return self.created_at.time()
     
+    def get_user(self):
+        """
+        Obtiene el id del usuario
+        :return: id del usuario
+        """
+        return self.user_id
+    

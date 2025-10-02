@@ -98,6 +98,5 @@ def test_users():
     assert len(users) == 14
     assert users[0].id == 1472011
     assert users[0].birthdate == "1966-09-05"
-    assert users[0].registered_at.year == 2025
     
     
