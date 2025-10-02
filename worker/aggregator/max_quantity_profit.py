@@ -10,7 +10,7 @@ class QuantityAndProfit(Worker):
     def __init__(self, in_queue: MessageMiddlewareQueue, out_queue: MessageMiddlewareQueue):
         super().__init__(in_queue)
         self.out_queue = out_queue
-        # Diccionario de tres niveles: year -> month -> item_id -> {"quantity", "subtotal"}
+        # Diccionario de tres niveles: year -> month -> item_data -> {"quantity", "subtotal"}
         self.data = dict()
         
     def __on_message__(self, message):
@@ -36,14 +36,14 @@ class QuantityAndProfit(Worker):
         """
         for it in items:
             ym = str(it.year_month_created_at)   # clave de mes
-            item_id = it.item_id                 # usá un id estable, no un dict
+            item_data = it.item_data                 # usá un id estable, no un dict
 
             month_bucket = self.data.setdefault(ym, {})
-            agg_item = month_bucket.get(item_id)
+            agg_item = month_bucket.get(item_data)
 
             if agg_item is None:
             # Tomamos el primer item como base (si querés, podés hacer una copia)
-                month_bucket[item_id] = it
+                month_bucket[item_data] = it
             else:
                 agg_item.quantity += it.quantity
                 agg_item.subtotal += it.subtotal
@@ -55,7 +55,7 @@ class QuantityAndProfit(Worker):
      # logging.info("LA DATAA %r", next(iter(self.data.items()), None))
 
         for ym, items_by_id in self.data.items():
-        # items_by_id es un dict { item_id: ItemAcumulado }
+        # items_by_id es un dict { item_data: ItemAcumulado }
             if not items_by_id:
                 continue
 
