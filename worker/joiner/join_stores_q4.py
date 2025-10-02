@@ -7,7 +7,7 @@ from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_QUERY_4_INTERME
 from utils.custom_logging import initialize_log
 import os
 
-EXPECTED_EOFS = 1
+EXPECTED_EOFS = 2
 
 class Q4StoresJoiner(Worker):
     """
@@ -19,7 +19,7 @@ class Q4StoresJoiner(Worker):
         self.out_queue = out_queue
         self.pending_clients = list()
         self.processed_clients = list()
-        self.stores = {}
+        self.stores = dict()
         self.eof_count = 0
 
     def __on_message__(self, msg):
@@ -40,20 +40,24 @@ class Q4StoresJoiner(Worker):
         if message.type == MESSAGE_TYPE_STORES:
             for item in items:
                 self.stores[item.get_id()] = item.get_name()
+            logging.info(f"Loaded {len(self.stores)} stores {self.stores}")
 
         elif message.type == MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT:
+            logging.info(f"Processing {len(items)} intermediate results")
             for item in items:
-                store_name = self.stores.get(item.get_store())
+                store_name = self.stores.get(item.get_store(), 0)
+                logging.info(f"Joining store id {item.get_store()} with name {store_name}")
                 if store_name:
-                    self.processed_clients.append((store_name, item.get_birthdate(), item.get_purchases_qty()))
+                    self.processed_clients.append(Q4Result(store_name, item.get_birthdate(), item.get_purchases_qty()))
                 else:
                     self.pending_clients.append(item)
+            logging.info(f"aca me quedan {self.processed_clients} y {self.pending_clients}")
 
     def send_processed_clients(self, message):
         total_chunk = ''
-        for (store, birthdate, purchases_qty) in self.processed_clients:
-            q4Result = Q4Result(store, birthdate, purchases_qty)
+        for q4Result in self.processed_clients:
             total_chunk += q4Result.serialize()
+        logging.info(f"MANDE DATAA {total_chunk}")
         msg = Message(message.request_id, MESSAGE_TYPE_QUERY_4_RESULT, message.msg_num, total_chunk)
         self.out_queue.send(msg.serialize())
 
@@ -61,7 +65,6 @@ class Q4StoresJoiner(Worker):
         for item in self.pending_clients:
             store_name = self.stores.get(item.get_store())
             if store_name:
-                key = (store_name, item.get_period())
                 self.processed_clients.append((store_name, item.get_birthdate(), item.get_purchases_qty()))
                 self.pending_clients.remove(item)
 
@@ -84,7 +87,8 @@ def initialize_config():
     config_params["input_queue_1"] = os.getenv('INPUT_QUEUE_1')
     config_params["input_queue_2"] = os.getenv('INPUT_QUEUE_2')
     config_params["output_queue"] = os.getenv('OUTPUT_QUEUE_1')
-    config_params["output_exchange_q3"] = os.getenv('EXCHANGE_NAME')
+    config_params["output_queue"] = os.getenv('OUTPUT_QUEUE_1')
+    config_params["exchange"] = os.getenv('EXCHANGE_NAME')
     config_params["logging_level"] = os.getenv('LOG_LEVEL', 'INFO')
 
     if None in [config_params["rabbitmq_host"], config_params["input_queue_1"],
@@ -99,7 +103,8 @@ def main():
     initialize_log(config_params["logging_level"])
 
     output_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["output_queue"])
-    input_queues = MessageMiddlewareExchange({config_params["input_queue_1"]: [str(MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT), str(MESSAGE_TYPE_EOF)], 
+    input_queues = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["exchange"], 
+                                             {config_params["input_queue_1"]: [str(MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT), str(MESSAGE_TYPE_EOF)], 
                                               config_params["input_queue_2"]: [str(MESSAGE_TYPE_STORES), str(MESSAGE_TYPE_EOF)]})
 
     joiner = Q4StoresJoiner(input_queues, output_queue)

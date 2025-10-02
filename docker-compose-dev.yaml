@@ -148,8 +148,8 @@ services:
     - testing_net
     depends_on:
     - gateway
-#
-  #filter-amount:
+
+  # filter-amount:
   #  container_name: filter-amount
   #  image: worker:latest
   #  command: "/worker/filter/amount.py"
@@ -163,7 +163,7 @@ services:
   #  - testing_net
   #  depends_on:
   #  - gateway
-#
+
   filter-amount-1:
     container_name: filter-amount-1
     image: worker:latest
@@ -299,7 +299,7 @@ services:
       OUTPUT_QUEUE_2: EOF-joiner-menu-items-1-2
       OUTPUT_QUEUE_3: EOF-joiner-menu-items-1-3
       LOG_LEVEL: INFO
-      EXPECTED_ACKS: 2 #Cantidad de réplicas sin contar este nodo.
+      EXPECTED_ACKS: 2 
     networks:
     - testing_net
     depends_on:
@@ -576,8 +576,8 @@ services:
     command: "/worker/aggregator/store_aggregator.py"
     environment:
       RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE_1: year-filtered-queue-q4
-      OUTPUT_QUEUE_1: aggregated-store-q4-queue
+      INPUT_QUEUE: year-filtered-queue-q4
+      OUTPUT_QUEUE: aggregated-store-q4-queue
       LOG_LEVEL: INFO
       EXPECTED_ACKS: 0
     networks:
@@ -610,6 +610,7 @@ services:
       INPUT_QUEUE_1: top-clients-queue
       INPUT_QUEUE_2: stores-queue
       OUTPUT_QUEUE_1: results-queue
+      EXCHANGE_NAME: join-stores-q4-exchange
       LOG_LEVEL: INFO
     networks:
     - testing_net
