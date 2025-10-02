@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 from Middleware.middleware import MessageMiddleware
+from pkg.message.message import Message
+import logging
 
 class Worker(ABC):
     
@@ -29,6 +31,13 @@ class Worker(ABC):
             self.in_middleware.stop_consuming()
         except Exception as e:
             print(f"Error al detener: {type(e).__name__}: {e}")
+           
+    def _send_groups(self, original_message: Message, groups: dict, out_middleware: MessageMiddleware):
+        for key, items in groups.items():
+            new_chunk = ''.join(item.serialize() for item in items)
+            new_message = original_message.new_from_original(new_chunk)
+            serialized = new_message.serialize()
+            out_middleware.send(serialized)
             
     @abstractmethod      
     def close(self):

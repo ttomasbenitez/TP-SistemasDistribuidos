@@ -26,6 +26,7 @@ class Gateway:
         self._in_queue = in_queue
         self._consumer_thread: threading.Thread = None
         self._results_started = False
+        self._finished_queries = 0
     
         signal.signal(signal.SIGTERM, self.__handle_shutdown)
         signal.signal(signal.SIGINT, self.__handle_shutdown)
@@ -88,7 +89,6 @@ class Gateway:
 
         def _consume():
             try:
-                # BLOQUEANTE, corre en este hilo
                 self._in_queue.start_consuming(self.__on_result_message)
             except Exception as e:
                 logging.error(f"action: consume_messages | result: fail | error: {e}")
@@ -97,6 +97,11 @@ class Gateway:
         self._consumer_thread.start()
     
     def __on_result_message(self, message):
+        proceced_message = Message.deserialize(message)
+        if proceced_message.type == MESSAGE_TYPE_EOF:
+            self._finished_queries += 1
+            return
+
         self._client_protocol.send_message(message)
         
     def __handle_shutdown(self, signum, frame):

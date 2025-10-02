@@ -29,7 +29,6 @@ class FilterAmountNode(Worker):
                 amount = item.get_final_amount()
                 if amount >= self.amount_to_filter:
                     new_chunk += Q1Result(item.transaction_id, amount).serialize()
-            
             if new_chunk:
                 new_message = Message(message.request_id, MESSAGE_TYPE_QUERY_1_RESULT, message.msg_num, new_chunk)
                 serialized = new_message.serialize()
@@ -38,7 +37,7 @@ class FilterAmountNode(Worker):
             logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
     
     def __received_EOF__(self, message):
-        self.out_queue.send(message.serialize(), str(message.type))
+        self.out_queue.send(message.serialize())
         logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")
             
     def close(self):

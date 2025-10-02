@@ -69,7 +69,7 @@ class Client:
         Sends an EOF message to the gateway to indicate the end of data transmission.
         """
         try:
-            self._protocol.send_message(Message(0, MESSAGE_TYPE_EOF, 0, 0).serialize())
+            self._protocol.send_message(Message(0, MESSAGE_TYPE_EOF, 0, '').serialize())
             logging.info(f'action: send_eof | result: success')
         except Exception as e:
             logging.error(f'action: send_eof | result: fail | error: {e}')
@@ -82,9 +82,9 @@ class Client:
         logging.info(f'action: client shutdown | result: success')
         
     def __wait_for_results(self):
-        results_storage = ResultStorage()
         message = self._protocol.read_message()
         logging.info(f'action: receive_message | result: success | message type: {message.type}')
+        results_storage = ResultStorage(f"storage/client-{message.request_id}.ndjson")
         results_storage.start_run(message.request_id)
         while True:
             try:

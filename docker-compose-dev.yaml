@@ -23,15 +23,10 @@ services:
       LISTEN_BACKLOG: '5'
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: results-queue
-      OUTPUT_QUEUE_2: stores-q3-queue-1
-      OUTPUT_QUEUE_3: stores-q3-queue-2
-      OUTPUT_QUEUE_4: stores-q3-queue-3
-      OUTPUT_QUEUE_5: stores-q4-queue-1
-      OUTPUT_QUEUE_6: stores-q4-queue-2
-      OUTPUT_QUEUE_7: stores-q4-queue-3
-      OUTPUT_QUEUE_8: menu-items-queue
-      OUTPUT_QUEUE_9: users-queue
-      OUTPUT_QUEUE_10: batches-queue
+      OUTPUT_QUEUE_1: stores-queue
+      OUTPUT_QUEUE_2: menu-items-queue
+      OUTPUT_QUEUE_3: users-queue
+      OUTPUT_QUEUE_4: batches-queue
       EXCHANGE_NAME: gateway-exchange
     depends_on:
       rabbitmq:
@@ -136,8 +131,9 @@ services:
     environment:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-semester-q3-queue
-      INPUT_QUEUE_2: stores-q3-queue
+      INPUT_QUEUE_2: stores-queue
       OUTPUT_QUEUE_1: results-queue
+      EXCHANGE_NAME: joiner-stores-q3-exchange
       LOG_LEVEL: INFO
     networks:
     - testing_net
@@ -150,21 +146,7 @@ services:
     command: "/worker/aggregator/semester_aggregator.py"
     environment:
       RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE: time-filtered-queue-q1
-      OUTPUT_QUEUE: aggregated-semester-q3-queue
-      LOG_LEVEL: INFO
-    networks:
-    - testing_net
-    depends_on:
-    - gateway
-    
-  agreggator-semester:
-    container_name: aggregator-semester
-    image: worker:latest
-    command: "/worker/aggregator/semester_aggregator.py"
-    environment:
-      RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE: time-filtered-queue-q1
+      INPUT_QUEUE: aggregated-store-q3-queue
       OUTPUT_QUEUE: aggregated-semester-q3-queue
       LOG_LEVEL: INFO
     networks:

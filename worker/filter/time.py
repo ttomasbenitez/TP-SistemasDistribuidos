@@ -88,8 +88,8 @@ def main():
 
     input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue"])
     output_exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["output_exchange_filter_time"], 
-                                        {config_params["output_queue_1"]: str(MESSAGE_TYPE_TRANSACTIONS), 
-                                        config_params["output_queue_2"]: str(MESSAGE_TYPE_TRANSACTIONS)})
+                                        {config_params["output_queue_1"]: [str(MESSAGE_TYPE_TRANSACTIONS), str(MESSAGE_TYPE_EOF)], 
+                                        config_params["output_queue_2"]: [str(MESSAGE_TYPE_TRANSACTIONS), str(MESSAGE_TYPE_EOF)]})
     
     filter = FilterTimeNode(input_queue, output_exchange, {6, 23})
     filter.start()
