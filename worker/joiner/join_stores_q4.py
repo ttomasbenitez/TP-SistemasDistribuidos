@@ -60,7 +60,7 @@ class Q4StoresJoiner(Worker):
         for item in self.pending_clients:
             store_name = self.stores.get(item.get_store())
             if store_name:
-                self.processed_clients.append((store_name, item.get_birthdate(), item.get_purchases_qty()))
+                self.processed_clients.append(Q4Result(store_name, item.get_birthdate(), item.get_purchases_qty()))
                 self.pending_clients.remove(item)
 
     def _send_eof(self, message):
