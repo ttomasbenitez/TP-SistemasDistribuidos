@@ -149,20 +149,20 @@ services:
     depends_on:
     - gateway
 
-  filter-amount:
-   container_name: filter-amount
-   image: worker:latest
-   command: "/worker/filter/amount.py"
-   environment:
-     RABBITMQ_HOST: rabbitmq
-     INPUT_QUEUE_1: time-filtered-queue-q1
-     OUTPUT_QUEUE_1: results-queue
-     LOG_LEVEL: INFO
-     EXPECTED_ACKS: 0
-   networks:
-   - testing_net
-   depends_on:
-   - gateway
+  # filter-amount:
+  #  container_name: filter-amount
+  #  image: worker:latest
+  #  command: "/worker/filter/amount.py"
+  #  environment:
+  #    RABBITMQ_HOST: rabbitmq
+  #    INPUT_QUEUE_1: time-filtered-queue-q1
+  #    OUTPUT_QUEUE_1: results-queue
+  #    LOG_LEVEL: INFO
+  #    EXPECTED_ACKS: 0
+  #  networks:
+  #  - testing_net
+  #  depends_on:
+  #  - gateway
 
   filter-amount-1:
     container_name: filter-amount-1
