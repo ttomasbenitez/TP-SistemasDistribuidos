@@ -36,6 +36,18 @@ class Q4IntermediateResult:
         """
         return f"{self.birthdate};{self.store_id};{self.purchases_qty}\n"
     
+    def get_store(self):
+        return self.store_id
+    
+    def get_birthdate(self):
+        return self.birthdate
+    
+    def get_purchases_qty(self):
+        return self.purchases_qty
+
+    def get_query(self):
+        return self.query
+
 class Q4Result:
     
     def __init__(self, store_name, birthdate, purchases_qty):
