@@ -1,65 +1,50 @@
 from worker import Worker 
-from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
+from Middleware.middleware import MessageMiddlewareQueue
 import logging
 from pkg.message.message import Message
 from utils.custom_logging import initialize_log
 import os
-from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_TRANSACTIONS, MESSAGE_TYPE_TRANSACTION_ITEMS
+from pkg.message.q3_result import Q3IntermediateResult
+from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT
 
 class SemesterAggregator(Worker):
 
     def __init__(self, in_queue: MessageMiddlewareQueue, out_queue: MessageMiddlewareQueue):
         super().__init__(in_queue)
         self.out_queue = out_queue
-        self.new_chunk_1 = b""
-        self.new_chunk_2 = b""
-        self.new_chunk_3 = b""
-        self.new_chunk_4 = b""
 
     def __on_message__(self, message):
         try:
-            logging.info(f"Recibo mensaje")
             message = Message.deserialize(message)
             if message.type == MESSAGE_TYPE_EOF:
                 self.__received_EOF__(message)
                 return
             items = message.process_message()
-            logging.info(f"Proceso mensaje | request_id: {message.request_id} | type: {message.type}")
-            for item in items:
-                year = item.get_year()
-                amount = item.get_final_amount()
-                semester = item.get_semester()
-                message_to_send = Message(message.request_id, message.type, message.msg_num, f"{item.transaction_id};{item.store_id};{item.user_id};{amount};{item.created_at}\n")
-                if year == 2024 and semester == 1:
-                    self.new_chunk_1 += message_to_send.serialize()
-                elif year == 2024 and semester == 2:
-                    self.new_chunk_2 += message_to_send.serialize()
-                elif year == 2025 and semester == 1:
-                    self.new_chunk_3 += message_to_send.serialize()
-                elif year == 2025 and semester == 2:
-                    self.new_chunk_4 += message_to_send.serialize()
-            if self.new_chunk_1:
-                message.update_content(self.new_chunk_1)
-                serialized = message.serialize()
-                self.out_queue.send(serialized)
-                logging.info(f"Filtro correctamente | request_id: {message.request_id} | type: {message.type}")
-            if self.new_chunk_2:
-                message.update_content(self.new_chunk_2)
-                serialized = message.serialize()
-                self.out_queue.send(serialized)
-                logging.info(f"Filtro correctamente | request_id: {message.request_id} | type: {message.type}")
-            if self.new_chunk_3:
-                message.update_content(self.new_chunk_3)
-                serialized = message.serialize()
-                self.out_queue.send(serialized)
-                logging.info(f"Filtro correctamente | request_id: {message.request_id} | type: {message.type}")
-            if self.new_chunk_4:
-                message.update_content(self.new_chunk_4)
-                serialized = message.serialize()
-                self.out_queue.send(serialized)
-                logging.info(f"Filtro correctamente | request_id: {message.request_id} | type: {message.type}")
+            agg = dict()
+            store_id = None
+
+            for it in items:
+               
+                year = it.get_year()
+                sem  = it.get_semester()
+                period = f"{year}-H{sem}"
+                if store_id is None:
+                    store_id = it.store_id
+                amount = it.get_final_amount()
+                agg[period] = agg.get(period, 0.0) + amount
+                
+            for period, total in agg.items():
+                res = Q3IntermediateResult(period, store_id, total)
+                self._send_grouped_item(message, res)
+            
         except Exception as e:
             logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
+            
+    def _send_grouped_item(self, message, item):
+        new_chunk = item.serialize()
+        new_message = Message(message.request_id, MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT, message.msg_num, new_chunk)
+        logging.info(f"Enviando mensaje | request_id: {new_message.request_id} | type: {new_message.type}")
+        self.out_queue.send(new_message.serialize())
             
     def close(self):
         try:

@@ -1,5 +1,5 @@
 from worker import Worker 
-from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
+from Middleware.middleware import MessageMiddlewareQueue
 import logging
 from pkg.message.message import Message
 from utils.custom_logging import initialize_log
@@ -14,27 +14,22 @@ class StoreAggregator(Worker):
         
     def __on_message__(self, message):
         try:
-            logging.info(f"Recibo mensaje")
             message = Message.deserialize(message)
             if message.type == MESSAGE_TYPE_EOF:
                 self.__received_EOF__(message)
                 return
             items = message.process_message()
-            logging.info(f"Proceso mensaje | request_id: {message.request_id} | type: {message.type}")
-            for item in items:
-                stores_dict = dict()
-                store = item.get_store()
-                if store not in stores_dict:
-                    stores_dict[store] = item.get_final_amount()
-                else:
-                    stores_dict[store] += item.get_final_amount()
-            if stores_dict:
-                message.update_content(stores_dict)
-                serialized = message.serialize()
-                self.out_queue.send(serialized)
-                logging.info(f"Filtro correctamente | request_id: {message.request_id} | type: {message.type}")
+            groups = self._group_items_by_store(items)
+            self._send_groups(message, groups, self.out_queue)
         except Exception as e:
             logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
+            
+    def _group_items_by_store(self, items):
+        groups = {}
+        for item in items:
+            store = item.get_store()
+            groups.setdefault(store, []).append(item)
+        return groups
             
     def close(self):
         try:

@@ -50,3 +50,9 @@ class Store:
         :return: Datos en bytes.
         """
         return f"{self.id};{self.name}\n"
+
+    def get_name(self):
+        return self.name
+    
+    def get_id(self):
+        return self.id

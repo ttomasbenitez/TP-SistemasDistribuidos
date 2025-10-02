@@ -99,7 +99,12 @@ class MessageMiddlewareExchange(MessageMiddleware):
             self.queues[queue_name] = {"queue": queue, "routing_key": routing_keys}
 
     def start_consuming(self, on_message_callback):
-        pass
+        def callback(ch, method, properties, body):
+            on_message_callback(body)
+        for queue_name in self.queues.keys():
+            self.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=False)
+
+        self.channel.start_consuming()
 
     def stop_consuming(self):
         self.connection.close()

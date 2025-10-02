@@ -20,7 +20,6 @@ class FilterYearNode(Worker):
                 self.__received_EOF__(message)
                 return
             items = message.process_message()
-            logging.info(f"Proceso mensaje | request_id: {message.request_id} | type: {message.type}")
             new_chunk = '' 
             for item in items:
                 year = item.get_year()
@@ -30,7 +29,6 @@ class FilterYearNode(Worker):
                 message.update_content(new_chunk)
                 serialized = message.serialize()
                 self.out_exchange.send(serialized, str(message.type))
-                logging.info(f"Filtro correctamente | request_id: {message.request_id} | type: {message.type}")
         except Exception as e:
             logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
             

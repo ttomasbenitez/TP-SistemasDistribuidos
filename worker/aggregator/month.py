@@ -75,7 +75,6 @@ class AggregatorMonth(Worker):
 
     def __on_message__(self, message):
         try:
-            logging.info("Procesando mensaje")
             message = Message.deserialize(message)
 
             if message.type == MESSAGE_TYPE_EOF:
@@ -92,8 +91,7 @@ class AggregatorMonth(Worker):
 
             items = message.process_message()
             groups = self._group_items_by_month(items)
-            self._send_groups(message, groups)
-
+            self._send_groups(message, groups, self.out_queue)
         except Exception as e:
             logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
 
@@ -122,13 +120,6 @@ class AggregatorMonth(Worker):
             groups.setdefault(month, []).append(item)
         return groups
     
-    def _send_groups(self, original_message, groups):
-        for month, month_items in groups.items():
-            new_chunk = ''.join(item.serialize() for item in month_items)
-            new_message = original_message.new_from_original(new_chunk)
-            serialized = new_message.serialize()
-            self.data_out_queue.send(serialized)
-            logging.info(f"Agregado correctamente | request_id: {new_message.request_id} | type: {new_message.type} | month: {month}")
 
     def close(self):
         try:
