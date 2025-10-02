@@ -134,9 +134,9 @@ class AggregatorMonth(Worker):
     
     def close(self):
         try:
-            for in_queue in self.data_in_queue:
+            for in_queue in self.eof_in_queues:
                 in_queue.close()
-            for out_queue in self.data_out_queue:
+            for out_queue in self.eof_out_queues:
                 out_queue.close()
             self.data_in_queue.close()
             self.data_out_queue.close()
