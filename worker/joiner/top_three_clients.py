@@ -49,7 +49,8 @@ class TopThreeClientsJoiner(Worker):
                 self.users_by_store[store_id] = dict()
                 
             for user_id, count in pre_process.items():
-                self.users_by_store[store_id][user_id] = self.users_by_store[store_id].get(user_id, 0) + count
+                if user_id:
+                    self.users_by_store[store_id][user_id] = self.users_by_store[store_id].get(user_id, 0) + count
 
 
     def _process_top_3(self):
@@ -61,8 +62,6 @@ class TopThreeClientsJoiner(Worker):
             chunk = ''
             for user in top_3_users:
                 user_id, transaction_count = user
-                if not user_id:
-                    continue
                 birthdate = self.users.get(user_id, 'N/A')
                 chunk += Q4IntermediateResult(store, birthdate, transaction_count).serialize()
             msg = Message(1, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT, 1, chunk)
