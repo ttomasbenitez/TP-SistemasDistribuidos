@@ -54,7 +54,7 @@ class StoresJoiner(Worker):
         total_chunk = ''
         for (key, total_tpv) in self.processed_transactions.items():
             store_name, period = key
-            q3Result = Q3Result(store_name, period, total_tpv)
+            q3Result = Q3Result(period, store_name, total_tpv)
             total_chunk += q3Result.serialize()
         msg = Message(message.request_id, MESSAGE_TYPE_QUERY_3_RESULT, message.msg_num, total_chunk)
         self.out_queue.send(msg.serialize())
