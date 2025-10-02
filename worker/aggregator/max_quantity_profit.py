@@ -70,7 +70,7 @@ class QuantityAndProfit(Worker):
 
     def close(self):
         try:
-            self.in_queue.close()
+            self.in_middleware.close()
             self.out_queue.close()
         except Exception as e:
             print(f"Error al cerrar: {type(e).__name__}: {e}")

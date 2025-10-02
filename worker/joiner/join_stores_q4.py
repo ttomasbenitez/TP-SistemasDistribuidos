@@ -40,24 +40,19 @@ class Q4StoresJoiner(Worker):
         if message.type == MESSAGE_TYPE_STORES:
             for item in items:
                 self.stores[item.get_id()] = item.get_name()
-            logging.info(f"Loaded {len(self.stores)} stores {self.stores}")
 
         elif message.type == MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT:
-            logging.info(f"Processing {len(items)} intermediate results")
             for item in items:
                 store_name = self.stores.get(item.get_store(), 0)
-                logging.info(f"Joining store id {item.get_store()} with name {store_name}")
                 if store_name:
                     self.processed_clients.append(Q4Result(store_name, item.get_birthdate(), item.get_purchases_qty()))
                 else:
                     self.pending_clients.append(item)
-            logging.info(f"aca me quedan {self.processed_clients} y {self.pending_clients}")
 
     def send_processed_clients(self, message):
         total_chunk = ''
         for q4Result in self.processed_clients:
             total_chunk += q4Result.serialize()
-        logging.info(f"MANDE DATAA {total_chunk}")
         msg = Message(message.request_id, MESSAGE_TYPE_QUERY_4_RESULT, message.msg_num, total_chunk)
         self.out_queue.send(msg.serialize())
 

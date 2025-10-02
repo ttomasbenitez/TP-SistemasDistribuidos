@@ -101,8 +101,6 @@ class Gateway:
         if proceced_message.type == MESSAGE_TYPE_EOF:
             self._finished_queries += 1
             return
-        if proceced_message.type == 10:
-            logging.info("RECIBI LOS RESULTADOS DE Q4")
         self._client_protocol.send_message(message)
         
     def __handle_shutdown(self, signum, frame):

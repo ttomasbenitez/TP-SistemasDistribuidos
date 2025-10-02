@@ -1,13 +1,17 @@
 from abc import ABC, abstractmethod
 from Middleware.middleware import MessageMiddleware
 from pkg.message.message import Message
+import signal
 import logging
-
 class Worker(ABC):
     
     def __init__(self, in_middleware: MessageMiddleware):
         self._running = False
         self.in_middleware = in_middleware
+        
+        
+        signal.signal(signal.SIGTERM, self.__handle_shutdown)
+        signal.signal(signal.SIGINT, self.__handle_shutdown)
         
     def start(self):
         self._running = True
@@ -42,3 +46,19 @@ class Worker(ABC):
     @abstractmethod      
     def close(self):
         pass
+    
+            
+    def __handle_shutdown(self, signum, frame):
+        """
+        Closes all worker connections and shuts down the worker.
+        """ 
+        try:
+            self.stop()
+        except Exception:
+            pass  
+        try:
+            self.close()
+        except Exception:
+            pass
+        logging.info(f'action: gateway shutdown | result: success')
+        

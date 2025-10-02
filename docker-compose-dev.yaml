@@ -576,9 +576,9 @@ services:
     command: "/worker/aggregator/store_aggregator.py"
     environment:
       RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE: year-filtered-queue-q4
-      OUTPUT_QUEUE: aggregated-store-q4-queue
-      LOG_LEVEL: INFO
+      INPUT_QUEUE_1: year-filtered-queue-q4
+      OUTPUT_QUEUE_1: aggregated-store-q4-queue
+      LOG_LEVEL: INFO 
       EXPECTED_ACKS: 0
     networks:
     - testing_net
