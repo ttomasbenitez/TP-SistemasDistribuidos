@@ -22,8 +22,8 @@ class StoresJoiner(Worker):
         self.stores = {}
         self.eof_count = 0
 
-    def __on_message__(self, message):
-        message = Message.deserialize(message)
+    def __on_message__(self, msg):
+        message = Message.deserialize(msg)
         logging.info(f"Received message | request_id: {message.request_id} | type: {message.type}")
         if message.type == MESSAGE_TYPE_EOF:
             self.eof_count += 1
@@ -70,7 +70,7 @@ class StoresJoiner(Worker):
                 self.pending_transactions.remove(item)
 
     def _send_eof(self, message):
-        self.out_queue.send(message.serialize())
+        self.out_queue.send(message)
         logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")
 
     def close(self):

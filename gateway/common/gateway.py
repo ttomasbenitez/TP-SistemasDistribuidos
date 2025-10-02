@@ -96,11 +96,7 @@ class Gateway:
         self._consumer_thread.start()
     
     def __on_result_message(self, message):
-        process = Message.deserialize(message)
-        if process.type == MESSAGE_TYPE_QUERY_3_RESULT:
-            logging.info(f"RECIBIENDO MENSAJE DE RESULTADOS Q3:")
-        else:
-            self._client_protocol.send_message(message)
+        self._client_protocol.send_message(message)
         
     def __handle_shutdown(self, signum, frame):
         """

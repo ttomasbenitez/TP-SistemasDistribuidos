@@ -22,26 +22,21 @@ class SemesterAggregator(Worker):
                 logging.info(f"Suma acumulada 2024-H1 tienda 1: {self.suma_test}")
                 self.__received_EOF__(message)
                 return
-            if not self.log:
-                logging.info(f"Primer mensaje recibido, iniciando procesamiento... {message.content}")
             items = message.process_message()
             agg = dict()
             store_id = None
 
             for it in items:
-                if self.log == False:
-                    logging.info(f"store DE ESTE ITEM {it.store_id}")
+               
                 year = it.get_year()
                 sem  = it.get_semester()
                 period = f"{year}-H{sem}"
-                # if store_id is None:
-                #     store_id = it.store_id
-                # if store_id != it.store_id:
-                #    logging.info(f"Mensaje contiene múltiples store_id!!!: {store_id} y {it.store_id}. Usando {store_id}.")
+                if store_id is None:
+                    store_id = it.store_id
                 amount = it.get_final_amount()
-                agg[(period, it.store_id)] = agg.get((period, it.store_id), 0.0) + amount
+                agg[period] = agg.get(period, 0.0) + amount
             self.log = True
-            for (period, store_id), total in agg.items():
+            for period, total in agg.items():
                 res = Q3IntermediateResult(period, store_id, total)
                 self._send_grouped_item(message, res)
             

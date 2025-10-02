@@ -146,7 +146,7 @@ services:
     command: "/worker/aggregator/semester_aggregator.py"
     environment:
       RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE: time-filtered-queue-q1
+      INPUT_QUEUE: aggregated-store-q3-queue
       OUTPUT_QUEUE: aggregated-semester-q3-queue
       LOG_LEVEL: INFO
     networks:
