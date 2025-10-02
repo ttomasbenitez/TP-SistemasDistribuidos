@@ -36,7 +36,7 @@ class TopThreeClientsJoiner(Worker):
 
         if message.type == MESSAGE_TYPE_USERS:
             for item in items:
-                self.users[item.get_user_id()] = item.get_brithdate()
+                self.users[item.get_user_id()] = item.get_birthdate()
         
         elif message.type == MESSAGE_TYPE_TRANSACTIONS:
             pre_process = dict()
@@ -61,10 +61,11 @@ class TopThreeClientsJoiner(Worker):
             chunk = ''
             for user in top_3_users:
                 user_id, transaction_count = user
+                if not user_id:
+                    continue
                 birthdate = self.users.get(user_id, 'N/A')
                 chunk += Q4IntermediateResult(store, birthdate, transaction_count).serialize()
             msg = Message(1, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT, 1, chunk)
-            logging.info(f"Sending top 3 clients for store {store} | request_id: {msg.request_id} | type: {msg.type}")
             self.out_queue.send(msg.serialize())
 
     def _send_eof(self, message):

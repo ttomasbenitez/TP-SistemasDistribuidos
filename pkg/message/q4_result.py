@@ -4,8 +4,8 @@ from pkg.message.utils import  parse_int, get_items_from_bytes, parse_float
 class Q4IntermediateResult: 
     
     def __init__(self, store_id, birthdate, purchases_qty):
-        self.birthdate = birthdate
         self.store_id = store_id
+        self.birthdate = birthdate
         self.purchases_qty = purchases_qty
         self.query = QUERY_4
         
@@ -16,8 +16,8 @@ class Q4IntermediateResult:
         :return: Objeto Transaction.
         """
         parts = data.split(';')
-        birthdate = parts[0]
-        store_id = parse_int(parts[1])
+        store_id = parse_int(parts[0])
+        birthdate = parts[1]
         purchases_qty = parse_int(parts[2])
         return Q4IntermediateResult(store_id, birthdate, purchases_qty)
     
@@ -34,7 +34,7 @@ class Q4IntermediateResult:
         Serializa el objeto Transaction a bytes.
         :return: Datos en bytes.
         """
-        return f"{self.birthdate};{self.store_id};{self.purchases_qty}\n"
+        return f"{self.store_id};{self.birthdate};{self.purchases_qty}\n"
     
     def get_store(self):
         return self.store_id
@@ -51,8 +51,8 @@ class Q4IntermediateResult:
 class Q4Result:
     
     def __init__(self, store_name, birthdate, purchases_qty):
-        self.birthdate = birthdate
         self.store_name = store_name
+        self.birthdate = birthdate
         self.purchases_qty = purchases_qty
         self.query = QUERY_4
         
@@ -63,10 +63,10 @@ class Q4Result:
         :return: Objeto Transaction.
         """
         parts = data.split(';')
-        birthdate = parts[0]
-        store_name = parts[1]
+        store_name = parts[0]
+        birthdate = parts[1]
         purchases_qty = parse_int(parts[2])
-        return Q4Result(birthdate, store_name, purchases_qty)
+        return Q4Result(store_name, birthdate, purchases_qty)
     
     def get_q4_result_from_bytes(data: bytes):
         """
@@ -81,7 +81,7 @@ class Q4Result:
         Serializa el objeto Transaction a bytes.
         :return: Datos en bytes.
         """
-        return f"{self.birthdate};{self.store_name};{self.purchases_qty}\n"
+        return f"{self.store_name};{self.birthdate};{self.purchases_qty}\n"
     
     def pre_process(self):
         
