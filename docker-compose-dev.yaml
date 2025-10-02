@@ -170,8 +170,10 @@ services:
     command: "/worker/aggregator/semester_aggregator.py"
     environment:
       RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE: time-filtered-queue-q1
-      OUTPUT_QUEUE: aggregated-semester-q3-queue
+      INPUT_QUEUE_1: time-filtered-queue-q3
+      INPUT_QUEUE_2: EOF-aggregator-semester-2-1
+      OUTPUT_QUEUE_1: aggregated-semester-q3-queue
+      OUTPUT_QUEUE_2: EOF-aggregator-semester-1-2
       LOG_LEVEL: INFO
     networks:
     - testing_net
@@ -184,8 +186,10 @@ services:
     command: "/worker/aggregator/store_aggregator.py"
     environment:
       RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE: time-filtered-queue-q3
-      OUTPUT_QUEUE: aggregated-store-q3-queue
+      INPUT_QUEUE_1: time-filtered-queue-q3
+      INPUT_QUEUE_2: EOF-aggregator-store-q3-1
+      OUTPUT_QUEUE_1: aggregated-store-q3-queue
+      OUTPUT_QUEUE_2: EOF-aggregator-store-q3-2
       LOG_LEVEL: INFO
     networks:
     - testing_net
