@@ -36,23 +36,64 @@ services:
     networks:
     - testing_net
 
-  filter-year:
-    container_name: filter-year
+#  filter-year:
+#    container_name: filter-year
+#    image: worker:latest
+#    command: "/worker/filter/year.py"
+#    environment:
+#      RABBITMQ_HOST: rabbitmq
+#      INPUT_QUEUE_1: batches-queue
+#      OUTPUT_QUEUE_1: year-filtered-queue-q1-q3
+#      OUTPUT_QUEUE_2: year-filtered-queue-q4
+#      OUTPUT_QUEUE_3: year-filtered-queue-q2
+#      EXCHANGE_NAME: year-filtered-exchange
+#      LOG_LEVEL: INFO
+#      EXPECTED_ACKS: 0
+#    networks:
+#    - testing_net
+#    depends_on:
+#    - gateway
+
+  filter-year-1:
+    container_name: filter-year-1
     image: worker:latest
     command: "/worker/filter/year.py"
     environment:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: batches-queue
+      INPUT_QUEUE_2: EOF-filter-year-2-1
       OUTPUT_QUEUE_1: year-filtered-queue-q1-q3
       OUTPUT_QUEUE_2: year-filtered-queue-q4
       OUTPUT_QUEUE_3: year-filtered-queue-q2
+      OUTPUT_QUEUE_4: EOF-filter-year-1-2
       EXCHANGE_NAME: year-filtered-exchange
       LOG_LEVEL: INFO
+      EXPECTED_ACKS: 1
     networks:
     - testing_net
     depends_on:
     - gateway
-  
+
+  filter-year-2:
+    container_name: filter-year-2
+    image: worker:latest
+    command: "/worker/filter/year.py"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: batches-queue
+      INPUT_QUEUE_2: EOF-filter-year-1-2
+      OUTPUT_QUEUE_1: year-filtered-queue-q1-q3
+      OUTPUT_QUEUE_2: year-filtered-queue-q4
+      OUTPUT_QUEUE_3: year-filtered-queue-q2
+      OUTPUT_QUEUE_4: EOF-filter-year-2-1
+      EXCHANGE_NAME: year-filtered-exchange
+      LOG_LEVEL: INFO
+      EXPECTED_ACKS: 1
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
+ 
   #filter-time:
   #  container_name: filter-time
   #  image: worker:latest
@@ -195,7 +236,7 @@ services:
     networks:
     - testing_net
     depends_on:
-    - filter-year
+    - gateway
 
   aggregator-month-2:
     container_name: aggregator-month-2
@@ -212,7 +253,7 @@ services:
     networks:
     - testing_net
     depends_on:
-    - filter-year
+    - gateway
 
   aggregator-quantity-profit:
     container_name: aggregator-quantity-profit
