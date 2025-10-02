@@ -1,8 +1,8 @@
-from pkg.message.constants import QUERY_4, MAX_PROFIT, MAX_QUANTITY
+from pkg.message.constants import QUERY_2, MAX_PROFIT, MAX_QUANTITY
 from pkg.message.utils import  parse_int, get_items_from_bytes, parse_float
 
 
-class Q4IntermediateResult: 
+class Q2IntermediateResult: 
     
     def __init__(self, year_month_created_at, item_id, quantity, subtotal):
         self.year_month_created_at = year_month_created_at
@@ -21,15 +21,15 @@ class Q4IntermediateResult:
         item_id = parse_int(parts[1])
         quantity = parse_int(parts[2])
         subtotal = parse_float(parts[3])
-        return Q4IntermediateResult(year_month_created_at, item_id, quantity, subtotal)
+        return Q2IntermediateResult(year_month_created_at, item_id, quantity, subtotal)
     
-    def get_q4_result_from_bytes(data: bytes):
+    def get_q2_result_from_bytes(data: bytes):
         """
         Crea una lista de objetos Transaction a partir de bytes.
         :param data: Datos en bytes.
         :return: Lista de objetos Transaction.
         """ 
-        return get_items_from_bytes(data, Q4IntermediateResult)
+        return get_items_from_bytes(data, Q2IntermediateResult)
     
     def serialize(self):
         """
@@ -40,14 +40,14 @@ class Q4IntermediateResult:
     
         
     
-class Q4Result: 
+class Q2Result: 
     
     def __init__(self, year_month_created_at, item_data, value, result_type):
         self.year_month_created_at = year_month_created_at
         self.item_data = item_data
         self.value = value
         self.result_type = result_type
-        self.query = QUERY_4
+        self.query = QUERY_2
         
     def deserialize(data: bytes):
         """ 
@@ -60,15 +60,15 @@ class Q4Result:
         item_data = parts[1]
         value = parts[2]
         result_type = parts[3]
-        return Q4Result(year_month_created_at, item_data, value, result_type)
+        return Q2Result(year_month_created_at, item_data, value, result_type)
     
-    def get_q4_result_from_bytes(data: bytes):
+    def get_q2_result_from_bytes(data: bytes):
         """
         Crea una lista de objetos Transaction a partir de bytes.
         :param data: Datos en bytes.
         :return: Lista de objetos Transaction.
         """ 
-        return get_items_from_bytes(data, Q4Result)
+        return get_items_from_bytes(data, Q2Result)
     
     def serialize(self):
         """

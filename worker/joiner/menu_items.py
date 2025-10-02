@@ -1,6 +1,6 @@
 import logging
 from pkg.message.message import Message
-from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_QUERY_4_RESULT
+from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_QUERY_2_RESULT
 from utils.custom_logging import initialize_log
 from multiprocessing import Process, Value, Manager
 from pkg.message.message import Message
@@ -113,7 +113,7 @@ class JoinerMenuItems:
                 self.processing_data.value = True
             items = message.process_message()
 
-            if message.type == MESSAGE_TYPE_QUERY_4_RESULT:
+            if message.type == MESSAGE_TYPE_QUERY_2_RESULT:
                 ready_to_send = ''
                 for item in items:
                     name = self.menu_items.get(parse_int(item.item_data))
@@ -156,7 +156,7 @@ class JoinerMenuItems:
                 self.pending_items.remove(item)
 
         if ready_to_send:
-            serialized = Message(0, MESSAGE_TYPE_QUERY_4_RESULT, 0, ready_to_send).serialize()
+            serialized = Message(0, MESSAGE_TYPE_QUERY_2_RESULT, 0, ready_to_send).serialize()
             self.out_queue.send(serialized)
             logging.info(f"Sending message: {serialized}")
 

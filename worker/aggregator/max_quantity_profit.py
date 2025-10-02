@@ -2,10 +2,10 @@ from worker import Worker
 from Middleware.middleware import MessageMiddlewareQueue
 import logging
 from pkg.message.message import Message
-from pkg.message.constants import  MESSAGE_TYPE_QUERY_4_RESULT, MESSAGE_TYPE_EOF, MAX_PROFIT, MAX_QUANTITY
+from pkg.message.constants import  MESSAGE_TYPE_QUERY_2_RESULT, MESSAGE_TYPE_EOF, MAX_PROFIT, MAX_QUANTITY
 from utils.custom_logging import initialize_log
 import os
-from pkg.message.q4_result import Q4Result
+from pkg.message.q2_result import Q2Result
 class QuantityAndProfit(Worker):
     
     def __init__(self, in_queue: MessageMiddlewareQueue, out_queue: MessageMiddlewareQueue):
@@ -62,10 +62,10 @@ class QuantityAndProfit(Worker):
                 items_by_id.items(), key=lambda kv: kv[1].subtotal
             )
             
-            chunk += Q4Result(ym, max_item_quantity_id, max_item_quantity.quantity, MAX_QUANTITY).serialize()
-            chunk += Q4Result(ym, max_item_profit_id, max_item_profit.subtotal, MAX_PROFIT).serialize()
+            chunk += Q2Result(ym, max_item_quantity_id, max_item_quantity.quantity, MAX_QUANTITY).serialize()
+            chunk += Q2Result(ym, max_item_profit_id, max_item_profit.subtotal, MAX_PROFIT).serialize()
          
-        serialized_message = Message(0, MESSAGE_TYPE_QUERY_4_RESULT, 0, chunk).serialize()
+        serialized_message = Message(0, MESSAGE_TYPE_QUERY_2_RESULT, 0, chunk).serialize()
         self.out_queue.send(serialized_message)
 
     def close(self):
