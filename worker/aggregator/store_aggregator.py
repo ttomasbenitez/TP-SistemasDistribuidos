@@ -4,7 +4,7 @@ import logging
 from pkg.message.message import Message
 from utils.custom_logging import initialize_log
 import os
-from pkg.message.constants import MESSAGE_TYPE_TRANSACTIONS, MESSAGE_TYPE_TRANSACTION_ITEMS, MESSAGE_TYPE_EOF
+from pkg.message.constants import MESSAGE_TYPE_EOF
 
 class StoreAggregator(Worker):
 

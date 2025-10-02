@@ -8,7 +8,9 @@ from pkg.message.constants import (
     MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT,
     MESSAGE_TYPE_QUERY_3_RESULT,
     MESSAGE_TYPE_QUERY_2_RESULT,
-    MESSAGE_TYPE_QUERY_2_INTERMEDIATE_RESULT
+    MESSAGE_TYPE_QUERY_2_INTERMEDIATE_RESULT,
+    MESSAGE_TYPE_QUERY_4_RESULT,
+    MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT
 )         
 from pkg.message.menu_item import MenuItem
 from pkg.message.store import Store
@@ -19,6 +21,7 @@ from pkg.message.q1_result import Q1Result
 from pkg.message.q3_result import Q3Result
 from pkg.message.q3_result import Q3IntermediateResult
 from pkg.message.q2_result import Q2Result, Q2IntermediateResult
+from pkg.message.q4_result import Q4Result, Q4IntermediateResult
 
 
 class Message:
@@ -111,6 +114,10 @@ class Message:
             return Q2IntermediateResult.get_q2_result_from_bytes(self.content)
         if self.type == MESSAGE_TYPE_QUERY_2_RESULT:
             return Q2Result.get_q2_result_from_bytes(self.content)
+        if self.type == MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT:
+            return Q4IntermediateResult.get_q4_result_from_bytes(self.content)
+        if self.type == MESSAGE_TYPE_QUERY_4_RESULT:
+            return Q4Result.get_q4_result_from_bytes(self.content)
         
     def update_content(self, new_content):
         """

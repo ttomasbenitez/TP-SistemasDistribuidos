@@ -257,8 +257,39 @@ services:
     command: "/worker/aggregator/store_aggregator.py"
     environment:
       RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE_1: time-filtered-queue-q3
-      OUTPUT_QUEUE_1: aggregated-store-q3-queue
+      INPUT_QUEUE_1: year-filtered-queue-q4
+      OUTPUT_QUEUE_1: aggregated-store-q4-queue
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
+
+  top-three-clients:
+    container_name: top-three-clients
+    image: worker:latest
+    command: "/worker/joiner/top_three_clients.py"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: aggregated-store-q4-queue
+      INPUT_QUEUE_2: users-queue
+      OUTPUT_QUEUE_1: top-clients-queue
+      EXCHANGE_NAME: top-three-clients-exchange
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
+
+  join-stores-q4:
+    container_name: join-stores-q4
+    image: worker:latest
+    command: "/worker/joiner/join_stores_q4.py"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: top-clients-queue
+      INPUT_QUEUE_2: stores-queue
+      OUTPUT_QUEUE_1: results-queue
       LOG_LEVEL: INFO
     networks:
     - testing_net
