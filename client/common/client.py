@@ -69,7 +69,7 @@ class Client:
         Sends an EOF message to the gateway to indicate the end of data transmission.
         """
         try:
-            self._protocol.send_message(Message(0, MESSAGE_TYPE_EOF, 0, 0).serialize())
+            self._protocol.send_message(Message(0, MESSAGE_TYPE_EOF, 0, '').serialize())
             logging.info(f'action: send_eof | result: success')
         except Exception as e:
             logging.error(f'action: send_eof | result: fail | error: {e}')

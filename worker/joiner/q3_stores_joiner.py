@@ -56,10 +56,8 @@ class StoresJoiner(Worker):
             store_name, period = key
             q3Result = Q3Result(store_name, period, total_tpv)
             total_chunk += q3Result.serialize()
-        message = Message(message.request_id, MESSAGE_TYPE_QUERY_3_RESULT, message.msg_num, total_chunk)
-        serialized = message.serialize()
-        self.out_queue.send(serialized)
-        logging.info(f"Sending message: {serialized}")
+        msg = Message(message.request_id, MESSAGE_TYPE_QUERY_3_RESULT, message.msg_num, total_chunk)
+        self.out_queue.send(msg.serialize())
 
     def _process_pending(self):
         for item in self.pending_transactions:
@@ -70,7 +68,7 @@ class StoresJoiner(Worker):
                 self.pending_transactions.remove(item)
 
     def _send_eof(self, message):
-        self.out_queue.send(message)
+        self.out_queue.send(message.serialize())
         logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")
 
     def close(self):

@@ -16,6 +16,7 @@ from pkg.message.user import User
 from pkg.message.q1_result import Q1Result
 from pkg.message.q3_result import Q3Result
 from pkg.message.q3_result import Q3IntermediateResult
+import logging
 
 
 class Message:

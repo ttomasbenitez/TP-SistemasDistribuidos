@@ -12,14 +12,11 @@ class SemesterAggregator(Worker):
     def __init__(self, in_queue: MessageMiddlewareQueue, out_queue: MessageMiddlewareQueue):
         super().__init__(in_queue)
         self.out_queue = out_queue
-        self.suma_test = 0
-        self.log = False
 
     def __on_message__(self, message):
         try:
             message = Message.deserialize(message)
             if message.type == MESSAGE_TYPE_EOF:
-                logging.info(f"Suma acumulada 2024-H1 tienda 1: {self.suma_test}")
                 self.__received_EOF__(message)
                 return
             items = message.process_message()
@@ -35,7 +32,7 @@ class SemesterAggregator(Worker):
                     store_id = it.store_id
                 amount = it.get_final_amount()
                 agg[period] = agg.get(period, 0.0) + amount
-            self.log = True
+                
             for period, total in agg.items():
                 res = Q3IntermediateResult(period, store_id, total)
                 self._send_grouped_item(message, res)
@@ -44,10 +41,6 @@ class SemesterAggregator(Worker):
             logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
             
     def _send_grouped_item(self, message, item):
-        if item == None:
-            return
-        if item.store_id == 1 and item.year_half_created_at == "2024-H1":
-            self.suma_test += item.intermediate_tpv
         new_chunk = item.serialize()
         new_message = Message(message.request_id, MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT, message.msg_num, new_chunk)
         logging.info(f"Enviando mensaje | request_id: {new_message.request_id} | type: {new_message.type}")

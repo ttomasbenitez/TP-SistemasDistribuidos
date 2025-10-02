@@ -11,22 +11,15 @@ class StoreAggregator(Worker):
     def __init__(self, in_queue: MessageMiddlewareQueue, out_queue: MessageMiddlewareQueue):
         super().__init__(in_queue)
         self.out_queue = out_queue
-        self.suma_test = 0
         
     def __on_message__(self, message):
         try:
             message = Message.deserialize(message)
             if message.type == MESSAGE_TYPE_EOF:
-                logging.info(f"Suma acumulada 2024-H1 tienda 1 desde storex: {self.suma_test}")
                 self.__received_EOF__(message)
                 return
             items = message.process_message()
             groups = self._group_items_by_store(items)
-            for key, items in groups.items():
-                for item in items:
-                    if item.get_year() == 2024 and item.get_store() == 1 and item.get_semester() == 1:
-                        self.suma_test += item.get_final_amount()
-                
             self._send_groups(message, groups, self.out_queue)
         except Exception as e:
             logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")

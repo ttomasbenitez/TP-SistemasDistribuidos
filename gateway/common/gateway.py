@@ -3,7 +3,7 @@ import logging
 import signal
 import threading
 from pkg.message.message import Message
-from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_REQUEST_ID, MESSAGE_TYPE_QUERY_3_RESULT
+from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_REQUEST_ID
 from Middleware.middleware import MessageMiddlewareExchange, MessageMiddlewareQueue
 from pkg.message.protocol import Protocol
 
@@ -26,6 +26,7 @@ class Gateway:
         self._in_queue = in_queue
         self._consumer_thread: threading.Thread = None
         self._results_started = False
+        self._finished_queries = 0
     
         signal.signal(signal.SIGTERM, self.__handle_shutdown)
         signal.signal(signal.SIGINT, self.__handle_shutdown)
@@ -96,6 +97,11 @@ class Gateway:
         self._consumer_thread.start()
     
     def __on_result_message(self, message):
+        proceced_message = Message.deserialize(message)
+        if proceced_message.type == MESSAGE_TYPE_EOF:
+            self._finished_queries += 1
+            return
+
         self._client_protocol.send_message(message)
         
     def __handle_shutdown(self, signum, frame):
