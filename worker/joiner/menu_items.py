@@ -6,6 +6,7 @@ from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_MENU_ITEMS, MES
 from utils.custom_logging import initialize_log
 import os
 from multiprocessing import Process, Manager, Value
+from pkg.message.utils import parse_int
 
 EXPECTED_EOFS = 2
 
@@ -20,26 +21,22 @@ class JoinerMenuItems:
         
         self.out_queue = out_queue
         self.manager = Manager()
-        self.menu_items = self.manager.dict()  # compartido entre procesos
-        self.pending_items = self.manager.list()  # TransactionItems pendientes de join
+        self.menu_items = self.manager.dict()
+        self.pending_items = self.manager.list() 
         self.received_eofs = Value('i', 0)
 
-        # Guardamos referencias a las colas
         self.queues = [
             ("menu_items", menu_items_input_queue),
             ("products", products_in_queue)
         ]
 
     def start(self):
-        # Creamos un proceso por cada cola
         processes = []
         for name, queue in self.queues:
-            logging.info(f"Starting process for queue: {name}")
             p = Process(target=self._consume_queue, args=(queue,))
             p.start()
             processes.append(p)
 
-        # Esperamos que terminen
         for p in processes:
             p.join()
 
@@ -66,9 +63,9 @@ class JoinerMenuItems:
         elif message.type == MESSAGE_TYPE_QUERY_4_RESULT:
             ready_to_send = ''
             for item in items:
-                name = self.menu_items.get(item.item_data)
+                name = self.menu_items.get(parse_int(item.item_data))
                 if name:
-                    item.item_data = name
+                    item.join_item_name(name)
                     ready_to_send += item.serialize()
                 else:
                     self.pending_items.append(item)
@@ -82,9 +79,9 @@ class JoinerMenuItems:
     def _process_pending(self):
         ready_to_send = ''
         for item in list(self.pending_items):
-            name = self.menu_items.get(item.item_data)
+            name = self.menu_items.get(parse_int(item.item_data))
             if name:
-                item.item_data = name
+                item.join_item_name(name)
                 ready_to_send += item.serialize()
                 self.pending_items.remove(item)
 

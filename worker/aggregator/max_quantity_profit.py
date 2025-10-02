@@ -2,15 +2,15 @@ from worker import Worker
 from Middleware.middleware import MessageMiddlewareQueue
 import logging
 from pkg.message.message import Message
-from pkg.message.constants import  MESSAGE_TYPE_QUERY_4_RESULT, MESSAGE_TYPE_EOF
+from pkg.message.constants import  MESSAGE_TYPE_QUERY_4_RESULT, MESSAGE_TYPE_EOF, MAX_PROFIT, MAX_QUANTITY
 from utils.custom_logging import initialize_log
 import os
+from pkg.message.q4_result import Q4Result
 class QuantityAndProfit(Worker):
     
     def __init__(self, in_queue: MessageMiddlewareQueue, out_queue: MessageMiddlewareQueue):
         super().__init__(in_queue)
         self.out_queue = out_queue
-        # Diccionario de tres niveles: year -> month -> item_data -> {"quantity", "subtotal"}
         self.data = dict()
         
     def __on_message__(self, message):
@@ -35,15 +35,14 @@ class QuantityAndProfit(Worker):
         Acumula cantidad y subtotal por año, mes y producto
         """
         for it in items:
-            ym = str(it.year_month_created_at)   # clave de mes
-            item_data = it.item_data                 # usá un id estable, no un dict
+            ym = str(it.year_month_created_at)
+            item_id = it.item_id               
 
             month_bucket = self.data.setdefault(ym, {})
-            agg_item = month_bucket.get(item_data)
+            agg_item = month_bucket.get(item_id)
 
             if agg_item is None:
-            # Tomamos el primer item como base (si querés, podés hacer una copia)
-                month_bucket[item_data] = it
+                month_bucket[item_id] = it
             else:
                 agg_item.quantity += it.quantity
                 agg_item.subtotal += it.subtotal
@@ -51,28 +50,23 @@ class QuantityAndProfit(Worker):
     def _send_results_by_date(self):
         chunk = ''
 
-        # Si querés loguear "el primero", hacé una vista a lista
-     # logging.info("LA DATAA %r", next(iter(self.data.items()), None))
-
         for ym, items_by_id in self.data.items():
-        # items_by_id es un dict { item_data: ItemAcumulado }
             if not items_by_id:
                 continue
+            
+            max_item_quantity_id, max_item_quantity = max(
+                items_by_id.items(), key=lambda kv: kv[1].quantity
+            )
 
-        # Elegimos máximos en cantidad y en subtotal
-            values = list(items_by_id.values())
-            max_item_quantity = max(values, key=lambda x: x.quantity)
-            max_item_profit   = max(values, key=lambda x: x.subtotal)
-
-            # Serializamos (evitando duplicar si son el mismo ítem)
-            chunk += max_item_quantity.serialize()
-            chunk += max_item_profit.serialize()
-            logging.info(f"{max_item_profit.serialize()} SERIALIZADO PROFIT {max_item_quantity.serialize()} QUANTITYYY")
-
+            max_item_profit_id, max_item_profit = max(
+                items_by_id.items(), key=lambda kv: kv[1].subtotal
+            )
+            
+            chunk += Q4Result(ym, max_item_quantity_id, max_item_quantity.quantity, MAX_QUANTITY).serialize()
+            chunk += Q4Result(ym, max_item_profit_id, max_item_profit.subtotal, MAX_PROFIT).serialize()
+         
         serialized_message = Message(0, MESSAGE_TYPE_QUERY_4_RESULT, 0, chunk).serialize()
         self.out_queue.send(serialized_message)
-        logging.info(f"Enviado Q4 IntermediateResult | bytes={len(serialized_message)}")
-
 
     def close(self):
         try:
