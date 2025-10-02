@@ -2,8 +2,9 @@ from worker import Worker
 from Middleware.middleware import MessageMiddlewareQueue
 import logging
 from pkg.message.message import Message
-from pkg.message.constants import MESSAGE_TYPE_EOF
+from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_QUERY_4_RESULT
 from utils.custom_logging import initialize_log
+from pkg.message.q4_result import Q4Result
 import os
 
 class AggregatorMonth(Worker):
@@ -21,7 +22,8 @@ class AggregatorMonth(Worker):
             
             items = message.process_message()
             groups = self._group_items_by_month(items)
-            self._send_groups(message, groups, self.out_queue)
+            new_message = Message(message.request_id, MESSAGE_TYPE_QUERY_4_RESULT, message.msg_num, '')
+            self._send_groups(new_message, groups, self.out_queue)
         except Exception as e:
             print(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
     
@@ -33,7 +35,9 @@ class AggregatorMonth(Worker):
         groups = {}
         for item in items:
             month = item.get_month()
-            groups.setdefault(month, []).append(item)
+            year = item.get_year()
+            q4_intermediate = Q4Result(f"{year}-{month}", item.item_id, item.quantity, item.subtotal)
+            groups.setdefault(f"{year}-{month}", []).append(q4_intermediate)
         return groups
     
 

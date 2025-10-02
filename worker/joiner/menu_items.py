@@ -2,7 +2,7 @@ from worker import Worker
 from Middleware.middleware import MessageMiddlewareQueue
 import logging
 from pkg.message.message import Message
-from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_TRANSACTION_ITEMS
+from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_QUERY_4_RESULT
 from utils.custom_logging import initialize_log
 import os
 from multiprocessing import Process, Manager, Value
@@ -53,7 +53,6 @@ class JoinerMenuItems:
             with self.received_eofs.get_lock():
                 self.received_eofs.value += 1
                 if self.received_eofs.value == EXPECTED_EOFS:
-                    # Procesar pendientes
                     self._process_pending()
                     self._send_eof(message)
             return
@@ -64,15 +63,14 @@ class JoinerMenuItems:
             for item in items:
                 self.menu_items[item.get_id()] = item.get_name()
 
-        elif message.type == MESSAGE_TYPE_TRANSACTION_ITEMS:
+        elif message.type == MESSAGE_TYPE_QUERY_4_RESULT:
             ready_to_send = ''
             for item in items:
-                name = self.menu_items.get(item.item_id)
+                name = self.menu_items.get(item.item_data)
                 if name:
-                    item.item_id = name
+                    item.item_data = name
                     ready_to_send += item.serialize()
                 else:
-                    # Guardar para procesar más tarde
                     self.pending_items.append(item)
 
             if ready_to_send:
@@ -84,14 +82,14 @@ class JoinerMenuItems:
     def _process_pending(self):
         ready_to_send = ''
         for item in list(self.pending_items):
-            name = self.menu_items.get(item.item_id)
+            name = self.menu_items.get(item.item_data)
             if name:
-                item.item_id = name
+                item.item_data = name
                 ready_to_send += item.serialize()
                 self.pending_items.remove(item)
 
         if ready_to_send:
-            serialized = Message(0, MESSAGE_TYPE_TRANSACTION_ITEMS, 0, ready_to_send).serialize()
+            serialized = Message(0, MESSAGE_TYPE_QUERY_4_RESULT, 0, ready_to_send).serialize()
             self.out_queue.send(serialized)
             logging.info(f"Sending message: {serialized}")
 
