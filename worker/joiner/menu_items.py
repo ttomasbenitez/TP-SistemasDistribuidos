@@ -1,10 +1,16 @@
 import logging
+from pkg.message.message import Message
+from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_QUERY_4_RESULT
 from utils.custom_logging import initialize_log
 from multiprocessing import Process, Value, Manager
 from pkg.message.message import Message
-from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_TRANSACTION_ITEMS, MESSAGE_TYPE_MENU_ITEMS
+from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_MENU_ITEMS
 from Middleware.middleware import MessageMiddlewareQueue
 import os
+from multiprocessing import Process, Manager, Value
+from pkg.message.utils import parse_int
+
+EXPECTED_EOFS = 2
 
 class JoinerMenuItems:
     def __init__(self, expected_acks: int, data_input_queue: MessageMiddlewareQueue, menu_items_input_queue: MessageMiddlewareQueue, data_out_queue: MessageMiddlewareQueue, eof_in_queues: list[MessageMiddlewareQueue], eof_out_queues: list[MessageMiddlewareQueue]):
@@ -107,19 +113,14 @@ class JoinerMenuItems:
                 self.processing_data.value = True
             items = message.process_message()
 
-            # TransactionItems
-            if message.type == MESSAGE_TYPE_TRANSACTION_ITEMS:
-                logging.info(f"TRANSACTION ITEMS {message}")
+            if message.type == MESSAGE_TYPE_QUERY_4_RESULT:
                 ready_to_send = ''
                 for item in items:
-                    logging.info("ITEM")
-                    name = self.menu_items.get(item.item_id)
-                    logging.info(f"NAME {name}")
+                    name = self.menu_items.get(parse_int(item.item_data))
                     if name:
-                        item.item_id = name
+                        item.join_item_name(name)
                         ready_to_send += item.serialize()
                     else:
-                        # Guardar para procesar más tarde
                         self.pending_items.append(item)
 
                 if ready_to_send:
@@ -148,15 +149,15 @@ class JoinerMenuItems:
     def _process_pending(self):
         ready_to_send = ''
         for item in list(self.pending_items):
-            name = self.menu_items.get(item.item_id)
+            name = self.menu_items.get(parse_int(item.item_data))
             if name:
-                item.item_id = name
+                item.join_item_name(name)
                 ready_to_send += item.serialize()
                 self.pending_items.remove(item)
 
         if ready_to_send:
-            serialized = Message(0, MESSAGE_TYPE_TRANSACTION_ITEMS, 0, ready_to_send).serialize()
-            self.data_out_queue.send(serialized)
+            serialized = Message(0, MESSAGE_TYPE_QUERY_4_RESULT, 0, ready_to_send).serialize()
+            self.out_queue.send(serialized)
             logging.info(f"Sending message: {serialized}")
 
     def _on_eof_from_queue_message(self, message):
