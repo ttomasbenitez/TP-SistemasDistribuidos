@@ -9,16 +9,18 @@ from multiprocessing import Process, Value
 
 class SemesterAggregator(Worker):
 
-    def __init__(self, data_in_queue: MessageMiddlewareQueue, out_queue: MessageMiddlewareQueue, eof_in_queues: list[MessageMiddlewareQueue], eof_out_queues: list[MessageMiddlewareQueue]):
+    def __init__(self, expected_acks: int, data_in_queue: MessageMiddlewareQueue, out_queue: MessageMiddlewareQueue, eof_in_queues: list[MessageMiddlewareQueue], eof_out_queues: list[MessageMiddlewareQueue]):
         super().__init__(data_in_queue)
         self.data_in_queue = data_in_queue
         self.out_queue = out_queue
         self.eof_in_queues = eof_in_queues
         self.eof_out_queues = eof_out_queues
+        self.leader = Value('b', expected_acks == 0)
         self.new_chunk_1 = b""
         self.new_chunk_2 = b""
         self.new_chunk_3 = b""
         self.new_chunk_4 = b""
+        self.expected_acks = Value('i', expected_acks)
 
     def start(self):
         # Creamos un proceso por cada input queue
@@ -44,6 +46,11 @@ class SemesterAggregator(Worker):
 
     def _consume_eof_queue(self, queue: MessageMiddlewareQueue):
         queue.start_consuming(self._on_eof_from_queue_message)
+
+    def _send_final_eof(self, message):
+        logging.info(f"\n\nMensaje de EOF completito: {message}")
+        self.data_out_queue.send(message.serialize())
+        logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")
 
     def _on_eof_from_queue_message(self, message):
         try:
@@ -71,14 +78,21 @@ class SemesterAggregator(Worker):
                         return
         except Exception as e:
             print(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
-            
+
     def __on_message__(self, message):
         try:
             logging.info(f"Recibo mensaje")
             message = Message.deserialize(message)
+
             if message.type == MESSAGE_TYPE_EOF:
-                self.__received_EOF__(message)
+                with self.leader.get_lock():
+                    if self.leader.value:
+                        self._send_final_eof(message)
+                    else: 
+                        self.leader.value = True
+                        self.__received_EOF__(message)
                 return
+            
             items = message.process_message()
             logging.info(f"Proceso mensaje | request_id: {message.request_id} | type: {message.type}")
             for item in items:
@@ -110,6 +124,7 @@ class SemesterAggregator(Worker):
                 self.out_queue.send(serialized)
                 logging.info(f"Filtro correctamente | request_id: {message.request_id} | type: {message.type}")
             if self.new_chunk_4:
+                print("New chunk 4: ", self.new_chunk_4)
                 message.update_content(self.new_chunk_4)
                 serialized = message.serialize()
                 self.out_queue.send(serialized)
@@ -142,6 +157,7 @@ def initialize_config():
         "input_queue": os.getenv('INPUT_QUEUE_1'),
         "output_queue": os.getenv('OUTPUT_QUEUE_1'),
         "logging_level": os.getenv('LOG_LEVEL', 'INFO'),
+        "expected_acks": int(os.getenv('EXPECTED_ACKS', '0')),
     }
 
     # Claves requeridas
@@ -181,7 +197,7 @@ def main():
     input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue"])
     output_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["output_queue"])
     
-    filter = SemesterAggregator(input_queue, output_queue, eof_input_queues, eof_output_queues)
+    filter = SemesterAggregator(config_params["expected_acks"], input_queue, output_queue, eof_input_queues, eof_output_queues)
     filter.start()
 
 if __name__ == "__main__":
