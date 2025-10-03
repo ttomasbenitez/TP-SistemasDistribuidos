@@ -81,4 +81,4 @@ class Q2Result:
         self.item_data = item_name
         
     def pre_process(self):
-        return {"qId": self.query, "year_month_created_at": self.year_month_created_at, "item_name": self.item_data, self.result_type: self.value }
+        return {"qId": self.query, "year_month_created_at": f"0{self.year_month_created_at}", "item_name": self.item_data, self.result_type: self.value }

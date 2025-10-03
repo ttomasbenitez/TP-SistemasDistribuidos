@@ -58,7 +58,9 @@ class TopThreeClientsJoiner(Worker):
             if store is None:
                 continue
             sorted_users = sorted(users.items(), key=lambda x: (-x[1], x[0]))
-            top_3_users = sorted_users[:3]
+            threshold_value = sorted_users[:3][-1][1]
+            top_3_users = [user for user in sorted_users if user[1] >= threshold_value]
+            
             chunk = ''
             for user in top_3_users:
                 user_id, transaction_count = user
