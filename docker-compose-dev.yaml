@@ -23,12 +23,13 @@ services:
       LISTEN_BACKLOG: '5'
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: results-queue
-      OUTPUT_QUEUE_1: stores-queue
-      OUTPUT_QUEUE_2: menu-items-queue-1
-      OUTPUT_QUEUE_3: menu-items-queue-2
-      OUTPUT_QUEUE_4: menu-items-queue-3
-      OUTPUT_QUEUE_5: users-queue
-      OUTPUT_QUEUE_6: batches-queue
+      OUTPUT_QUEUE_1: stores-queue-1
+      OUTPUT_QUEUE_2: stores-queue-2
+      OUTPUT_QUEUE_3: menu-items-queue-1
+      OUTPUT_QUEUE_4: menu-items-queue-2
+      OUTPUT_QUEUE_5: menu-items-queue-3
+      OUTPUT_QUEUE_6: users-queue
+      OUTPUT_QUEUE_7: batches-queue
       EXCHANGE_NAME: gateway-exchange
     depends_on:
       rabbitmq:
@@ -352,7 +353,7 @@ services:
     environment:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-semester-q3-queue
-      INPUT_QUEUE_2: stores-queue
+      INPUT_QUEUE_2: stores-queue-1
       OUTPUT_QUEUE_1: results-queue
       EXCHANGE_NAME: joiner-stores-q3-exchange
       LOG_LEVEL: INFO
@@ -608,7 +609,7 @@ services:
     environment:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: top-clients-queue
-      INPUT_QUEUE_2: stores-queue
+      INPUT_QUEUE_2: stores-queue-2
       OUTPUT_QUEUE_1: results-queue
       EXCHANGE_NAME: join-stores-q4-exchange
       LOG_LEVEL: INFO
