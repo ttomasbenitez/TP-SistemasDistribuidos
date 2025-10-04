@@ -37,24 +37,6 @@ services:
     networks:
     - testing_net
 
-#  filter-year:
-#    container_name: filter-year
-#    image: worker:latest
-#    command: "/worker/filter/year.py"
-#    environment:
-#      RABBITMQ_HOST: rabbitmq
-#      INPUT_QUEUE_1: batches-queue
-#      OUTPUT_QUEUE_1: year-filtered-queue-q1-q3
-#      OUTPUT_QUEUE_2: year-filtered-queue-q4
-#      OUTPUT_QUEUE_3: year-filtered-queue-q2
-#      EXCHANGE_NAME: year-filtered-exchange
-#      LOG_LEVEL: INFO
-#      EXPECTED_ACKS: 0
-#    networks:
-#    - testing_net
-#    depends_on:
-#    - gateway
-
   filter-year-1:
     container_name: filter-year-1
     image: worker:latest
@@ -94,23 +76,6 @@ services:
     - testing_net
     depends_on:
     - gateway
- 
-  #filter-time:
-  #  container_name: filter-time
-  #  image: worker:latest
-  #  command: "/worker/filter/time.py"
-  #  environment:
-  #    RABBITMQ_HOST: rabbitmq
-  #    INPUT_QUEUE_1: year-filtered-queue-q1-q3
-  #    OUTPUT_QUEUE_1: time-filtered-queue-q1
-  #    OUTPUT_QUEUE_2: time-filtered-queue-q3
-  #    EXCHANGE_NAME: time-filtered-exchange
-  #    LOG_LEVEL: INFO
-  #    EXPECTED_ACKS: 0
-  #  networks:
-  #  - testing_net
-  #  depends_on:
-  #  - gateway
 
   filter-time-1:
     container_name: filter-time-1
@@ -149,21 +114,6 @@ services:
     - testing_net
     depends_on:
     - gateway
-
-  # filter-amount:
-  #  container_name: filter-amount
-  #  image: worker:latest
-  #  command: "/worker/filter/amount.py"
-  #  environment:
-  #    RABBITMQ_HOST: rabbitmq
-  #    INPUT_QUEUE_1: time-filtered-queue-q1
-  #    OUTPUT_QUEUE_1: results-queue
-  #    LOG_LEVEL: INFO
-  #    EXPECTED_ACKS: 0
-  #  networks:
-  #  - testing_net
-  #  depends_on:
-  #  - gateway
 
   filter-amount-1:
     container_name: filter-amount-1
@@ -270,22 +220,6 @@ services:
     depends_on:
     - gateway
 
-  #joiner-menu-items:
-  #  container_name: joiner-menu-items
-  #  image: worker:latest
-  #  command: "/worker/joiner/menu_items.py"
-  #  environment:
-  #    RABBITMQ_HOST: rabbitmq
-  #    INPUT_QUEUE_1: products-results-queue
-  #    INPUT_QUEUE_2: menu-items-queue
-  #    OUTPUT_QUEUE_1: results-queue
-  #    LOG_LEVEL: INFO
-  #    EXPECTED_ACKS: 0 #Cantidad de réplicas sin contar este nodo.
-  #  networks:
-  #  - testing_net
-  #  depends_on:
-  #  - aggregator-quantity-profit
-
   joiner-menu-items-1:
     container_name: joiner-menu-items-1
     image: worker:latest
@@ -362,57 +296,6 @@ services:
     - testing_net
     depends_on:
     - gateway
-
-  #join-stores-q3-1:
-  #  container_name: joiner-stores-q3-1
-  #  image: worker:latest
-  #  command: "/worker/joiner/q3_stores_joiner.py"
-  #  environment:
-  #    RABBITMQ_HOST: rabbitmq
-  #    INPUT_QUEUE_1: aggregated-semester-q3-queue
-  #    INPUT_QUEUE_2: stores-queue
-  #    INPUT_QUEUE_3: EOF-joiner-stores-q3-2-1
-  #    OUTPUT_QUEUE_1: results-queue
-  #    OUTPUT_QUEUE_2: EOF-joiner-stores-q3-1-2
-  #    LOG_LEVEL: INFO
-  #    EXPECTED_ACKS: 1
-  #  networks:
-  #  - testing_net
-  #  depends_on:
-  #  - gateway
-#
-  #join-stores-q3-2:
-  #  container_name: joiner-stores-q3-2
-  #  image: worker:latest
-  #  command: "/worker/joiner/q3_stores_joiner.py"
-  #  environment:
-  #    RABBITMQ_HOST: rabbitmq
-  #    INPUT_QUEUE_1: aggregated-semester-q3-queue
-  #    INPUT_QUEUE_2: stores-queue
-  #    INPUT_QUEUE_3: EOF-joiner-stores-q3-1-2
-  #    OUTPUT_QUEUE_1: results-queue
-  #    OUTPUT_QUEUE_2: EOF-joiner-stores-q3-2-1
-  #    LOG_LEVEL: INFO
-  #    EXPECTED_ACKS: 1
-  #  networks:
-  #  - testing_net
-  #  depends_on:
-  #  - gateway
-
-  #aggregator-semester:
-  #  container_name: aggregator-semester
-  #  image: worker:latest
-  #  command: "/worker/aggregator/semester_aggregator.py"
-  #  environment:
-  #    RABBITMQ_HOST: rabbitmq
-  #    INPUT_QUEUE_1: aggregated-store-q3-queue
-  #    OUTPUT_QUEUE_1: aggregated-semester-q3-queue
-  #    LOG_LEVEL: INFO
-  #    EXPECTED_ACKS: 0
-  #  networks:
-  #  - testing_net
-  #  depends_on:
-  #  - gateway
 
   aggregator-semester-1:
     container_name: aggregator-semester-1
@@ -498,22 +381,6 @@ services:
     depends_on:
     - gateway
 
-  #aggregator-store-q3:
-  #  container_name: aggregator-store-q3
-  #  image: worker:latest
-  #  command: "/worker/aggregator/store_aggregator.py"
-  #  environment:
-  #    RABBITMQ_HOST: rabbitmq
-  #    INPUT_QUEUE_1: time-filtered-queue-q3
-  #    OUTPUT_QUEUE_1: aggregated-store-q3-queue
-  #    LOG_LEVEL: INFO
-  #    EXPECTED_ACKS: 0
-  #  networks:
-  #  - testing_net
-  #  depends_on:
-  #  - gateway
-#
-
   aggregator-store-q3-1:
     container_name: aggregator-store-q3-1
     image: worker:latest
@@ -571,16 +438,35 @@ services:
     depends_on:
     - gateway
 
-  aggregator-store-q4:
+  aggregator-store-q4-1:
     container_name: aggregator-store-q4
     image: worker:latest
     command: "/worker/aggregator/store_aggregator.py"
     environment:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: year-filtered-queue-q4
+      INPUT_QUEUE_2: EOF-aggregator-month-2-1
       OUTPUT_QUEUE_1: aggregated-store-q4-queue
+      OUTPUT_QUEUE_2: EOF-aggregator-month-1-2
       LOG_LEVEL: INFO 
-      EXPECTED_ACKS: 0
+      EXPECTED_ACKS: 1
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
+  
+  aggregator-store-q4-2:
+    container_name: aggregator-store-q4-2
+    image: worker:latest
+    command: "/worker/aggregator/store_aggregator.py"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: year-filtered-queue-q4
+      INPUT_QUEUE_2: EOF-aggregator-month-1-2
+      OUTPUT_QUEUE_1: aggregated-store-q4-queue
+      OUTPUT_QUEUE_2: EOF-aggregator-month-2-1
+      LOG_LEVEL: INFO 
+      EXPECTED_ACKS: 1
     networks:
     - testing_net
     depends_on:

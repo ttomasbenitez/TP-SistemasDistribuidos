@@ -57,17 +57,29 @@ class TopThreeClientsJoiner(Worker):
         for store, users in self.users_by_store.items():
             if store is None:
                 continue
+        
+            unique_values = []
+        
             sorted_users = sorted(users.items(), key=lambda x: (-x[1], x[0]))
-            threshold_value = sorted_users[:3][-1][1]
-            top_3_users = [user for user in sorted_users if user[1] >= threshold_value]
-            
+ 
+            for user in sorted_users:
+                if user[1] not in unique_values:
+                    unique_values.append(user[1])
+                if len(unique_values) == 3:
+                    break
+
+            top_3_users = [user for user in sorted_users if user[1] in unique_values]
             chunk = ''
             for user in top_3_users:
                 user_id, transaction_count = user
                 birthdate = self.users.get(user_id, 'N/A')
                 chunk += Q4IntermediateResult(store, birthdate, transaction_count).serialize()
+            
             msg = Message(1, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT, 1, chunk)
             self.out_queue.send(msg.serialize())
+
+# Filtrar los usuarios que tienen valores en los top 3
+            
 
     def _send_eof(self, message):
         self.out_queue.send(message.serialize())

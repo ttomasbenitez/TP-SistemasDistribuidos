@@ -3,10 +3,11 @@ import logging
 import signal
 import threading
 from pkg.message.message import Message
-from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_REQUEST_ID
+from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_REQUEST_ID, MESSAGE_TYPE_ALL_RESULTS
 from Middleware.middleware import MessageMiddlewareExchange, MessageMiddlewareQueue
 from pkg.message.protocol import Protocol
 
+EXPECTED_QUERIES = 4
 class ConnectionClosedException(Exception):
     """Exception raised when a client connection is closed unexpectedly."""
     pass
@@ -100,6 +101,8 @@ class Gateway:
         proceced_message = Message.deserialize(message)
         if proceced_message.type == MESSAGE_TYPE_EOF:
             self._finished_queries += 1
+            if self._finished_queries == EXPECTED_QUERIES:
+                logging.info(f'action: all results sent | result: success')
             return
         self._client_protocol.send_message(message)
         
