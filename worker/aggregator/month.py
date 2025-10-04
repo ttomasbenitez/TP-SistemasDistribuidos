@@ -120,7 +120,7 @@ class AggregatorMonth(Worker):
         for item in items:
             month = item.get_month()
             year = item.get_year()
-            q4_intermediate = Q2IntermediateResult(f"{year}-{month}", item.item_id, item.quantity, item.subtotal)
+            q4_intermediate = Q2IntermediateResult(f"{year}-0{month}", item.item_id, item.quantity, item.subtotal)
             groups.setdefault(f"{year}-{month}", []).append(q4_intermediate)
         return groups
     
