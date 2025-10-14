@@ -68,8 +68,8 @@ class StoresJoiner(Worker):
     def send_joined_transactions_by_request(self, message, request_id):
         total_chunk = ''
         for (key, total_tpv) in self.processed_transactions.items():
-            request_id, store_name, period = key
-            if request_id != request_id:
+            req_id, store_name, period = key
+            if request_id != req_id:
                 continue
             q3Result = Q3Result(period, store_name, total_tpv)
             total_chunk += q3Result.serialize()

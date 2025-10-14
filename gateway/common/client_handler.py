@@ -20,9 +20,9 @@ class ClientHandler(threading.Thread):
 
     def run(self):
         try:
-            logging.info("action: client_handler_start | result: success")
+            logging.info(f"action: client_handler_start | result: success | queue name: {self._in_queue.queue_name}")
 
-            self._protocol.send_message(Message(self._request_id, MESSAGE_TYPE_REQUEST_ID, 0, '').serialize())
+            self._protocol.send_message(Message(self._request_id, MESSAGE_TYPE_REQUEST_ID, 0, ''    ).serialize())
             # Recibir datos del cliente y enviarlos al exchange
             self._receive_and_publish()
 
@@ -38,7 +38,7 @@ class ClientHandler(threading.Thread):
         while self._running:
             message = self._protocol.read_message()
             if message.type == MESSAGE_TYPE_EOF:
-                logging.info("action: receive_data | result: eof")
+                logging.info("action: client_handler receive_data | result: eof")
                 break
 
             items = message.process_message_from_csv()
@@ -50,7 +50,9 @@ class ClientHandler(threading.Thread):
 
     def _start_results_consumer(self):
         """Levanta un hilo separado para consumir los resultados de RabbitMQ."""
-        self._protocol.send_message(Message(0, MESSAGE_TYPE_REQUEST_ID, 0, '').serialize())
+        # self._protocol.send_message(Message(self._request_id, MESSAGE_TYPE_REQUEST_ID, 0, '').serialize())
+
+        logging.info(f"action: start_results_consumer | result: in_progress from queue {self._in_queue.queue_name}")
 
         def _consume():
             try:

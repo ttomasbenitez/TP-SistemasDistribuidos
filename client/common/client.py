@@ -29,7 +29,7 @@ class Client:
             self._socket.connect((self._gateway_host, self._gateway_port))
             self._protocol = Protocol(self._socket)
             self._receive_request_id()
-            logging.info(f'action: connect | result: success | gateway address: {self._gateway_host}:{self._gateway_port}')
+            logging.info(f'action: connect | result: success | gateway address: {self._gateway_host}:{self._gateway_port} | request_id: {self._request_id}')
             self.__send_request()
             self.__wait_for_results()
         except Exception as e:
@@ -46,8 +46,9 @@ class Client:
         """
         try:
             self.__send_data()
+            logging.info(f'action: send_data | result: success | request_id: {self._request_id}')
             self.__send_end_of_data()
-            logging.info(f'action: send_request | result: success')
+            logging.info(f'action: send_request | result: success | request_id: {self._request_id}')
         except Exception as e:
             logging.error(f'action: send_request | result: fail | error: {e}')
 
@@ -64,7 +65,7 @@ class Client:
             file_reader = FileReader(file_path, int(os.getenv('MAX_BATCH_SIZE')))
             while file_reader.has_more_data():
                 data = file_reader.get_chunk()
-                self._protocol.send_message(Message(0, message_type, 0, data).serialize())
+                self._protocol.send_message(Message(self._request_id, message_type, 0, data).serialize())
             file_reader.close()
 
         logging.info(f'action: send_data_folder | folder: {folder_path} | result: success')
@@ -74,7 +75,7 @@ class Client:
         Sends an EOF message to the gateway to indicate the end of data transmission.
         """
         try:
-            self._protocol.send_message(Message(0, MESSAGE_TYPE_EOF, 0, '').serialize())
+            self._protocol.send_message(Message(self._request_id, MESSAGE_TYPE_EOF, 0, '').serialize())
             logging.info(f'action: send_eof | result: success')
         except Exception as e:
             logging.error(f'action: send_eof | result: fail | error: {e}')
