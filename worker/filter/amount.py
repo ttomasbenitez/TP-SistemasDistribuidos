@@ -6,18 +6,20 @@ from pkg.message.q1_result import Q1Result
 from utils.custom_logging import initialize_log
 import os
 from pkg.message.constants import MESSAGE_TYPE_EOF, QUERY_1, MESSAGE_TYPE_QUERY_1_RESULT
-from multiprocessing import Process, Value
+from multiprocessing import Process, Manager, Value
 
 
 class FilterAmountNode(Worker):
     
-    def __init__(self, expected_acks: int, data_in_queue: MessageMiddlewareQueue, data_out_queue: MessageMiddlewareQueue, eof_in_queues: list[MessageMiddlewareQueue], eof_out_queues: list[MessageMiddlewareQueue], amount_to_filter: int):
+    def __init__(self, expected_acks: int, data_in_queue: MessageMiddlewareQueue, data_out_queue_prefix: str, eof_in_queues: list[MessageMiddlewareQueue], eof_out_queues: list[MessageMiddlewareQueue], amount_to_filter: int):
         self.data_in_queue = data_in_queue
-        self.data_out_queue = data_out_queue
+        self.data_out_queue_prefix = data_out_queue_prefix
         self.eof_out_queues = eof_out_queues
         self.eof_in_queues = eof_in_queues
         self.amount_to_filter = amount_to_filter
 
+        manager = Manager()
+        self.clients = manager.dict()  # clave=request_id, valor=cola de output
         self.eof_received = Value('b', False)  # 'b' = boolean
         self.leader = Value('b', expected_acks == 0)
         self.processing_data = Value('b', False)
@@ -80,8 +82,15 @@ class FilterAmountNode(Worker):
         try:
             logging.info("Procesando mensaje")
             message = Message.deserialize(message)
+            if message.request_id not in self.clients:
+                output_queue = MessageMiddlewareQueue(
+                    self.rabbitmq_host,
+                    f"{self.data_out_queue_prefix}_{message.request_id}",
+                    auto_delete=True
+                )
+                self.clients[message.request_id] = output_queue
 
-            if message.type == MESSAGE_TYPE_EOF:
+            elif message.type == MESSAGE_TYPE_EOF:
                 with self.leader.get_lock():
                     if self.leader.value:
                         self._send_final_eof(message)
@@ -185,9 +194,8 @@ def main():
     eof_input_queues, eof_output_queues = create_eofs_queues(config_params["rabbitmq_host"])
 
     data_input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue"])
-    data_output_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["output_queue"])
     
-    aggregator = FilterAmountNode(config_params["expected_acks"], data_input_queue, data_output_queue, eof_input_queues, eof_output_queues, 75)
+    aggregator = FilterAmountNode(config_params["expected_acks"], data_input_queue, config_params["output_queue"], eof_input_queues, eof_output_queues, 75)
     aggregator.start()
 
 if __name__ == "__main__":
