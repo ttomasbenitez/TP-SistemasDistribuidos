@@ -83,6 +83,7 @@ class FilterAmountNode(Worker):
         try:
             logging.info("Procesando mensaje")
             message = Message.deserialize(message)
+            logging.info(f"Mensaje recibido | request_id: {message.request_id} | type: {message.type}")
 
             if message.request_id not in self.clients:
                 out_queue_name = f"{self.data_out_queue_prefix}_{message.request_id}"
@@ -114,7 +115,7 @@ class FilterAmountNode(Worker):
             if new_chunk:
                 new_message = Message(message.request_id, MESSAGE_TYPE_QUERY_1_RESULT, message.msg_num, new_chunk)
                 serialized = new_message.serialize()
-                self.data_out_exchange.send(serialized)
+                self.data_out_exchange.send(serialized, str(message.request_id))
 
         except Exception as e:
             logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
@@ -197,10 +198,13 @@ def create_eofs_queues(rabbitmq_host):
     return input_queues, output_queues
 
 def main():
+    logging.info("Iniciando Filter Amount Node SIN ERROR ALGUNO")
     config_params = initialize_config()
 
     initialize_log(config_params["logging_level"])
-    
+
+    logging.info(f"Configuración cargada RABBITMQHOSTAMOUNT: {config_params['rabbitmq_host']}")
+
     eof_input_queues, eof_output_queues = create_eofs_queues(config_params["rabbitmq_host"])
 
     data_output_exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["exchange"], {})

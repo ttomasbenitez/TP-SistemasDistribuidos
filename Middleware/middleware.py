@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import logging
 import pika
 
 class MessageMiddlewareMessageError(Exception):
@@ -77,6 +78,7 @@ class MessageMiddlewareQueue(MessageMiddleware):
 class MessageMiddlewareExchange(MessageMiddleware):
     def __init__(self, host, exchange_name, queues_dict):
         self.exchange_name = exchange_name
+        self.host = host
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(host))
         self.channel = self.connection.channel()
         self.channel.exchange_declare(exchange=exchange_name, exchange_type='direct', durable=True)
@@ -111,7 +113,7 @@ class MessageMiddlewareExchange(MessageMiddleware):
         Crea una cola, la bindea al exchange y la agrega al diccionario interno.
         Si la cola ya existe, no falla.
         """
-        queue = MessageMiddlewareQueue(self.exchange_name, queue_name)
+        queue = MessageMiddlewareQueue(self.host, queue_name)
 
         # Bindear al exchange
         self.channel.queue_bind(exchange=self.exchange_name, queue=queue_name, routing_key=routing_key)
