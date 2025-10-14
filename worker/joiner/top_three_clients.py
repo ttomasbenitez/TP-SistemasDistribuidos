@@ -20,15 +20,17 @@ class TopThreeClientsJoiner(Worker):
         self.eof_count = 0
         self.users = dict() 
         self.users_by_store = dict()  
+        self.eofs_by_client = {}
 
     def __on_message__(self, msg):
         message = Message.deserialize(msg)
         if message.type == MESSAGE_TYPE_EOF:
-            self.eof_count += 1
-            if self.eof_count < EXPECTED_EOFS:
-                logging.info(f"EOF recibido {self.eof_count}/{EXPECTED_EOFS} | request_id: {message.request_id} | type: {message.type}")
+            self.eofs_by_client[message.request_id] = self.eofs_by_client.get(message.request_id, 0) + 1
+            if self.eofs_by_client[message.request_id] < EXPECTED_EOFS:
+                logging.info(f"EOF recibido {self.eofs_by_client[message.request_id]}/{EXPECTED_EOFS} | request_id: {message.request_id} | type: {message.type}")
                 return
-            self._process_top_3()
+            
+            self._process_top_3_by_request(message.request_id)
             self._send_eof(message)
             return
 
@@ -36,30 +38,35 @@ class TopThreeClientsJoiner(Worker):
 
         if message.type == MESSAGE_TYPE_USERS:
             for item in items:
-                self.users[item.get_user_id()] = item.get_birthdate()
+                key = (item.get_user_id(), message.request_id)
+                self.users[key] = item.get_birthdate()
         
         elif message.type == MESSAGE_TYPE_TRANSACTIONS:
             pre_process = dict()
             store_id = None
             for item in items:
-                pre_process[item.get_user()] = pre_process.get(item.get_user(), 0) + 1
+                key = (item.get_user_id(), message.request_id)
+                pre_process[key] = pre_process.get(key, 0) + 1
                 if store_id is None:
                     store_id = item.get_store() 
-            if store_id not in self.users_by_store:
-                self.users_by_store[store_id] = dict()
+            if (store_id, message.request_id) not in self.users_by_store:
+                self.users_by_store[(store_id, message.request_id)] = dict()
                 
             for user_id, count in pre_process.items():
                 if user_id:
-                    self.users_by_store[store_id][user_id] = self.users_by_store[store_id].get(user_id, 0) + count
+                    self.users_by_store[(store_id, message.request_id)][user_id] = self.users_by_store[(store_id, message.request_id)].get(user_id, 0) + count
 
 
-    def _process_top_3(self):
-        for store, users in self.users_by_store.items():
+    def _process_top_3_by_request(self, request_id):
+        for (store, req_id), users in self.users_by_store.items():
             if store is None:
                 continue
-        
+            
+            if req_id != request_id:
+                continue
+
             unique_values = []
-        
+
             sorted_users = sorted(users.items(), key=lambda x: (-x[1], x[0]))
  
             for user in sorted_users:
@@ -75,7 +82,7 @@ class TopThreeClientsJoiner(Worker):
                 birthdate = self.users.get(user_id, 'N/A')
                 chunk += Q4IntermediateResult(store, birthdate, transaction_count).serialize()
             
-            msg = Message(1, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT, 1, chunk)
+            msg = Message(request_id, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT, 1, chunk)
             self.out_queue.send(msg.serialize())
 
 # Filtrar los usuarios que tienen valores en los top 3
