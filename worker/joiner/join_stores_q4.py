@@ -17,20 +17,20 @@ class Q4StoresJoiner(Worker):
     def __init__(self, input_queues: MessageMiddlewareExchange, out_queue: MessageMiddlewareQueue):
         super().__init__(input_queues)
         self.out_queue = out_queue
-        self.pending_clients = list()
-        self.processed_clients = list()
+        self.pending_clients = dict()
+        self.processed_clients = dict()
         self.stores = dict()
-        self.eof_count = 0
+        self.eofs_by_client = {}
 
     def __on_message__(self, msg):
         message = Message.deserialize(msg)
         logging.info(f"Received message | request_id: {message.request_id} | type: {message.type}")
         if message.type == MESSAGE_TYPE_EOF:
-            self.eof_count += 1
-            if self.eof_count < EXPECTED_EOFS:
-                logging.info(f"EOF recibido {self.eof_count}/{EXPECTED_EOFS} | request_id: {message.request_id} | type: {message.type}")
+            self.eofs_by_client[message.request_id] = self.eofs_by_client.get(message.request_id, 0) + 1
+            if self.eofs_by_client[message.request_id] < EXPECTED_EOFS:
+                logging.info(f"EOF recibido {self.eofs_by_client[message.request_id]}/{EXPECTED_EOFS} | request_id: {message.request_id} | type: {message.type}")
                 return
-            self._process_pending()
+            self._process_pending(request_id=message.request_id)
             self.send_processed_clients(message)
             self._send_eof(message)
             return
@@ -39,29 +39,33 @@ class Q4StoresJoiner(Worker):
 
         if message.type == MESSAGE_TYPE_STORES:
             for item in items:
-                self.stores[item.get_id()] = item.get_name()
+                key = (item.get_id(), message.request_id)
+                self.stores[key] = item.get_name()
 
         elif message.type == MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT:
             for item in items:
-                store_name = self.stores.get(item.get_store(), 0)
+                store_name = self.stores.get((item.get_store(), message.request_id), 0)
                 if store_name:
-                    self.processed_clients.append(Q4Result(store_name, item.get_birthdate(), item.get_purchases_qty()))
+                    self.processed_clients[message.request_id] = Q4Result(store_name, item.get_birthdate(), item.get_purchases_qty())
                 else:
-                    self.pending_clients.append(item)
+                    self.pending_clients[(item.get_store(), message.request_id)] = item
 
     def send_processed_clients(self, message):
         total_chunk = ''
-        for q4Result in self.processed_clients:
-            total_chunk += q4Result.serialize()
+
+        for req_id, q4Result in self.processed_clients.items():
+            if req_id == message.request_id:
+                total_chunk += q4Result.serialize()
         msg = Message(message.request_id, MESSAGE_TYPE_QUERY_4_RESULT, message.msg_num, total_chunk)
         self.out_queue.send(msg.serialize())
 
-    def _process_pending(self):
-        for item in self.pending_clients:
-            store_name = self.stores.get(item.get_store())
-            if store_name:
-                self.processed_clients.append(Q4Result(store_name, item.get_birthdate(), item.get_purchases_qty()))
-                self.pending_clients.remove(item)
+    def _process_pending(self, request_id):
+        for (store, req_id), item in self.pending_clients.items():
+            if req_id == request_id:
+                store_name = self.stores.get((store, req_id))
+                if store_name:
+                    self.processed_clients[req_id] = Q4Result(store_name, item.get_birthdate(), item.get_purchases_qty())
+                del self.pending_clients[(store, req_id)]
 
     def _send_eof(self, message):
         self.out_queue.send(message.serialize())
