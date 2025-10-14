@@ -3,7 +3,7 @@ import logging
 import signal
 import threading
 from pkg.message.message import Message
-from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_REQUEST_ID, MESSAGE_TYPE_ALL_RESULTS
+from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_REQUEST_ID, MESSAGE_TYPE_CLIENT_ID
 from Middleware.middleware import MessageMiddlewareExchange, MessageMiddlewareQueue
 from pkg.message.protocol import Protocol
 
@@ -28,6 +28,7 @@ class Gateway:
         self._consumer_thread: threading.Thread = None
         self._results_started = False
         self._finished_queries = 0
+        self._client_id = 0 # Identificador único autoincremental para cada cliente
     
         signal.signal(signal.SIGTERM, self.__handle_shutdown)
         signal.signal(signal.SIGINT, self.__handle_shutdown)
@@ -40,8 +41,10 @@ class Gateway:
         while self._running:
             try:
                 client_sock = self.__accept_new_connection()
-                logging.info(f'action: new_connection | result: success')
+                logging.info(f'action: new_connection | result: success | client_id: {self._client_id}')
                 self._client_protocol = Protocol(client_sock)
+
+                self._send_id()
                 self.__receive_data()
                 self.__start_results_consumer_once()    
             except OSError as e:
@@ -86,7 +89,7 @@ class Gateway:
             return
 
         self._results_started = True
-        self._client_protocol.send_message(Message(0, MESSAGE_TYPE_REQUEST_ID, 0, '').serialize())
+        self._client_protocol.send_message(Message(0, MESSAGE_TYPE_REQUEST_ID, 0, '').serialize()) #ESTO ES UNA ESPECIA DE ACK PARA EL CLIENTE
 
         def _consume():
             try:
@@ -127,3 +130,9 @@ class Gateway:
             pass
         logging.info(f'action: gateway shutdown | result: success')
         
+    def _send_id(self):
+        """
+        Sends the client ID to the connected client.
+        """
+        self._client_protocol.send_message(Message(0, MESSAGE_TYPE_CLIENT_ID, 0, str(self._client_id)).serialize())
+        self._client_id += 1

@@ -6,6 +6,7 @@ from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_STORES, MESSAGE
 from utils.custom_logging import initialize_log
 import os
 from pkg.message.q3_result import Q3Result
+import threading
 
 EXPECTED_EOFS = 2
 
@@ -25,16 +26,28 @@ class StoresJoiner(Worker):
     def __on_message__(self, msg):
         message = Message.deserialize(msg)
         logging.info(f"Received message | request_id: {message.request_id} | type: {message.type}")
+
         if message.type == MESSAGE_TYPE_EOF:
             self.eof_count += 1
             if self.eof_count < EXPECTED_EOFS:
-                logging.info(f"EOF recibido {self.eof_count}/{EXPECTED_EOFS} | request_id: {message.request_id} | type: {message.type}")
+                logging.info(f"EOF recibido {self.eof_count}/{EXPECTED_EOFS}")
                 return
-            self._process_pending()
-            self.send_joined_transactions(message)
-            self._send_eof(message)
+
+            # --- ÚLTIMO EOF: procesar y publicar usando out_mw (channel separado) ---
+            try:
+                self._process_pending()                  # solo CPU/mem
+                self.send_joined_transactions(message)   # publica en out_mw (OUT channel)
+                self._send_eof(message)                  # publica EOF en out_mw
+            except Exception as e:
+                # Si algo falla aquí, logueá el tipo exacto (p.ej. ChannelClosedByBroker)
+                logging.exception(f"Error publicando resultados finales: {type(e).__name__}: {e}")
+                # Podés reintentar con backoff o persistir en disco para retry.
+            finally:
+                # Parada diferida del consumer de entrada (IN) fuera del callback:
+                self._request_stop_consuming_async()
             return
 
+        # --- Mensajes de datos ---
         items = message.process_message()
 
         if message.type == MESSAGE_TYPE_STORES:
@@ -80,6 +93,21 @@ class StoresJoiner(Worker):
             logging.error(f"Error al cerrar: {type(e).__name__}: {e}")
 
 
+    
+    def _request_stop_consuming_async(self):
+        def _stop():
+            try:
+                self.in_mw.stop_consuming()   # solo afecta el channel IN
+            except Exception as e:
+                logging.info(f"stop_consuming ignorado: {type(e).__name__}: {e}")
+            finally:
+                try:
+                    self.in_mw.close()        # cerrar IN
+                except Exception:
+                    pass
+                # El out_mw cerralo recién cuando estés SEGURO de no publicar más.
+        threading.Thread(target=_stop, daemon=True).start()
+
 def initialize_config():
     config_params = {}
     config_params["rabbitmq_host"] = os.getenv('RABBITMQ_HOST')
@@ -111,3 +139,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
