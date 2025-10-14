@@ -36,7 +36,7 @@ class Gateway:
                 results_in_queue = MessageMiddlewareQueue(self._rabbitmq_host, results_queue_name)
 
                 # Crear un handler por cliente
-                handler = ClientHandler(client_sock, self._exchange, results_in_queue)
+                handler = ClientHandler(client_id, client_sock, self._exchange, results_in_queue)
 
                 self._clients.append(handler)
                 handler.start()  # arranca el hilo del cliente

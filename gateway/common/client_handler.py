@@ -8,8 +8,9 @@ from Middleware.middleware import MessageMiddlewareQueue
 EXPECTED_QUERIES = 4
 
 class ClientHandler(threading.Thread):
-    def __init__(self, client_sock, exchange, in_queue):
+    def __init__(self, request_id, client_sock, exchange, in_queue):
         super().__init__()
+        self._request_id = request_id
         self._protocol = Protocol(client_sock)
         self._exchange = exchange
         self._in_queue = in_queue
@@ -21,6 +22,7 @@ class ClientHandler(threading.Thread):
         try:
             logging.info("action: client_handler_start | result: success")
 
+            self._protocol.send_message(Message(self._request_id, MESSAGE_TYPE_REQUEST_ID, 0, 0))
             # Recibir datos del cliente y enviarlos al exchange
             self._receive_and_publish()
 

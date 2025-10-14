@@ -19,6 +19,7 @@ class Client:
         self._gateway_port = gateway_port
         self._socket.bind(('', 0))
         self._protocol = None
+        self._request_id = None
     
         signal.signal(signal.SIGTERM, self.__handle_shutdown)
         signal.signal(signal.SIGINT, self.__handle_shutdown)
@@ -27,6 +28,7 @@ class Client:
         try:
             self._socket.connect((self._gateway_host, self._gateway_port))
             self._protocol = Protocol(self._socket)
+            self._receive_request_id()
             logging.info(f'action: connect | result: success | gateway address: {self._gateway_host}:{self._gateway_port}')
             self.__send_request()
             self.__wait_for_results()
@@ -34,6 +36,9 @@ class Client:
             logging.error(f'action: connect | result: fail | error: {e}')
             
         self.__handle_shutdown(None, None)
+
+    def _receive_request_id(self):
+        self._request_id = self._protocol.read_message().request_id
 
     def __send_request(self):
         """
