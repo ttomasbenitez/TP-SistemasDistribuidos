@@ -1,23 +1,26 @@
 from worker import Worker 
-from Middleware.middleware import MessageMiddlewareQueue
+from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
 import logging
 from pkg.message.message import Message
 from pkg.message.q1_result import Q1Result
 from utils.custom_logging import initialize_log
 import os
 from pkg.message.constants import MESSAGE_TYPE_EOF, QUERY_1, MESSAGE_TYPE_QUERY_1_RESULT
-from multiprocessing import Process, Value
+from multiprocessing import Process, Manager, Value, Lock
 
 
 class FilterAmountNode(Worker):
     
-    def __init__(self, expected_acks: int, data_in_queue: MessageMiddlewareQueue, data_out_queue: MessageMiddlewareQueue, eof_in_queues: list[MessageMiddlewareQueue], eof_out_queues: list[MessageMiddlewareQueue], amount_to_filter: int):
+    def __init__(self, expected_acks: int, data_in_queue: MessageMiddlewareQueue, data_out_exchange: MessageMiddlewareExchange, data_out_queue_prefix: str, eof_in_queues: list[MessageMiddlewareQueue], eof_out_queues: list[MessageMiddlewareQueue], amount_to_filter: int):
         self.data_in_queue = data_in_queue
-        self.data_out_queue = data_out_queue
+        self.data_out_exchange = data_out_exchange
+        self.data_out_queue_prefix = data_out_queue_prefix
         self.eof_out_queues = eof_out_queues
         self.eof_in_queues = eof_in_queues
         self.amount_to_filter = amount_to_filter
 
+        manager = Manager()
+        self.clients = manager.list()
         self.eof_received = Value('b', False)  # 'b' = boolean
         self.leader = Value('b', expected_acks == 0)
         self.processing_data = Value('b', False)
@@ -81,6 +84,11 @@ class FilterAmountNode(Worker):
             logging.info("Procesando mensaje")
             message = Message.deserialize(message)
 
+            if message.request_id not in self.clients:
+                out_queue_name = f"{self.data_out_queue_prefix}_{message.request_id}"
+                self.data_out_exchange.add_queue_to_exchange(out_queue_name, str(message.request_id))
+                self.clients.append(message.request_id)
+
             if message.type == MESSAGE_TYPE_EOF:
                 with self.leader.get_lock():
                     if self.leader.value:
@@ -106,7 +114,7 @@ class FilterAmountNode(Worker):
             if new_chunk:
                 new_message = Message(message.request_id, MESSAGE_TYPE_QUERY_1_RESULT, message.msg_num, new_chunk)
                 serialized = new_message.serialize()
-                self.data_out_queue.send(serialized)
+                self.data_out_exchange.send(serialized)
 
         except Exception as e:
             logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
@@ -125,7 +133,8 @@ class FilterAmountNode(Worker):
             logging.info(f"EOF enviado a réplica | request_id: {message.request_id} | type: {message.type}")
 
     def _send_final_eof(self, message):
-        self.data_out_queue.send(message.serialize())
+        self.data_out_exchange.send(message.serialize())
+        self.clients.remove(message.request_id)
         logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")
             
     def close(self):
@@ -135,7 +144,7 @@ class FilterAmountNode(Worker):
             for out_queue in self.eof_out_queues:
                 out_queue.close()
             self.data_in_queue.close()
-            self.data_out_queue.close()
+            self.data_out_exchange.close()
         except Exception as e:
             print(f"Error al cerrar: {type(e).__name__}: {e}")
 
@@ -154,12 +163,22 @@ def initialize_config():
     
     config_params["rabbitmq_host"] = os.getenv('RABBITMQ_HOST')
     config_params["input_queue"] = os.getenv('INPUT_QUEUE_1')
-    config_params["output_queue"] = os.getenv('OUTPUT_QUEUE_1')
+    config_params["out_queue_name"] = os.getenv('OUTPUT_QUEUE_1')
+    config_params["exchange"] = os.getenv('EXCHANGE_NAME')
     config_params["logging_level"] = os.getenv('LOG_LEVEL', 'INFO')
     config_params["expected_acks"] = int(os.getenv('EXPECTED_ACKS'))
 
-    if config_params["rabbitmq_host"] is None or config_params["input_queue"] is None or config_params["output_queue"] is None or config_params["expected_acks"] is None:
-        raise ValueError("Expected value not found. Aborting filter.")
+    required_keys = [
+        "rabbitmq_host",
+        "out_queue_name",
+        "input_queue",
+        "exchange",
+        "expected_acks",
+    ]
+
+    missing_keys = [key for key in required_keys if config_params[key] is None]
+    if missing_keys:
+        raise ValueError(f"Expected value(s) not found for: {', '.join(missing_keys)}. Aborting filter.")
     
     return config_params
 
@@ -184,10 +203,10 @@ def main():
     
     eof_input_queues, eof_output_queues = create_eofs_queues(config_params["rabbitmq_host"])
 
+    data_output_exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["exchange"], {})
     data_input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue"])
-    data_output_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["output_queue"])
     
-    aggregator = FilterAmountNode(config_params["expected_acks"], data_input_queue, data_output_queue, eof_input_queues, eof_output_queues, 75)
+    aggregator = FilterAmountNode(config_params["expected_acks"], data_input_queue, data_output_exchange, config_params["out_queue_name"], eof_input_queues, eof_output_queues, 75)
     aggregator.start()
 
 if __name__ == "__main__":

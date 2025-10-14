@@ -63,10 +63,9 @@ def main():
     
     queues_dict = create_queues_dict()
     exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["exchange_name"], queues_dict)
-    in_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue"])
 
     # Initialize gateway and start gateway loop
-    gateway = Gateway(port, listen_backlog, exchange, in_queue)
+    gateway = Gateway(port, listen_backlog, exchange, config_params["input_queue"], config_params["rabbitmq_host"])
     gateway.run()
 
 def initialize_log(logging_level):
