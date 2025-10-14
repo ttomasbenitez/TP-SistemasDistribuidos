@@ -134,7 +134,7 @@ class FilterAmountNode(Worker):
             logging.info(f"EOF enviado a réplica | request_id: {message.request_id} | type: {message.type}")
 
     def _send_final_eof(self, message):
-        self.data_out_exchange.send(message.serialize())
+        self.data_out_exchange.send(message.serialize(), str(message.request_id))
         self.clients.remove(message.request_id)
         logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")
             
