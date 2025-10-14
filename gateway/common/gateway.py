@@ -13,6 +13,7 @@ class Gateway:
         self._running = True
         self._clients = []
         self._rabbitmq_host = rabbitmq_host
+        self._request_id = 0
 
         self._gateway_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._gateway_socket.bind(('', port))
@@ -31,12 +32,12 @@ class Gateway:
                 client_sock, addr = self._gateway_socket.accept()
                 logging.info(f"action: new_connection | ip: {addr[0]} | result: success")
 
-                client_id = str(uuid.uuid4())
-                results_queue_name = f"{self._in_queue_prefix}_{client_id}"
+                results_queue_name = f"{self._in_queue_prefix}_{self._request_id}"
                 results_in_queue = MessageMiddlewareQueue(self._rabbitmq_host, results_queue_name)
 
                 # Crear un handler por cliente
-                handler = ClientHandler(client_id, client_sock, self._exchange, results_in_queue)
+                handler = ClientHandler(self._request_id, client_sock, self._exchange, results_in_queue)
+                self._request_id += 1
 
                 self._clients.append(handler)
                 handler.start()  # arranca el hilo del cliente

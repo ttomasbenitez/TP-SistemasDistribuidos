@@ -22,7 +22,7 @@ class ClientHandler(threading.Thread):
         try:
             logging.info("action: client_handler_start | result: success")
 
-            self._protocol.send_message(Message(self._request_id, MESSAGE_TYPE_REQUEST_ID, 0, 0))
+            self._protocol.send_message(Message(self._request_id, MESSAGE_TYPE_REQUEST_ID, 0, '').serialize())
             # Recibir datos del cliente y enviarlos al exchange
             self._receive_and_publish()
 
