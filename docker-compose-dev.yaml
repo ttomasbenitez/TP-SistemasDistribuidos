@@ -127,6 +127,7 @@ services:
       OUTPUT_QUEUE_1: results-queue
       OUTPUT_QUEUE_2: EOF-filter-amount-1-2
       OUTPUT_QUEUE_3: EOF-filter-amount-1-3
+      EXCHANGE_NAME: amount-filtered-exchange
       LOG_LEVEL: INFO
       EXPECTED_ACKS: 2
     networks:
@@ -146,6 +147,7 @@ services:
       OUTPUT_QUEUE_1: results-queue
       OUTPUT_QUEUE_2: EOF-filter-amount-2-1
       OUTPUT_QUEUE_3: EOF-filter-amount-2-3
+      EXCHANGE_NAME: amount-filtered-exchange
       LOG_LEVEL: INFO
       EXPECTED_ACKS: 2
     networks:
@@ -165,6 +167,7 @@ services:
       OUTPUT_QUEUE_1: results-queue
       OUTPUT_QUEUE_2: EOF-filter-amount-3-1
       OUTPUT_QUEUE_3: EOF-filter-amount-3-2
+      EXCHANGE_NAME: amount-filtered-exchange
       LOG_LEVEL: INFO
       EXPECTED_ACKS: 2
     networks:
