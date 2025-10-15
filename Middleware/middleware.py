@@ -53,7 +53,7 @@ class MessageMiddleware(ABC):
 class MessageMiddlewareQueue(MessageMiddleware):
     def __init__(self, host, queue_name):
         self.queue_name = queue_name
-        self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=host, heartbeat=600))
+        self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=host, heartbeat=6000))
         self.channel = self.connection.channel()
         self.channel.queue_declare(queue=queue_name, durable=True)
 

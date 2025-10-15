@@ -48,12 +48,12 @@ services:
       OUTPUT_QUEUE_2: year-filtered-queue-q4
       OUTPUT_QUEUE_3: year-filtered-queue-q2
       EXCHANGE_NAME: year-filtered-exchange
-      EOF_QUEUE: eof-filter-year-1
-      EOF_SERVICE_QUEUE: eof-service-filter-year
-      EOF_FINAL_QUEUE: eof-final-filter-year
       EOF_EXCHANGE_NAME: eof-exchange-filter-year
+      EOF_SELF_QUEUE: eof-filter-year-1
+      EOF_QUEUE_1: eof-filter-year-1
+      EOF_QUEUE_2: eof-filter-year-2
+      EOF_SERVICE_QUEUE: eof-service-filter-year
       LOG_LEVEL: INFO
-      EXPECTED_ACKS: 2
     networks:
     - testing_net
     depends_on:
@@ -70,10 +70,28 @@ services:
       OUTPUT_QUEUE_2: year-filtered-queue-q4
       OUTPUT_QUEUE_3: year-filtered-queue-q2
       EXCHANGE_NAME: year-filtered-exchange
-      EOF_QUEUE: eof-filter-year-2
-      EOF_SERVICE_QUEUE: eof-service-filter-year
-      EOF_FINAL_QUEUE: eof-final-filter-year
       EOF_EXCHANGE_NAME: eof-exchange-filter-year
+      EOF_SELF_QUEUE: eof-filter-year-2
+      EOF_QUEUE_1: eof-filter-year-1
+      EOF_QUEUE_2: eof-filter-year-2
+      EOF_SERVICE_QUEUE: eof-service-filter-year
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
+
+  filter-year-eof-service:
+    container_name: filter-year-eof-service
+    image: worker:latest
+    command: "/worker/eof/eof_service.py"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE: eof-service-filter-year
+      OUTPUT_QUEUE_1: year-filtered-queue-q1-q3
+      OUTPUT_QUEUE_2: year-filtered-queue-q4
+      OUTPUT_QUEUE_3: year-filtered-queue-q2
+      EXCHANGE_NAME: year-filtered-exchange
       LOG_LEVEL: INFO
       EXPECTED_ACKS: 2
     networks:
