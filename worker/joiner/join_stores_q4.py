@@ -1,5 +1,5 @@
 from pkg.message.q4_result import Q4Result
-from worker import Worker
+from worker.base import Worker 
 from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
 import logging
 from pkg.message.message import Message

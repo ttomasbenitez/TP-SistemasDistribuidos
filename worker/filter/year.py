@@ -1,95 +1,100 @@
-from worker import Worker 
+from worker.base import Worker 
+from worker.eof.eof_service import EofService
 from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
 import logging
 from pkg.message.message import Message
-from utils.custom_logging import initialize_log
+from utils.custom_logging import initialize_log, setup_process_logger
 import os
 from pkg.message.constants import MESSAGE_TYPE_TRANSACTIONS, MESSAGE_TYPE_TRANSACTION_ITEMS, MESSAGE_TYPE_EOF
-from multiprocessing import Process, Value
+from multiprocessing import Process
 
 
 class FilterYearNode(Worker):
         
-    def __init__(self, expected_acks: int, data_in_queue: MessageMiddlewareQueue, data_out_exchange: MessageMiddlewareExchange, eof_in_queues: list[MessageMiddlewareQueue], eof_out_queues: list[MessageMiddlewareQueue], years_set):
-        self.data_in_queue = data_in_queue
+    def __init__(self, host, in_queue_name, 
+                data_out_exchange: MessageMiddlewareExchange, 
+                eof_exchange: MessageMiddlewareExchange, 
+                eof_queue: MessageMiddlewareQueue,
+                eof_service: EofService,
+                eof_final_queue: MessageMiddlewareQueue, 
+                years_set):
+        self.__init_manager__()
+        self.host = host
+        self.in_queue_name = in_queue_name
+        # self.data_in_queue = data_in_queue
         self.data_out_exchange = data_out_exchange
         self.years = years_set
-        self.eof_out_queues = eof_out_queues
-        self.eof_in_queues = eof_in_queues
-        self.eof_received = Value('b', False)  # 'b' = boolean
-        self.leader = Value('b', expected_acks == 0)
-        self.processing_data = Value('b', False)
-        self.expected_acks = Value('i', expected_acks)
+        self.eof_exchange = eof_exchange
+        self.eof_queue = eof_queue
+        self.eof_service = eof_service
+        self.eof_final_queue = eof_final_queue
 
     def start(self):
         # Creamos un proceso por cada input queue
-        processes = []
+        p_eof_service = Process(target=self._consume_eof_service,args=(self.eof_service,))
 
         logging.info(f"Starting process")
-        p = Process(target=self._consume_data_queue, args=(self.data_in_queue,))
-        p.start()
-        processes.append(p)
-
-        for queue in self.eof_in_queues:
-            logging.info(f"Starting process")
-            p = Process(target=self._consume_eof_queue, args=(queue,))
-            p.start()
-            processes.append(p)
+        p_data = Process(target=self._consume_data_queue)
+        
+        logging.info(f"Starting EOF node process")
+        p_eof = Process(target=self._consume_eof, args=(self.eof_queue,))
+        
+        logging.info(f"Starting final EOF consume process")
+        p_end = Process(target=self._consume_final_eof, args=(self.eof_final_queue,))
 
         # Esperamos que terminen
-        for p in processes:
-            p.join()
-
-    def _consume_data_queue(self, queue: MessageMiddlewareQueue):
-        queue.start_consuming(self.__on_message__)
-
-    def _consume_eof_queue(self, queue: MessageMiddlewareQueue):
-        queue.start_consuming(self._on_eof_from_queue_message)
-
-    def _on_eof_from_queue_message(self, message):
-        try:
-            logging.info("Procesando mensaje de EOF queue")
-            message = Message.deserialize(message)
+        for p in (p_data, p_eof, p_end, p_eof_service): p.start()
+        for p in (p_data, p_eof, p_end, p_eof_service): p.join()
         
-            with self.leader.get_lock():
-                is_leader = self.leader.value
+    def _consume_eof_service(self, eof_service: EofService):
+        eof_service.start()
 
-            if is_leader:
-                with self.expected_acks.get_lock():
-                    if self.expected_acks.value > 0:
-                       self.expected_acks.value -= 1
-                    if self.expected_acks.value <= 0:
-                        self._send_final_eof(message)
-            else:
-                with self.processing_data.get_lock(), self.eof_received.get_lock():
-                    if message.type == MESSAGE_TYPE_EOF and not self.processing_data.value and not self.eof_received.value:
-                        self.eof_received.value = True
-                        self.__received_EOF__(message)
-                        logging.info("Procesamiento finalizado")
-                        return
-                    elif message.type == MESSAGE_TYPE_EOF and self.processing_data.value and not self.eof_received.value:
-                        self.eof_received.value = True
-                        return
-                    
-        except Exception as e:
-            print(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
+    def _consume_final_eof(self, queue: MessageMiddlewareQueue):
+        setup_process_logger('name=filter_year_node', level=logging.getLevelName(logging.getLogger().level))
+        def _on_final_eof(message):
+            try:     
+                message = Message.deserialize(message)
+                self.data_out_exchange.send(message.serialize(), str(message.type))
+                logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")
+            except Exception as e:
+                logging.error(f"Error enviando EOF: {e}")
+        queue.start_consuming(_on_final_eof)
+    
+    def _consume_eof(self, queue: MessageMiddlewareQueue): 
+        setup_process_logger('name=filter_year_node', level=logging.getLevelName(logging.getLogger().level))
+        def on_eof_message(message):
+            try:
+                message = Message.deserialize(message)
+                if message.type == MESSAGE_TYPE_EOF:
+                    logging.info(f"EOF recibido en nodo | request_id: {message.request_id} | type: {message.type}")
+                    self._ensure_request(message.request_id)
+                    self.drained[message.request_id].wait()
+                    self.eof_service.send_message(message.serialize())
+            except Exception as e:
+                logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
+        queue.start_consuming(on_eof_message)
+        
+    def _consume_data_queue(self):
+        setup_process_logger('name=filter_year_node', level="INFO")
+        queue = MessageMiddlewareQueue(self.host, self.in_queue_name)          # <-- NUEVO en el hijo
+        try:
+            queue.start_consuming(self.__on_message__)
+        finally:
+            queue.close()
 
     def __on_message__(self, message):
         try:
             message = Message.deserialize(message)
-
+            
             if message.type == MESSAGE_TYPE_EOF:
-                with self.leader.get_lock():
-                    if self.leader.value:
-                        self._send_final_eof(message)
-                    else: 
-                        self.leader.value = True
-                        self.__received_EOF__(message)
+                logging.info(f"EOF recibido en data queue | request_id: {message.request_id}")
+                self.eof_exchange.send(message.serialize(), str(message.type))
                 return
-
-            with self.processing_data.get_lock():
-                self.processing_data.value = True
-
+            
+            self._ensure_request(message.request_id)
+            
+            self._inc_inflight(message.request_id) 
+            
             items = message.process_message()
 
             if not items:
@@ -109,33 +114,15 @@ class FilterYearNode(Worker):
             logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
 
         finally:
-            with self.processing_data.get_lock():
-                self.processing_data.value = False
-
-            with self.eof_received.get_lock():
-                if self.eof_received.value:
-                    self.__received_EOF__(Message(0, MESSAGE_TYPE_EOF, 0, 0))
-
-    def __received_EOF__(self, message):
-        for queue in self.eof_out_queues:
-            queue.send(message.serialize())
-            logging.info(f"EOF enviado a réplica | request_id: {message.request_id} | type: {message.type}")
-
-    def _send_final_eof(self, message):
-        try:
-            self.data_out_exchange.send(message.serialize(), str(message.type))
-            logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")
-        except Exception as e:
-            logging.error(f"Error enviando EOF: {e}")
+           self._dec_inflight(message.request_id)
 
     def close(self):
         try:
-            for in_queue in self.eof_in_queues:
-                in_queue.close()
-            for out_queue in self.eof_out_queues:
-                out_queue.close()
             self.data_in_queue.close()
             self.data_out_exchange.close()
+            self.eof_exchange.close()
+            self.eof_service.close()
+            self.eof_final_queue.close()
         except Exception as e:
             print(f"Error al cerrar: {type(e).__name__}: {e}")
 
@@ -157,7 +144,11 @@ def initialize_config():
         "output_queue_3": os.getenv('OUTPUT_QUEUE_3'),
         "output_exchange_filter_year": os.getenv('EXCHANGE_NAME'),
         "logging_level": os.getenv('LOG_LEVEL', 'INFO'),
-        "expected_acks": int(os.getenv('EXPECTED_ACKS'))
+        "expected_acks": int(os.getenv('EXPECTED_ACKS')),
+        "eof_queue": os.getenv('EOF_QUEUE'),
+        "eof_service_queue": os.getenv('EOF_SERVICE_QUEUE'),
+        "eof_final_queue": os.getenv('EOF_FINAL_QUEUE'),
+        "eof_exchange": os.getenv('EOF_EXCHANGE_NAME'),
     }
 
     required_keys = [
@@ -176,33 +167,28 @@ def initialize_config():
     
     return config_params
 
-def create_eofs_queues(rabbitmq_host):
-    input_queues = []
-    output_queues = []
-
-    for key, queue_name in os.environ.items():
-        if key.startswith("INPUT_QUEUE_"):
-            if queue_name.startswith("EOF"):
-                input_queues.append(MessageMiddlewareQueue(rabbitmq_host, queue_name))
-        elif key.startswith("OUTPUT_QUEUE_"):
-            if queue_name.startswith("EOF"):
-                output_queues.append(MessageMiddlewareQueue(rabbitmq_host, queue_name))
-
-    return input_queues, output_queues
-
 def main():
     config_params = initialize_config()
 
     initialize_log(config_params["logging_level"])
-    
-    eof_input_queues, eof_output_queues = create_eofs_queues(config_params["rabbitmq_host"])
 
     data_input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue"])
     data_output_exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["output_exchange_filter_year"], 
                                         {config_params["output_queue_1"]: [str(MESSAGE_TYPE_TRANSACTIONS), str(MESSAGE_TYPE_EOF)], 
                                         config_params["output_queue_2"]: [str(MESSAGE_TYPE_TRANSACTIONS), str(MESSAGE_TYPE_EOF)], 
                                         config_params["output_queue_3"]: [str(MESSAGE_TYPE_TRANSACTION_ITEMS), str(MESSAGE_TYPE_EOF)]})
-    filter = FilterYearNode(config_params["expected_acks"], data_input_queue, data_output_exchange, eof_input_queues, eof_output_queues, {2024, 2025})
+
+    eof_exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["eof_exchange"], 
+                                        {config_params["eof_queue"]: [str(MESSAGE_TYPE_EOF)]})
+    eof_service = EofService(config_params["expected_acks"], 
+                             MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["eof_service_queue"]), 
+                             MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["eof_final_queue"]))
+    eof_final_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["eof_final_queue"])
+    eof_node_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["eof_queue"])
+    # filter = FilterYearNode(data_input_queue, data_output_exchange, eof_exchange, eof_node_queue, eof_service, eof_final_queue, {2024, 2025})
+    host = config_params["rabbitmq_host"]
+    in_queue_name = config_params["input_queue"]
+    filter = FilterYearNode(host, in_queue_name, data_output_exchange, eof_exchange, eof_node_queue, eof_service, eof_final_queue, {2024, 2025})
     filter.start()
 
 if __name__ == "__main__":

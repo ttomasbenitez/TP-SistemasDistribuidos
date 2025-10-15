@@ -39,6 +39,7 @@ class ClientHandler(threading.Thread):
             message = self._protocol.read_message()
             if message.type == MESSAGE_TYPE_EOF:
                 logging.info("action: client_handler receive_data | result: eof")
+                self._exchange.send(message.serialize(), str(message.type))
                 break
 
             items = message.process_message_from_csv()

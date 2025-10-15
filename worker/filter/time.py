@@ -1,4 +1,4 @@
-from worker import Worker 
+from worker.base import Worker 
 from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
 import logging
 from pkg.message.message import Message

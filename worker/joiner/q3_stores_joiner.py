@@ -1,12 +1,11 @@
-from worker import Worker
-from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
+from worker.base import Worker 
+from Middleware.middleware import MessageMiddlewareExchange
 import logging
 from pkg.message.message import Message
 from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_STORES, MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT, MESSAGE_TYPE_QUERY_3_RESULT
 from utils.custom_logging import initialize_log
 import os
 from pkg.message.q3_result import Q3Result
-import threading
 
 EXPECTED_EOFS = 2
 

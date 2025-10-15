@@ -41,7 +41,6 @@ class Gateway:
                 queues_dict = self.create_queues_dict()
                 exchange = MessageMiddlewareExchange(self._rabbitmq_host, self._exchange_name, queues_dict)
 
-
                 # Crear un handler por cliente
                 handler = ClientHandler(self._request_id, client_sock, exchange, results_in_queue)
                 self._request_id += 1

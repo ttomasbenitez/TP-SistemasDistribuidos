@@ -3,15 +3,22 @@ from Middleware.middleware import MessageMiddleware
 from pkg.message.message import Message
 import signal
 import logging
+from multiprocessing import Manager
+
 class Worker(ABC):
     
     def __init__(self, in_middleware: MessageMiddleware):
         self._running = False
         self.in_middleware = in_middleware
         
-        
         signal.signal(signal.SIGTERM, self.__handle_shutdown)
         signal.signal(signal.SIGINT, self.__handle_shutdown)
+        
+    def __init_manager__(self):
+        self.manager = Manager()
+        self.lock = self.manager.Lock()
+        self.inflight = self.manager.dict()
+        self.drained = self.manager.dict()
         
     def start(self):
         self._running = True
@@ -28,6 +35,28 @@ class Worker(ABC):
     @abstractmethod
     def __on_message__(self, raw):
         pass
+
+    def _ensure_request(self, request_id):
+        with self.lock:
+            if request_id not in self.inflight:
+                self.inflight[request_id] = 0
+            if request_id not in self.drained:
+                ev = self.manager.Event()
+                ev.set()
+                self.drained[request_id] = ev
+
+    def _inc_inflight(self, request_id):
+        with self.lock:
+            self.inflight[request_id] += 1
+            if self.inflight[request_id] > 0:
+                self.drained[request_id].clear()
+
+    def _dec_inflight(self, request_id):
+        with self.lock:
+            self.inflight[request_id] -= 1
+            if self.inflight[request_id] <= 0:
+                self.inflight[request_id] = 0
+                self.drained[request_id].set()
     
     def stop(self):
         self._running = False
