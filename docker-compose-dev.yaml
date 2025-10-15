@@ -84,7 +84,7 @@ services:
   filter-year-eof-service:
     container_name: filter-year-eof-service
     image: worker:latest
-    command: "/worker/eof/eof_service.py"
+    command: "/worker/eof/eof_service_year.py"
     environment:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE: eof-service-filter-year
@@ -144,7 +144,7 @@ services:
   filter-time-eof-service:
     container_name: filter-time-eof-service
     image: worker:latest
-    command: "/worker/eof/eof_service.py"
+    command: "/worker/eof/eof_service_time.py"
     environment:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE: eof-service-filter-time
@@ -157,8 +157,6 @@ services:
     - testing_net
     depends_on:
     - gateway
-
-
 
   filter-amount-1:
     container_name: filter-amount-1
