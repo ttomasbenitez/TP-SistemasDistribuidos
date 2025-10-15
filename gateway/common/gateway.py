@@ -82,17 +82,20 @@ class Gateway:
 
     def create_queues_dict(self):
         queues_dict = {}
-
+    
         for key, queue_name in os.environ.items():
             if key.startswith("OUTPUT_QUEUE_"):
                 if queue_name.startswith("users"):
-                    routing_key = [str(MESSAGE_TYPE_USERS), str(MESSAGE_TYPE_EOF)]
+                    base_keys = [str(MESSAGE_TYPE_USERS), str(MESSAGE_TYPE_EOF)]
                 elif queue_name.startswith("menu"):
-                    routing_key = [str(MESSAGE_TYPE_MENU_ITEMS), str(MESSAGE_TYPE_EOF)]
+                    base_keys = [str(MESSAGE_TYPE_MENU_ITEMS), str(MESSAGE_TYPE_EOF)]
                 elif queue_name.startswith("stores"):
-                    routing_key = [str(MESSAGE_TYPE_STORES), str(MESSAGE_TYPE_EOF)]
+                    base_keys = [str(MESSAGE_TYPE_STORES), str(MESSAGE_TYPE_EOF)]
                 else:
-                    routing_key = [str(MESSAGE_TYPE_TRANSACTIONS), str(MESSAGE_TYPE_TRANSACTION_ITEMS), str(MESSAGE_TYPE_EOF)]
-                
-                queues_dict[queue_name] = routing_key
+                    base_keys = [str(MESSAGE_TYPE_TRANSACTIONS), str(MESSAGE_TYPE_TRANSACTION_ITEMS), str(MESSAGE_TYPE_EOF)]
+
+                # routing keys compuestas tipo "STORES.<request_id>"
+                routing_keys = [f"{key}.{self._request_id}" for key in base_keys]
+                queues_dict[queue_name] = routing_keys
+
         return queues_dict

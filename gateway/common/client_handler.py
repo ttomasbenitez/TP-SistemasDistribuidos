@@ -39,13 +39,15 @@ class ClientHandler(threading.Thread):
             message = self._protocol.read_message()
             if message.type == MESSAGE_TYPE_EOF:
                 logging.info("action: client_handler receive_data | result: eof")
+                self._exchange.send(message.serialize(), f"{message.type}.{message.request_id}")
+                logging.info(f"action: send_to_exchange | result: success | type: {message.type}")
                 break
 
             items = message.process_message_from_csv()
             serialized = ''.join(i.serialize() for i in items)
             message.update_content(serialized)
 
-            self._exchange.send(message.serialize(), str(message.type))
+            self._exchange.send(message.serialize(), f"{message.type}.{message.request_id}")
             logging.info(f"action: send_to_exchange | result: success | type: {message.type}")
 
     def _start_results_consumer(self):
