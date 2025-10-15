@@ -106,13 +106,15 @@ services:
     environment:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: year-filtered-queue-q1-q3
-      INPUT_QUEUE_2: EOF-filter-time-2-1
+      EOF_SELF_QUEUE: EOF-filter-time-1
       OUTPUT_QUEUE_1: time-filtered-queue-q1
       OUTPUT_QUEUE_2: time-filtered-queue-q3
-      OUTPUT_QUEUE_3: EOF-filter-time-1-2
+      EOF_QUEUE_NODO_1: EOF-filter-time-1
+      EOF_QUEUE_NODO_2: EOF-filter-time-2
       EXCHANGE_NAME: time-filtered-exchange
+      EOF_EXCHANGE_NAME: eof-exchange-filter-time
+      EOF_SERVICE_QUEUE: eof-service-filter-time
       LOG_LEVEL: INFO
-      EXPECTED_ACKS: 1
     networks:
     - testing_net
     depends_on:
@@ -125,17 +127,38 @@ services:
     environment:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: year-filtered-queue-q1-q3
-      INPUT_QUEUE_2: EOF-filter-time-1-2
+      EOF_SELF_QUEUE: EOF-filter-time-2
       OUTPUT_QUEUE_1: time-filtered-queue-q1
       OUTPUT_QUEUE_2: time-filtered-queue-q3
-      OUTPUT_QUEUE_3: EOF-filter-time-2-1
+      EOF_QUEUE_NODO_1: EOF-filter-time-1
+      EOF_QUEUE_NODO_2: EOF-filter-time-2
       EXCHANGE_NAME: time-filtered-exchange
+      EOF_EXCHANGE_NAME: eof-exchange-filter-time
+      EOF_SERVICE_QUEUE: eof-service-filter-time
       LOG_LEVEL: INFO
-      EXPECTED_ACKS: 1
     networks:
     - testing_net
     depends_on:
     - gateway
+
+  filter-time-eof-service:
+    container_name: filter-time-eof-service
+    image: worker:latest
+    command: "/worker/eof/eof_service.py"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE: eof-service-filter-time
+      OUTPUT_QUEUE_1: time-filtered-queue-q1
+      OUTPUT_QUEUE_2: time-filtered-queue-q3
+      EXCHANGE_NAME: time-filtered-exchange
+      LOG_LEVEL: INFO
+      EXPECTED_ACKS: 2
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
+
+
 
   filter-amount-1:
     container_name: filter-amount-1

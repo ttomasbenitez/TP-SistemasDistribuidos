@@ -91,6 +91,7 @@ class FilterAmountNode(Worker):
                 self.clients.append(message.request_id)
 
             if message.type == MESSAGE_TYPE_EOF:
+                logging.info(f"EOF recibido en AMOUNT NENE | request_id: {message.request_id}")
                 with self.leader.get_lock():
                     if self.leader.value:
                         self._send_final_eof(message)

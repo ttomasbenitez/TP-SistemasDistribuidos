@@ -19,6 +19,7 @@ class EofService(Worker):
         try:
             message = Message.deserialize(message)
             if message.type == MESSAGE_TYPE_EOF:
+                logging.info(f"EOF recibido en data queue | request_id: {message.request_id}")
                 self.acks_by_client[message.request_id] = self.acks_by_client.get(message.request_id, 0) + 1  
                 if self.acks_by_client[message.request_id] == self.expected_acks:
                     logging.info(f"Enviando final EOF del cliente {message.request_id}")
@@ -55,8 +56,8 @@ def initialize_config():
         "input_queue": os.getenv('INPUT_QUEUE'),
         "output_queue_1": os.getenv('OUTPUT_QUEUE_1'),
         "output_queue_2": os.getenv('OUTPUT_QUEUE_2'),
-        "output_queue_3": os.getenv('OUTPUT_QUEUE_3'),
-        "output_exchange_filter_year": os.getenv('EXCHANGE_NAME'),
+        "output_queue_3": os.getenv('OUTPUT_QUEUE_3', ''), # Ver cómo hacemos con este caso
+        "output_exchange_filter": os.getenv('EXCHANGE_NAME'),
         "logging_level": os.getenv('LOG_LEVEL', 'INFO'),
         "expected_acks": int(os.getenv('EXPECTED_ACKS')),
     }
@@ -66,8 +67,7 @@ def initialize_config():
         "input_queue",
         "output_queue_1",
         "output_queue_2",
-        "output_queue_3",
-        "output_exchange_filter_year",
+        "output_exchange_filter",
     ]
 
     missing_keys = [key for key in required_keys if config_params[key] is None]
@@ -82,10 +82,16 @@ def main():
     initialize_log(config_params["logging_level"])
 
     eof_input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue"])
-    eof_output_exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["output_exchange_filter_year"], 
+
+    if config_params["output_queue_3"] == '':
+        eof_output_exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["output_exchange_filter"], 
                                         {config_params["output_queue_1"]: [str(MESSAGE_TYPE_EOF)], 
-                                        config_params["output_queue_2"]: [str(MESSAGE_TYPE_EOF)], 
-                                        config_params["output_queue_3"]: [str(MESSAGE_TYPE_EOF)]})
+                                        config_params["output_queue_2"]: [str(MESSAGE_TYPE_EOF)]})
+    else:
+        eof_output_exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["output_exchange_filter"], 
+                                            {config_params["output_queue_1"]: [str(MESSAGE_TYPE_EOF)], 
+                                            config_params["output_queue_2"]: [str(MESSAGE_TYPE_EOF)], 
+                                            config_params["output_queue_3"]: [str(MESSAGE_TYPE_EOF)]})
 
     eof_service = EofService(
         expected_acks=config_params["expected_acks"],

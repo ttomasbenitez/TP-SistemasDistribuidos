@@ -43,7 +43,7 @@ class FilterYearNode(Worker):
             try:
                 message = Message.deserialize(message)
                 if message.type == MESSAGE_TYPE_EOF:
-                    logging.info(f"EOF recibido en nodo | request_id: {message.request_id} | type: {message.type}")
+                    logging.info(f"EOF recibido en EOF Queue Propia | request_id: {message.request_id} | type: {message.type}")
                     self._ensure_request(message.request_id)
                     self.drained[message.request_id].wait()
                     eof_service_queue.send(message.serialize())
