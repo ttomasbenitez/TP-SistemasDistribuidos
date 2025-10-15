@@ -78,6 +78,7 @@ class FilterTimeNode(Worker):
             message = Message.deserialize(message)
 
             if message.type == MESSAGE_TYPE_EOF:
+                logging.info(f"EOF recibido en data queue | request_id: {message.request_id}")
                 with self.leader.get_lock():
                     if self.leader.value:
                         self._send_final_eof(message)

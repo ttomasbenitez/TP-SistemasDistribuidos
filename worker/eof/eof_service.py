@@ -22,7 +22,7 @@ class EofService(Worker):
                 self.acks_by_client[message.request_id] = self.acks_by_client.get(message.request_id, 0) + 1  
                 if self.acks_by_client[message.request_id] == self.expected_acks:
                     logging.info(f"Enviando final EOF del cliente {message.request_id}")
-                    self.eof_out_exchange.send(message.serialize())
+                    self.eof_out_exchange.send(message.serialize(), str(message.type))
                     del self.acks_by_client[message.request_id]
         except Exception as e:
             logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
