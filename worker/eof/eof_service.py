@@ -3,7 +3,6 @@ from Middleware.middleware import MessageMiddlewareQueue
 import logging
 from pkg.message.message import Message
 from pkg.message.constants import MESSAGE_TYPE_EOF
-from utils.custom_logging import initialize_log
 
 class EofService(Worker):
   
@@ -12,7 +11,6 @@ class EofService(Worker):
         self.eof_out_queue = eof_out_queue
         self.expected_acks = expected_acks
         self.acks_by_client = dict()
-        # initialize_log()
       
     def __on_message__(self, message):
         try:
