@@ -65,8 +65,6 @@ class Worker(ABC):
     def _consume_eof(self): 
         eof_service_queue = MessageMiddlewareQueue(self.host, self.eof_service_queue)
         eof_self_queue = MessageMiddlewareQueue(self.host, self.eof_self_queue)
-    
-        logging.info(f"COUNT FINAL: {self.count}")
         def on_eof_message(message):
             try:
                 message = Message.deserialize(message)
