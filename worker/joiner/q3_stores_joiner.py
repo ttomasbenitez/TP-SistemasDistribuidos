@@ -17,9 +17,6 @@ EXPECTED_EOFS = 2
 
 
 class StoresJoiner(Worker):
-    """
-    Versión con threads: maneja stores y data simultáneamente, compartiendo memoria.
-    """
 
     def __init__(self, data_input_queue: MessageMiddlewareQueue, stores_input_queue: MessageMiddlewareQueue,
                  out_exchange: MessageMiddlewareExchange, out_queue_name: str):
