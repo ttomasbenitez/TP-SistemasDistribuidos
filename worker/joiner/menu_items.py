@@ -1,6 +1,6 @@
 import logging
 from pkg.message.message import Message
-from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_QUERY_2_RESULT
+from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_MENU_ITEMS, MESSAGE_TYPE_QUERY_2_RESULT, MESSAGE_TYPE_STORES
 from utils.custom_logging import initialize_log
 from multiprocessing import Process, Value, Manager
 from pkg.message.message import Message
@@ -9,6 +9,7 @@ from Middleware.middleware import MessageMiddlewareExchange, MessageMiddlewareQu
 import os
 from multiprocessing import Process, Manager, Value
 from pkg.message.utils import parse_int
+import threading
 
 EXPECTED_EOFS = 2
 
@@ -17,7 +18,6 @@ class JoinerMenuItems:
                  menu_items_input_queue: MessageMiddlewareQueue, 
                 output_exchange: MessageMiddlewareExchange,
                  out_queue_prefix: str):
-        super().__init__()
         self.data_input_queue = data_input_queue
         self.menu_items_input_queue = menu_items_input_queue
         self.output_exchange = output_exchange
@@ -28,53 +28,74 @@ class JoinerMenuItems:
         self.pending_items = []
         self.eofs_by_client = {}
 
+        self.menu_items_lock = threading.Lock()
+        self.eofs_lock = threading.Lock()
+
+    def start(self):
+        t_data = threading.Thread(target=self.data_input_queue.start_consuming, args=(self.__on_message__,))
+        t_menu_items = threading.Thread(target=self.menu_items_input_queue.start_consuming, args=(self.__on_menu_items_message__,))
+        t_data.start()
+        t_menu_items.start()
+        t_data.join()
+        t_menu_items.join()
+
+
+    def __on_menu_items_message__(self, message):
+        logging.info("Procesando mensaje de Menu Items")
+        message = Message.deserialize(message)
+
+        if message.type == MESSAGE_TYPE_EOF:
+            with self.eofs_lock:
+                self.eofs_by_client[message.request_id] = self.eofs_by_client.get(message.request_id, 0) + 1
+            return
+
+        items = message.process_message()
+        if message.type == MESSAGE_TYPE_MENU_ITEMS:
+            for item in items:
+                with self.menu_items_lock:
+                    if message.request_id not in self.menu_items:
+                        self.menu_items[message.request_id] = {}
+                    self.menu_items[message.request_id][item.get_id()] = item.get_name()
+            logging.info(f"Menu Items actualizados: {self.menu_items[message.request_id]} para request_id {message.request_id}")
 
     def __on_message__(self, message):
-        try:
-            logging.info("Procesando mensaje")
-            message = Message.deserialize(message)
+        logging.info("Procesando mensaje de Data Input Joiner Q2")
+        message = Message.deserialize(message)
 
-            if message.request_id not in self.clients:
-                out_queue_name = f"{self.out_queue_prefix}_{message.request_id}"
-                self.output_exchange.add_queue_to_exchange(out_queue_name, str(message.request_id))
-                self.clients.append(message.request_id)
+        if message.request_id not in self.clients:
+            out_queue_name = f"{self.out_queue_prefix}_{message.request_id}"
+            self.output_exchange.add_queue_to_exchange(out_queue_name, str(message.request_id))
+            self.clients.append(message.request_id)
 
-            if message.type == MESSAGE_TYPE_EOF:
-                self._process_pending(message.request_id)
-                return
-
-            items = message.process_message()
-
-            if message.type == MESSAGE_TYPE_QUERY_2_RESULT:
-                ready_to_send = ''
-                for item in items:
-                    name = self.menu_items.get(parse_int(item.item_data))
-                    if name:
-                        item.join_item_name(name)
-                        ready_to_send += item.serialize()
-                    else:
-                        self.pending_items.append(item, message.request_id)
-
-                if ready_to_send:
-                    logging.info("READY TO SEND")
-                    message.update_content(ready_to_send)
-                    serialized = message.serialize()
-                    self.output_exchange.send(serialized, str(message.request_id))
-                    logging.info(f"Sending message: {serialized}")
-
-        except Exception as e:
-            logging.error(f"Error en JoinerMenuItems: {e}")
-
-        finally:
+        if message.type == MESSAGE_TYPE_EOF:
+            with self.eofs_lock:
+                self.eofs_by_client[message.request_id] = self.eofs_by_client.get(message.request_id, 0) + 1
+                if self.eofs_by_client[message.request_id] < EXPECTED_EOFS:
+                    return
             try:
-                self.in_middleware.stop_consuming()
+                self._process_pending(message.request_id)
             except Exception as e:
-                logging.info(f"stop_consuming ignorado: {type(e).__name__}: {e}")
-            finally:
-                try:
-                    self.in_middleware.close()
-                except Exception:
-                    pass
+                logging.error(f"Error al procesar mensajes pendientes: {e}")
+            return
+
+        items = message.process_message()
+
+        if message.type == MESSAGE_TYPE_QUERY_2_RESULT:
+            ready_to_send = ''
+            for item in items:
+                with self.menu_items_lock:
+                    name = self.menu_items.get(message.request_id, {}).get(parse_int(item.item_data))
+                if name:
+                    item.join_item_name(name)
+                    ready_to_send += item.serialize()
+                else:
+                    self.pending_items.append((item, message.request_id))
+
+            if ready_to_send:
+                message.update_content(ready_to_send)
+                serialized = message.serialize()
+                self.output_exchange.send(serialized, str(message.request_id))
+                logging.info(f"Sending message: {serialized}")
 
     def _process_pending(self, request_id):
         ready_to_send = ''
@@ -127,11 +148,9 @@ def initialize_config():
     return config_params
 def main():
     config_params = initialize_config()
-
     initialize_log(config_params["logging_level"])
 
     output_exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["output_exchange_q2"], {})
-
     data_input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue_1"])
     menu_items_input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue_2"])
 
