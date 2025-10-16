@@ -66,7 +66,7 @@ class FilterYearNode(Worker):
                     logging.info(f"EOF FINAL recibido en Self EOF Queue | request_id: {message.request_id}")            
                     self._ensure_request(message.request_id)
                     self.drained[message.request_id].wait()
-                    data_output_exchange.send(message.serialize(), str(message.request_id))
+                    data_output_exchange.send(message.serialize(), str(message.type))
                     logging.info(f"EOF FINAL enviado | request_id: {message.request_id} | type: {message.type}")
             except Exception as e:
                 logging.error(f"Error al procesar el mensaje EOF FINAL: {type(e).__name__}: {e}")
