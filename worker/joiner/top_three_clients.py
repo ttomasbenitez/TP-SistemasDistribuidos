@@ -80,16 +80,16 @@ class TopThreeClientsJoiner(Worker):
             pre_process = dict()
             store_id = None
             for item in items:
-                key = (item.get_user(), message.request_id)
-                pre_process[key] = pre_process.get(key, 0) + 1
-                if store_id is None:
-                    store_id = item.get_store() 
+                if item.get_user():
+                    key = (item.get_user(), message.request_id)
+                    pre_process[key] = pre_process.get(key, 0) + 1
+                    if store_id is None:
+                        store_id = item.get_store() 
             if (store_id, message.request_id) not in self.users_by_store:
                 self.users_by_store[(store_id, message.request_id)] = dict()
                 
             for user_id, count in pre_process.items():
-                if user_id:
-                    self.users_by_store[(store_id, message.request_id)][user_id] = self.users_by_store[(store_id, message.request_id)].get(user_id, 0) + count
+                self.users_by_store[(store_id, message.request_id)][user_id] = self.users_by_store[(store_id, message.request_id)].get(user_id, 0) + count
 
 
     def _process_top_3_by_request(self, request_id):
@@ -115,8 +115,9 @@ class TopThreeClientsJoiner(Worker):
             for user in top_3_users:
                 user_id, transaction_count = user
                 with self.users_lock:
-                    birthdate = self.users.get(user_id, 'N/A')
-                chunk += Q4IntermediateResult(store, birthdate, transaction_count).serialize()
+                    birthdate = self.users.get(user_id)
+                if birthdate:
+                    chunk += Q4IntermediateResult(store, birthdate, transaction_count).serialize()
             
             msg = Message(request_id, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT, 1, chunk)
             self.output_queue.send(msg.serialize())
