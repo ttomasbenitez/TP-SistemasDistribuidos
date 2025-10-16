@@ -11,19 +11,19 @@ class QuantityAndProfit(Worker):
     def __init__(self, in_queue: MessageMiddlewareQueue, out_queue: MessageMiddlewareQueue):
         super().__init__(in_queue)
         self.out_queue = out_queue
-        self.data = dict()
+        self.data_by_request = dict()
         
     def __on_message__(self, message):
         try:
             message = Message.deserialize(message)
             if message.type == MESSAGE_TYPE_EOF:
                 logging.info(f"EOF recibido en data queue | request_id: {message.request_id}")
-                self._send_results_by_date()
+                self._send_results_by_date(message.request_id)
                 self.__received_EOF__(message)
                 return
             items = message.process_message()
             if items:
-                self._accumulate_items(items)
+                self._accumulate_items(items, message.request_id)
         except Exception as e:
             logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
 
@@ -31,7 +31,7 @@ class QuantityAndProfit(Worker):
         self.out_queue.send(message.serialize())
         logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")
             
-    def _accumulate_items(self, items):
+    def _accumulate_items(self, items, request_id):
         """
         Acumula cantidad y subtotal por año, mes y producto
         """
@@ -39,7 +39,7 @@ class QuantityAndProfit(Worker):
             ym = str(it.year_month_created_at)
             item_id = it.item_id               
 
-            month_bucket = self.data.setdefault(ym, {})
+            month_bucket = self.data_by_request.setdefault((ym, request_id), {})
             agg_item = month_bucket.get(item_id)
 
             if agg_item is None:
@@ -48,13 +48,14 @@ class QuantityAndProfit(Worker):
                 agg_item.quantity += it.quantity
                 agg_item.subtotal += it.subtotal
     
-    def _send_results_by_date(self):
+    def _send_results_by_date(self, request_id_of_eof):
         chunk = ''
 
-        for ym, items_by_id in self.data.items():
-            if not items_by_id:
+        for (ym, request_id), items_by_id in self.data_by_request.items():
+
+            if not items_by_id or request_id != request_id_of_eof:
                 continue
-            
+
             max_item_quantity_id, max_item_quantity = max(
                 items_by_id.items(), key=lambda kv: kv[1].quantity
             )
@@ -65,8 +66,9 @@ class QuantityAndProfit(Worker):
             
             chunk += Q2Result(ym, max_item_quantity_id, max_item_quantity.quantity, MAX_QUANTITY).serialize()
             chunk += Q2Result(ym, max_item_profit_id, max_item_profit.subtotal, MAX_PROFIT).serialize()
-         
-        serialized_message = Message(0, MESSAGE_TYPE_QUERY_2_RESULT, 0, chunk).serialize()
+
+        logging.info(f"Enviando resultados acumulados | request_id: {chunk}")
+        serialized_message = Message(request_id_of_eof, MESSAGE_TYPE_QUERY_2_RESULT, 0, chunk).serialize()
         self.out_queue.send(serialized_message)
 
     def close(self):
