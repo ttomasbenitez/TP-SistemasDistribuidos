@@ -46,6 +46,11 @@ class TopThreeClientsJoiner(Worker):
         if message.type == MESSAGE_TYPE_EOF:
             with self.eofs_lock:
                 self.eofs_by_client[message.request_id] = self.eofs_by_client.get(message.request_id, 0) + 1
+                if self.eofs_by_client[message.request_id] < EXPECTED_EOFS:
+                    logging.info(f"EOF USERS recibido {self.eofs_by_client[message.request_id]}/{EXPECTED_EOFS} | request_id: {message.request_id} | type: {message.type}")
+                    return
+            self._process_top_3_by_request(message.request_id)
+            self._send_eof(message)
             return
 
         items = message.process_message()
