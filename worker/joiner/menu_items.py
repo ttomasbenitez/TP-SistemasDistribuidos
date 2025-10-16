@@ -17,7 +17,7 @@ class JoinerMenuItems:
                  menu_items_input_queue: MessageMiddlewareQueue, 
                 output_exchange: MessageMiddlewareExchange,
                  out_queue_prefix: str):
-        super().__init__([data_input_queue, menu_items_input_queue])
+        super().__init__()
         self.data_input_queue = data_input_queue
         self.menu_items_input_queue = menu_items_input_queue
         self.output_exchange = output_exchange
