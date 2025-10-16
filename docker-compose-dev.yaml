@@ -319,24 +319,6 @@ services:
     depends_on:
     - aggregator-quantity-profit
 
-  join-stores-q3:
-    container_name: joiner-stores-q3
-    image: worker:latest
-    command: "/worker/joiner/q3_stores_joiner.py"
-    environment:
-      RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE_1: aggregated-semester-queue
-      INPUT_QUEUE_2: stores-queue-1
-      OUTPUT_QUEUE: results-queue
-      INPUT_EXCHANGE_NAME: aggregated-semester-exchange
-      OUTPUT_EXCHANGE_NAME: results-exchange
-      LOG_LEVEL: INFO
-      EXPECTED_ACKS: 0
-    networks:
-    - testing_net
-    depends_on:
-    - gateway
-
   aggregator-semester-1:
     container_name: aggregator-semester-1
     image: worker:latest
@@ -438,6 +420,24 @@ services:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE: eof-service-aggregator-store-q3
       OUTPUT_QUEUE: aggregated-store-q3-queue
+      LOG_LEVEL: INFO
+      EXPECTED_ACKS: 2
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
+
+  join-stores-q3:
+    container_name: joiner-stores-q3
+    image: worker:latest
+    command: "/worker/joiner/q3_stores_joiner.py"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: aggregated-semester-queue
+      INPUT_QUEUE_2: stores-queue-1
+      OUTPUT_QUEUE: results-queue
+      INPUT_EXCHANGE_NAME: aggregated-semester-exchange
+      OUTPUT_EXCHANGE_NAME: results-exchange
       LOG_LEVEL: INFO
       EXPECTED_ACKS: 2
     networks:

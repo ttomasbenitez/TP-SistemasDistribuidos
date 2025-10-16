@@ -15,7 +15,6 @@ import threading
 
 EXPECTED_EOFS = 2
 
-
 class StoresJoiner(Worker):
 
     def __init__(self, data_input_queue: MessageMiddlewareQueue, stores_input_queue: MessageMiddlewareQueue,
@@ -45,7 +44,6 @@ class StoresJoiner(Worker):
         t_stores.join()
 
     def __on_stores_message__(self, message):
-        logging.info("Procesando mensaje de Stores")
         message = Message.deserialize(message)
 
         if message.type == MESSAGE_TYPE_EOF:
@@ -60,7 +58,6 @@ class StoresJoiner(Worker):
                     if message.request_id not in self.stores:
                         self.stores[message.request_id] = {}
                     self.stores[message.request_id][item.get_id()] = item.get_name()
-            logging.info(f"Stores actualizados: {self.stores[message.request_id]}")
 
     def __on_message__(self, msg):
         message = Message.deserialize(msg)
@@ -92,7 +89,6 @@ class StoresJoiner(Worker):
             for item in items:
                 with self.stores_lock:
                     store_name = self.stores.get(message.request_id, {}).get(item.get_store())
-                logging.info(f"STORE_NAME: {store_name}, ITEM: {item.get_store()}")
                 if store_name:
                     key = (message.request_id, store_name, item.get_period())
                     self.processed_transactions[key] = self.processed_transactions.get(key, 0.0) + item.get_tpv()
