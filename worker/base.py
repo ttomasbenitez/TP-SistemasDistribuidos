@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from Middleware.middleware import MessageMiddleware
+from Middleware.middleware import MessageMiddleware, MessageMiddlewareQueue
+from pkg.message.constants import MESSAGE_TYPE_EOF
 from pkg.message.message import Message
 import signal
 import logging
@@ -7,9 +8,12 @@ from multiprocessing import Manager
 
 class Worker(ABC):
     
-    def __init__(self, in_middleware: MessageMiddleware):
+    def __init__(self, in_middleware: MessageMiddleware, host: str = '', eof_self_queue: str = '', eof_service_queue: str = ''):
         self._running = False
         self.in_middleware = in_middleware
+        self.host = host
+        self.eof_self_queue = eof_self_queue
+        self.eof_service_queue = eof_service_queue
         
         signal.signal(signal.SIGTERM, self.__handle_shutdown)
         signal.signal(signal.SIGINT, self.__handle_shutdown)
@@ -57,6 +61,24 @@ class Worker(ABC):
             if self.inflight[request_id] <= 0:
                 self.inflight[request_id] = 0
                 self.drained[request_id].set()
+                
+    def _consume_eof(self): 
+        eof_service_queue = MessageMiddlewareQueue(self.host, self.eof_service_queue)
+        eof_self_queue = MessageMiddlewareQueue(self.host, self.eof_self_queue)
+    
+        logging.info(f"COUNT FINAL: {self.count}")
+        def on_eof_message(message):
+            try:
+                message = Message.deserialize(message)
+                if message.type == MESSAGE_TYPE_EOF:
+                    logging.info(f"EOF recibido en nodo | request_id: {message.request_id} | type: {message.type}")
+                    self._ensure_request(message.request_id)
+                    self.drained[message.request_id].wait()
+                    eof_service_queue.send(message.serialize())
+            except Exception as e:
+                logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
+        
+        eof_self_queue.start_consuming(on_eof_message)
     
     def stop(self):
         self._running = False

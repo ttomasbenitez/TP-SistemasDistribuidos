@@ -63,12 +63,13 @@ class ClientHandler(threading.Thread):
 
         self._consumer_thread = threading.Thread(target=_consume)
         self._consumer_thread.start()
-        self._consumer_thread.join()  # Espera a que termine el consumo antes de cerrar
+        self._consumer_thread.join()
 
     def _on_result_message(self, raw_msg):
         """Callback que envía los mensajes del backend al cliente."""
         msg = Message.deserialize(raw_msg)
         if msg.type == MESSAGE_TYPE_EOF:
+            logging.info(f"action: send_eof_to_client | result: success | finished_queries: {self._finished_queries + 1}/{EXPECTED_QUERIES}")
             self._finished_queries += 1
             if self._finished_queries == EXPECTED_QUERIES:
                 logging.info("action: all_results_sent | result: success")

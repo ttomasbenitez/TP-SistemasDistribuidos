@@ -50,6 +50,7 @@ services:
       EOF_QUEUE_1: eof-filter-year-1
       EOF_QUEUE_2: eof-filter-year-2
       EOF_SERVICE_QUEUE: eof-service-filter-year
+      EOF_FINAL_QUEUE: eof-final-filter-year
       LOG_LEVEL: INFO
     networks:
     - testing_net
@@ -72,6 +73,7 @@ services:
       EOF_QUEUE_1: eof-filter-year-1
       EOF_QUEUE_2: eof-filter-year-2
       EOF_SERVICE_QUEUE: eof-service-filter-year
+      EOF_FINAL_QUEUE: eof-final-filter-year
       LOG_LEVEL: INFO
     networks:
     - testing_net
@@ -85,10 +87,11 @@ services:
     environment:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE: eof-service-filter-year
-      OUTPUT_QUEUE_1: year-filtered-queue-q1-q3
-      OUTPUT_QUEUE_2: year-filtered-queue-q4
-      OUTPUT_QUEUE_3: year-filtered-queue-q2
-      EXCHANGE_NAME: year-filtered-exchange
+      # OUTPUT_QUEUE_1: year-filtered-queue-q1-q3
+      # OUTPUT_QUEUE_2: year-filtered-queue-q4
+      # OUTPUT_QUEUE_3: year-filtered-queue-q2
+      OUTPUT_QUEUE: eof-final-filter-year
+      # EXCHANGE_NAME: year-filtered-exchange
       LOG_LEVEL: INFO
       EXPECTED_ACKS: 2
     networks:
@@ -107,9 +110,9 @@ services:
       EOF_SELF_QUEUE: EOF-filter-time-1
       OUTPUT_QUEUE_1: time-filtered-queue-q1
       OUTPUT_QUEUE_2: time-filtered-queue-q3
+      EXCHANGE_NAME: time-filtered-exchange
       EOF_QUEUE_NODO_1: EOF-filter-time-1
       EOF_QUEUE_NODO_2: EOF-filter-time-2
-      EXCHANGE_NAME: time-filtered-exchange
       EOF_EXCHANGE_NAME: eof-exchange-filter-time
       EOF_SERVICE_QUEUE: eof-service-filter-time
       LOG_LEVEL: INFO
@@ -128,9 +131,9 @@ services:
       EOF_SELF_QUEUE: EOF-filter-time-2
       OUTPUT_QUEUE_1: time-filtered-queue-q1
       OUTPUT_QUEUE_2: time-filtered-queue-q3
+      EXCHANGE_NAME: time-filtered-exchange
       EOF_QUEUE_NODO_1: EOF-filter-time-1
       EOF_QUEUE_NODO_2: EOF-filter-time-2
-      EXCHANGE_NAME: time-filtered-exchange
       EOF_EXCHANGE_NAME: eof-exchange-filter-time
       EOF_SERVICE_QUEUE: eof-service-filter-time
       LOG_LEVEL: INFO
@@ -163,14 +166,16 @@ services:
     environment:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: time-filtered-queue-q1
-      INPUT_QUEUE_2: EOF-filter-amount-2-1
-      INPUT_QUEUE_3: EOF-filter-amount-3-1
       OUTPUT_QUEUE_1: results-queue
-      OUTPUT_QUEUE_2: EOF-filter-amount-1-2
-      OUTPUT_QUEUE_3: EOF-filter-amount-1-3
       EXCHANGE_NAME: results-exchange
+      EOF_SELF_QUEUE: EOF-filter-amount-1
+      EOF_QUEUE_NODO_1: EOF-filter-amount-1
+      EOF_QUEUE_NODO_2: EOF-filter-amount-2
+      EOF_QUEUE_NODO_3: EOF-filter-amount-3
+      EOF_EXCHANGE_NAME: eof-exchange-filter-amount
+      EOF_SERVICE_QUEUE: eof-service-filter-amount
+      EOF_FINAL_QUEUE: eof-final-filter-amount
       LOG_LEVEL: INFO
-      EXPECTED_ACKS: 2
     networks:
     - testing_net
     depends_on:
@@ -183,14 +188,16 @@ services:
     environment:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: time-filtered-queue-q1
-      INPUT_QUEUE_2: EOF-filter-amount-1-2
-      INPUT_QUEUE_3: EOF-filter-amount-3-2
       OUTPUT_QUEUE_1: results-queue
-      OUTPUT_QUEUE_2: EOF-filter-amount-2-1
-      OUTPUT_QUEUE_3: EOF-filter-amount-2-3
       EXCHANGE_NAME: results-exchange
+      EOF_SELF_QUEUE: EOF-filter-amount-2
+      EOF_QUEUE_NODO_1: EOF-filter-amount-1
+      EOF_QUEUE_NODO_2: EOF-filter-amount-2
+      EOF_QUEUE_NODO_3: EOF-filter-amount-3
+      EOF_EXCHANGE_NAME: eof-exchange-filter-amount
+      EOF_SERVICE_QUEUE: eof-service-filter-amount
+      EOF_FINAL_QUEUE: eof-final-filter-amount
       LOG_LEVEL: INFO
-      EXPECTED_ACKS: 2
     networks:
     - testing_net
     depends_on:
@@ -203,18 +210,36 @@ services:
     environment:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: time-filtered-queue-q1
-      INPUT_QUEUE_2: EOF-filter-amount-1-3
-      INPUT_QUEUE_3: EOF-filter-amount-2-3
       OUTPUT_QUEUE_1: results-queue
-      OUTPUT_QUEUE_2: EOF-filter-amount-3-1
-      OUTPUT_QUEUE_3: EOF-filter-amount-3-2
       EXCHANGE_NAME: results-exchange
+      EOF_SELF_QUEUE: EOF-filter-amount-3
+      EOF_QUEUE_NODO_1: EOF-filter-amount-1
+      EOF_QUEUE_NODO_2: EOF-filter-amount-2
+      EOF_QUEUE_NODO_3: EOF-filter-amount-3
+      EOF_EXCHANGE_NAME: eof-exchange-filter-amount
+      EOF_SERVICE_QUEUE: eof-service-filter-amount
+      EOF_FINAL_QUEUE: eof-final-filter-amount
       LOG_LEVEL: INFO
-      EXPECTED_ACKS: 2
     networks:
     - testing_net
     depends_on:
     - gateway
+  
+  filter-amount-eof-service:
+    container_name: filter-amount-eof-service
+    image: worker:latest
+    command: "/worker/eof/eof_service_amount.py"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE: eof-service-filter-amount
+      OUTPUT_QUEUE: eof-final-filter-amount
+      LOG_LEVEL: INFO
+      EXPECTED_ACKS: 3
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
+
 
   aggregator-month-1:
     container_name: aggregator-month-1
