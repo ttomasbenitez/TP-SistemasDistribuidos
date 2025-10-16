@@ -31,23 +31,6 @@ def initialize_config():
 
     return config_params
 
-def create_queues_dict():
-    queues_dict = {}
-
-    for key, queue_name in os.environ.items():
-        if key.startswith("OUTPUT_QUEUE_"):
-            if queue_name.startswith("users"):
-                routing_key = [str(MESSAGE_TYPE_USERS), str(MESSAGE_TYPE_EOF)]
-            elif queue_name.startswith("menu"):
-                routing_key = [str(MESSAGE_TYPE_MENU_ITEMS), str(MESSAGE_TYPE_EOF)]
-            elif queue_name.startswith("stores"):
-                routing_key = [str(MESSAGE_TYPE_STORES), str(MESSAGE_TYPE_EOF)]
-            else:
-                routing_key = [str(MESSAGE_TYPE_TRANSACTIONS), str(MESSAGE_TYPE_TRANSACTION_ITEMS), str(MESSAGE_TYPE_EOF)]
-            
-            queues_dict[queue_name] = routing_key
-    return queues_dict
-
 def main():
     config_params = initialize_config()
     logging_level = config_params["logging_level"]
@@ -60,13 +43,9 @@ def main():
     # of the component
     logging.debug(f"action: config | result: success | port: {port} | "
                   f"listen_backlog: {listen_backlog} | logging_level: {logging_level}")
-    
-    queues_dict = create_queues_dict()
-    exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["exchange_name"], queues_dict)
-    in_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue"])
 
     # Initialize gateway and start gateway loop
-    gateway = Gateway(port, listen_backlog, exchange, in_queue)
+    gateway = Gateway(port, listen_backlog, config_params["exchange_name"], config_params["input_queue"], config_params["rabbitmq_host"])
     gateway.run()
 
 def initialize_log(logging_level):

@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import logging
 import pika
 
 class MessageMiddlewareMessageError(Exception):
@@ -52,7 +53,7 @@ class MessageMiddleware(ABC):
 class MessageMiddlewareQueue(MessageMiddleware):
     def __init__(self, host, queue_name):
         self.queue_name = queue_name
-        self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=host, heartbeat=600))
+        self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=host, heartbeat=6000))
         self.channel = self.connection.channel()
         self.channel.queue_declare(queue=queue_name, durable=True)
 
@@ -77,6 +78,7 @@ class MessageMiddlewareQueue(MessageMiddleware):
 class MessageMiddlewareExchange(MessageMiddleware):
     def __init__(self, host, exchange_name, queues_dict):
         self.exchange_name = exchange_name
+        self.host = host
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(host))
         self.channel = self.connection.channel()
         self.channel.exchange_declare(exchange=exchange_name, exchange_type='direct', durable=True)
@@ -105,6 +107,19 @@ class MessageMiddlewareExchange(MessageMiddleware):
             self.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=False)
 
         self.channel.start_consuming()
+
+    def add_queue_to_exchange(self, queue_name, routing_key):
+        """
+        Crea una cola, la bindea al exchange y la agrega al diccionario interno.
+        Si la cola ya existe, no falla.
+        """
+        queue = MessageMiddlewareQueue(self.host, queue_name)
+
+        # Bindear al exchange
+        self.channel.queue_bind(exchange=self.exchange_name, queue=queue_name, routing_key=routing_key)
+
+        # Guardar en el diccionario
+        self.queues[queue_name] = {"queue": queue, "routing_key": routing_key}
 
     def stop_consuming(self):
         self.connection.close()

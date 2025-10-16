@@ -19,6 +19,7 @@ class Client:
         self._gateway_port = gateway_port
         self._socket.bind(('', 0))
         self._protocol = None
+        self._request_id = None
     
         signal.signal(signal.SIGTERM, self.__handle_shutdown)
         signal.signal(signal.SIGINT, self.__handle_shutdown)
@@ -27,7 +28,8 @@ class Client:
         try:
             self._socket.connect((self._gateway_host, self._gateway_port))
             self._protocol = Protocol(self._socket)
-            logging.info(f'action: connect | result: success | gateway address: {self._gateway_host}:{self._gateway_port}')
+            self._receive_request_id()
+            logging.info(f'action: connect | result: success | gateway address: {self._gateway_host}:{self._gateway_port} | request_id: {self._request_id}')
             self.__send_request()
             self.__wait_for_results()
         except Exception as e:
@@ -35,14 +37,18 @@ class Client:
             
         self.__handle_shutdown(None, None)
 
+    def _receive_request_id(self):
+        self._request_id = self._protocol.read_message().request_id
+
     def __send_request(self):
         """
         Sends a request to the gateway.
         """
         try:
             self.__send_data()
+            logging.info(f'action: send_data | result: success | request_id: {self._request_id}')
             self.__send_end_of_data()
-            logging.info(f'action: send_request | result: success')
+            logging.info(f'action: send_request | result: success | request_id: {self._request_id}')
         except Exception as e:
             logging.error(f'action: send_request | result: fail | error: {e}')
 
@@ -59,7 +65,7 @@ class Client:
             file_reader = FileReader(file_path, int(os.getenv('MAX_BATCH_SIZE')))
             while file_reader.has_more_data():
                 data = file_reader.get_chunk()
-                self._protocol.send_message(Message(0, message_type, 0, data).serialize())
+                self._protocol.send_message(Message(self._request_id, message_type, 0, data).serialize())
             file_reader.close()
 
         logging.info(f'action: send_data_folder | folder: {folder_path} | result: success')
@@ -69,7 +75,7 @@ class Client:
         Sends an EOF message to the gateway to indicate the end of data transmission.
         """
         try:
-            self._protocol.send_message(Message(0, MESSAGE_TYPE_EOF, 0, '').serialize())
+            self._protocol.send_message(Message(self._request_id, MESSAGE_TYPE_EOF, 0, '').serialize())
             logging.info(f'action: send_eof | result: success')
         except Exception as e:
             logging.error(f'action: send_eof | result: fail | error: {e}')
@@ -82,14 +88,18 @@ class Client:
         logging.info(f'action: client shutdown | result: success')
         
     def __wait_for_results(self):
-        message = self._protocol.read_message()
-        logging.info(f'action: receive_message | result: success | message type: {message.type}')
-        results_storage = ResultStorage(f"storage/client-{message.request_id}.ndjson")
-        results_storage.start_run(message.request_id)
+        results_storage = ResultStorage(f"storage/client-{self._request_id}.ndjson")
+        results_storage.start_run(self._request_id)
         while True:
             try:
                 message = self._protocol.read_message()
+                logging.info(f'action: receive_message | result: success | message type: {message.type}')
+                
                 if not message:
+                    break
+                if message.type == MESSAGE_TYPE_EOF:
+                    logging.info(f'action: receive_message | result: eof | request_id: {message.request_id}')
+                    results_storage.close_run(self)
                     break
                 results_storage.add_chunk(message)
                 logging.info(f'action: receive_message | result: success | message type: {message.type}')
