@@ -17,6 +17,7 @@ class QuantityAndProfit(Worker):
         try:
             message = Message.deserialize(message)
             if message.type == MESSAGE_TYPE_EOF:
+                logging.info(f"EOF recibido en data queue | request_id: {message.request_id}")
                 self._send_results_by_date()
                 self.__received_EOF__(message)
                 return

@@ -100,10 +100,8 @@ class FilterTimeNode(Worker):
             self.data_input_queue.close()
             self.data_out_exchange.close()
             self.eof_out_exchange.close()
-            self.eof_service_queue.close()
-            self.eof_self_queue.close()
         except Exception as e:
-            print(f"Error al cerrar: {type(e).__name__}: {e}")
+            logging.error(f"Error al cerrar las conexiones: {type(e).__name__}: {e}")
 
 
 def initialize_config():
@@ -143,19 +141,6 @@ def initialize_config():
     
     return config_params
 
-def create_eofs_queues(rabbitmq_host):
-    input_queues = []
-    output_queues = []
-
-    for key, queue_name in os.environ.items():
-        if key.startswith("INPUT_QUEUE_"):
-            if queue_name.startswith("EOF"):
-                input_queues.append(MessageMiddlewareQueue(rabbitmq_host, queue_name))
-        elif key.startswith("OUTPUT_QUEUE_"):
-            if queue_name.startswith("EOF"):
-                output_queues.append(MessageMiddlewareQueue(rabbitmq_host, queue_name))
-
-    return input_queues, output_queues
 
 def main():
     config_params = initialize_config()
