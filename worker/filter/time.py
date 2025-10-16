@@ -5,7 +5,7 @@ from pkg.message.message import Message
 from utils.custom_logging import initialize_log, setup_process_logger
 import os
 from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_TRANSACTIONS
-from multiprocessing import Process, Value
+from multiprocessing import Process
 
 class FilterTimeNode(Worker):
     
