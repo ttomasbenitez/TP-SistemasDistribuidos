@@ -86,7 +86,6 @@ def initialize_config():
     config_params["input_queue_1"] = os.getenv('INPUT_QUEUE_1')
     config_params["input_queue_2"] = os.getenv('INPUT_QUEUE_2')
     config_params["output_queue"] = os.getenv('OUTPUT_QUEUE_1')
-    config_params["output_queue"] = os.getenv('OUTPUT_QUEUE_1')
     config_params["exchange"] = os.getenv('EXCHANGE_NAME')
     config_params["logging_level"] = os.getenv('LOG_LEVEL', 'INFO')
 
