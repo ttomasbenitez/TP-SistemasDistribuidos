@@ -98,7 +98,6 @@ def subset_check_ndjson(expected_path: str, actual_path: str, atol: float = 1e-6
     """
     exp_set: Set[Tuple] = set(canon_tuple(r, atol) for r in load_ndjson(expected_path) if _qid(r) != "unknown")
     act_set: Set[Tuple] = set(canon_tuple(r, atol) for r in load_ndjson(actual_path) if _qid(r) != "unknown")
-
     missing = sorted(exp_set - act_set)
     return {
         "ok": len(missing) == 0,
@@ -119,7 +118,8 @@ def main():
     # res = subset_check_ndjson(args.expected, args.actual, args.atol)
     # print(json.dumps(res, ensure_ascii=False, indent=2))
     # exit code útil en CI
-    res = subset_check_ndjson("data/kaggle/results.ndjson", "../client/storage/client-0.ndjson", atol=1e-6)
+    # res = subset_check_ndjson("data/kaggle/results.ndjson", "../client/storage/client-0.ndjson", atol=1e-6)
+    res = subset_check_ndjson("data/kaggle/results-test-case.ndjson", "../client/storage/client-0.ndjson", atol=1e-6)
     print(res)
 
     raise SystemExit(0 if res["ok"] else 1)
