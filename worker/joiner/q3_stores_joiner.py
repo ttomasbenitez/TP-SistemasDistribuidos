@@ -18,7 +18,7 @@ EXPECTED_EOFS = 2
 
 class StoresJoiner(Worker):
 
-    def __init__(self, data_input_queue: MessageMiddlewareQueue, stores_input_queue: MessageMiddlewareQueue,
+    def __init__(self, data_input_queue: str, stores_input_queue: str,
                  host: str, out_exchange: str, out_queue_name: str):
         self.data_input_queue = data_input_queue
         self.stores_input_queue = stores_input_queue
@@ -39,7 +39,7 @@ class StoresJoiner(Worker):
 
     def start(self):
         t_data = threading.Thread(target=self._consume_data_queue)
-        t_stores = threading.Thread(target=self.stores_input_queue.start_consuming, args=(self.__on_stores_message__,))
+        t_stores = threading.Thread(target=self._consume_stores_queue)
         t_data.start()
         t_stores.start()
         t_data.join()
@@ -47,6 +47,7 @@ class StoresJoiner(Worker):
         
     def _consume_data_queue(self):
         out_exchange = MessageMiddlewareExchange(self.host, self.out_exchange, {})
+        data_input_queue = MessageMiddlewareQueue(self.host, self.data_input_queue)
         
         def __on_message__(msg):
             message = Message.deserialize(msg)
@@ -84,9 +85,12 @@ class StoresJoiner(Worker):
                     else:
                         self.pending_transactions.append((item, message.request_id))
                         
-        self.data_input_queue.start_consuming(__on_message__)
+        data_input_queue.start_consuming(__on_message__)
 
-
+    def _consume_stores_queue(self):
+        stores_input_queue = MessageMiddlewareQueue(self.host, self.stores_input_queue)
+        stores_input_queue.start_consuming(self.__on_stores_message__)
+    
     def __on_stores_message__(self, message):
         message = Message.deserialize(message)
 
@@ -159,10 +163,7 @@ def main():
     config_params = initialize_config()
     initialize_log(config_params["logging_level"])
 
-    data_input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue_1"])
-    stores_input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue_2"])
-
-    joiner = StoresJoiner(data_input_queue, stores_input_queue, config_params["rabbitmq_host"], config_params["output_exchange_q3"], config_params["output_queue_name"])
+    joiner = StoresJoiner(config_params["input_queue_1"],  config_params["input_queue_2"], config_params["rabbitmq_host"], config_params["output_exchange_q3"], config_params["output_queue_name"])
     joiner.start()
 
 
