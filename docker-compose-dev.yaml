@@ -285,21 +285,17 @@ services:
     depends_on:
     - gateway
 
-  joiner-menu-items-1:
-    container_name: joiner-menu-items-1
+  joiner-menu-items:
+    container_name: joiner-menu-items
     image: worker:latest
     command: "/worker/joiner/menu_items.py"
     environment:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: products-results-queue
       INPUT_QUEUE_2: menu-items-queue-1
-      INPUT_QUEUE_3: EOF-joiner-menu-items-2-1
-      INPUT_QUEUE_4: EOF-joiner-menu-items-3-1
-      OUTPUT_QUEUE_1: results-queue
-      OUTPUT_QUEUE_2: EOF-joiner-menu-items-1-2
-      OUTPUT_QUEUE_3: EOF-joiner-menu-items-1-3
+      OUTPUT_QUEUE_PREFIX: results-queue
+      OUTPUT_EXCHANGE: output_exchange_q2
       LOG_LEVEL: INFO
-      EXPECTED_ACKS: 2 
     networks:
     - testing_net
     depends_on:
