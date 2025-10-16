@@ -5,7 +5,7 @@ from utils.custom_logging import initialize_log
 from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
 from pkg.message.constants import MESSAGE_TYPE_EOF
 
-class EofServiceTime(EofService):
+class EofServiceMonth(EofService):
     
     def send_message_to_output(self, message):
         try:
@@ -51,7 +51,7 @@ def main():
 
     eof_output_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["output_queue"])
 
-    eof_service = EofServiceTime(
+    eof_service = EofServiceMonth(
         expected_acks=config_params["expected_acks"],
         eof_in_queque=eof_input_queue,
         eof_out_middleware=eof_output_queue

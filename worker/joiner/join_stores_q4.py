@@ -23,7 +23,7 @@ class Q4StoresJoiner(Worker):
         self.stores = {}
         self.eofs_by_client = {}
         self.pending_clients = {}
-        self.processed_clients = {}
+        self.processed_clients = dict()
         self.clients = []
 
         # locks
@@ -87,16 +87,15 @@ class Q4StoresJoiner(Worker):
                 with self.stores_lock:
                     store_name = self.stores.get((item.get_store(), message.request_id), 0)
                 if store_name:
-                    self.processed_clients[message.request_id] = Q4Result(store_name, item.get_birthdate(), item.get_purchases_qty())
+                    self.processed_clients.setdefault(message.request_id, []).append(Q4Result(store_name, item.get_birthdate(), item.get_purchases_qty()))
                 else:
                     self.pending_clients[(item.get_store(), message.request_id)] = item
 
     def send_processed_clients(self, message):
         total_chunk = ''
-
-        for req_id, q4Result in self.processed_clients.items():
-            if req_id == message.request_id:
-                total_chunk += q4Result.serialize()
+        results = self.processed_clients.get(message.request_id, [])
+        for q4Result in results:
+            total_chunk += q4Result.serialize()
         msg = Message(message.request_id, MESSAGE_TYPE_QUERY_4_RESULT, message.msg_num, total_chunk)
         self.out_exchange.send(msg.serialize(), str(message.request_id))
 
@@ -105,7 +104,7 @@ class Q4StoresJoiner(Worker):
             if req_id == request_id:
                 store_name = self.stores.get((store, req_id))
                 if store_name:
-                    self.processed_clients[req_id] = Q4Result(store_name, item.get_birthdate(), item.get_purchases_qty())
+                    self.processed_clients.setdefault(req_id, []).append(Q4Result(store_name, item.get_birthdate(), item.get_purchases_qty()))
                 del self.pending_clients[(store, req_id)]
 
     def _send_eof(self, message):
