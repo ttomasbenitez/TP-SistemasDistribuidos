@@ -4,6 +4,7 @@ from pkg.message.constants import MESSAGE_TYPE_EOF
 from pkg.message.message import Message
 import signal
 import logging
+from utils.custom_logging import setup_process_logger
 from multiprocessing import Manager
 
 class Worker(ABC):
@@ -35,8 +36,6 @@ class Worker(ABC):
 
         self.stop()
         self.close()
-        
-    @abstractmethod
     def __on_message__(self, raw):
         pass
 
@@ -63,6 +62,7 @@ class Worker(ABC):
                 self.drained[request_id].set()
                 
     def _consume_eof(self): 
+        setup_process_logger('name=filter_amount_node', level="INFO")
         eof_service_queue = MessageMiddlewareQueue(self.host, self.eof_service_queue)
         eof_self_queue = MessageMiddlewareQueue(self.host, self.eof_self_queue)
         def on_eof_message(message):

@@ -17,7 +17,7 @@ class EofService(Worker, ABC):
         try:
             message = Message.deserialize(message)
             if message.type == MESSAGE_TYPE_EOF:
-                logging.info(f"EOF recibido en data queue | request_id: {message.request_id}")
+                logging.info(f"EOF recibido en service queue | request_id: {message.request_id}")
                 self.acks_by_client[message.request_id] = self.acks_by_client.get(message.request_id, 0) + 1  
                 if self.acks_by_client[message.request_id] == self.expected_acks:
                     logging.info(f"Enviando final EOF del cliente {message.request_id}")

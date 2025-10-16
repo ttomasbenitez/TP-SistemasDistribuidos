@@ -22,7 +22,7 @@ class ClientHandler(threading.Thread):
         try:
             logging.info(f"action: client_handler_start | result: success | queue name: {self._in_queue.queue_name}")
 
-            self._protocol.send_message(Message(self._request_id, MESSAGE_TYPE_REQUEST_ID, 0, ''    ).serialize())
+            self._protocol.send_message(Message(self._request_id, MESSAGE_TYPE_REQUEST_ID, 0, '').serialize())
             # Recibir datos del cliente y enviarlos al exchange
             self._receive_and_publish()
 
@@ -73,6 +73,7 @@ class ClientHandler(threading.Thread):
             self._finished_queries += 1
             if self._finished_queries == EXPECTED_QUERIES:
                 logging.info("action: all_results_sent | result: success")
+                self._protocol.send_message(raw_msg)
                 self._running = False
             return
         self._protocol.send_message(raw_msg)

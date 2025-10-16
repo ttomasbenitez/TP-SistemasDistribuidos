@@ -88,14 +88,18 @@ class Client:
         logging.info(f'action: client shutdown | result: success')
         
     def __wait_for_results(self):
-        message = self._protocol.read_message()
-        logging.info(f'action: receive_message | result: success | message type: {message.type}')
-        results_storage = ResultStorage(f"storage/client-{message.request_id}.ndjson")
-        results_storage.start_run(message.request_id)
+        results_storage = ResultStorage(f"storage/client-{self._request_id}.ndjson")
+        results_storage.start_run(self._request_id)
         while True:
             try:
                 message = self._protocol.read_message()
+                logging.info(f'action: receive_message | result: success | message type: {message.type}')
+                
                 if not message:
+                    break
+                if message.type == MESSAGE_TYPE_EOF:
+                    logging.info(f'action: receive_message | result: eof | request_id: {message.request_id}')
+                    results_storage.close_run(self)
                     break
                 results_storage.add_chunk(message)
                 logging.info(f'action: receive_message | result: success | message type: {message.type}')

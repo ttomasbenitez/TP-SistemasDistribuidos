@@ -54,9 +54,6 @@ class FilterYearNode(Worker):
         for p in (p_data, p_eof, p_eof_final):
             p.join()
 
-    def __on_message__(self, message):
-        pass
-    
     def _consume_eof_final(self):
         setup_process_logger('name=filter_amount_node', level="INFO")
         eof_final_queue = MessageMiddlewareQueue(self.host, self.eof_final_queue)
