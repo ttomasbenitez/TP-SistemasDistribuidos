@@ -105,7 +105,6 @@ def initialize_config():
         "rabbitmq_host": os.getenv('RABBITMQ_HOST'),
         "input_queue": os.getenv('INPUT_QUEUE_1'),
         "output_queue": os.getenv('OUTPUT_QUEUE_1'),
-        "output_exchange_aggregator_store_q3": os.getenv('EXCHANGE_NAME'),
         "eof_exchange_name": os.getenv('EOF_EXCHANGE_NAME'),
         "eof_self_queue": os.getenv('EOF_SELF_QUEUE'),
         "eof_queue_1": os.getenv('EOF_QUEUE_1'),
@@ -118,7 +117,6 @@ def initialize_config():
         "rabbitmq_host",
         "input_queue",
         "output_queue",
-        "output_exchange_aggregator_store_q3",
     ]
 
     missing_keys = [key for key in required_keys if config_params[key] is None]
