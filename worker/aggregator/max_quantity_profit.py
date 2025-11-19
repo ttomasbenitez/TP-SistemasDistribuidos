@@ -2,7 +2,7 @@ from worker.base import Worker
 from Middleware.middleware import MessageMiddlewareQueue
 import logging
 from pkg.message.message import Message
-from pkg.message.constants import  MESSAGE_TYPE_QUERY_2_RESULT, MESSAGE_TYPE_EOF, MAX_PROFIT, MAX_QUANTITY
+from pkg.message.constants import MESSAGE_TYPE_QUERY_2_RESULT, MESSAGE_TYPE_EOF, MAX_PROFIT, MAX_QUANTITY
 from utils.custom_logging import initialize_log
 import os
 from pkg.message.q2_result import Q2Result

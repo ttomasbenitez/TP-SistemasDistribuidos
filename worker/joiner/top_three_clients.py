@@ -26,6 +26,8 @@ class TopThreeClientsJoiner(Worker):
         self.users_by_store = {}
         self.eofs_by_client = {}
         self.clients = []
+        self.cantidad = {}
+        self.n = 0
 
         # locks
         self.users_lock = threading.Lock()
@@ -75,13 +77,15 @@ class TopThreeClientsJoiner(Worker):
             return
 
         items = message.process_message()
-        
+        self.cantidad[message.request_id] = self.cantidad.get(message.request_id, 0) + 1
+
         if message.type == MESSAGE_TYPE_TRANSACTIONS:
             pre_process = dict()
             store_id = None
             for item in items:
                 if item.get_user():
                     key = (item.get_user(), message.request_id)
+                    #self.cantidad[key] = self.cantidad.get(key, 0) + 1
                     pre_process[key] = pre_process.get(key, 0) + 1
                     if store_id is None:
                         store_id = item.get_store() 
@@ -119,6 +123,7 @@ class TopThreeClientsJoiner(Worker):
                 if birthdate:
                     chunk += Q4IntermediateResult(store, birthdate, transaction_count).serialize()
             
+            logging.info(f"CHUNKKKKKKK: {chunk}")
             msg = Message(request_id, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT, 1, chunk)
             self.output_queue.send(msg.serialize())
 
@@ -126,6 +131,9 @@ class TopThreeClientsJoiner(Worker):
             
 
     def _send_eof(self, message):
+        for key, inner in self.cantidad.items():
+            logging.info(f"CANTIDADDDDDDDDDDDD: {key}, {inner}")
+
         self.output_queue.send(message.serialize())
         logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")
 

@@ -61,10 +61,18 @@ class MessageMiddlewareQueue(MessageMiddleware):
         self.channel = self.connection.channel()
         self.channel.queue_declare(queue=queue_name, durable=True)
 
-    def start_consuming(self, on_message_callback):
-        def callback(ch, method, properties, body):
-            on_message_callback(body)
-        self.channel.basic_consume(queue=self.queue_name, on_message_callback=callback, auto_ack=True)
+    def start_consuming(self, on_message_callback, prefetch_count=None):
+        if prefetch_count:
+            self.channel.basic_qos(prefetch_count=prefetch_count)
+            def callback(ch, method, properties, body):
+                on_message_callback(body)
+                ch.basic_ack(delivery_tag=method.delivery_tag)
+            self.channel.basic_consume(queue=self.queue_name, on_message_callback=callback, auto_ack=False)
+        else:
+            def callback(ch, method, properties, body):
+                on_message_callback(body)
+            self.channel.basic_consume(queue=self.queue_name, on_message_callback=callback, auto_ack=True)
+            
         self.channel.start_consuming()
 
     def stop_consuming(self):
@@ -133,11 +141,19 @@ class MessageMiddlewareExchange(MessageMiddleware):
             self.queues[queue_name] = {"queue": queue, "routing_key": routing_keys}
 
         
-    def start_consuming(self, on_message_callback):
-        def callback(ch, method, properties, body):
-            on_message_callback(body)
-        for queue_name in self.queues.keys():
-            self.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=False)
+    def start_consuming(self, on_message_callback, prefetch_count=None):
+        if prefetch_count:
+            self.channel.basic_qos(prefetch_count=prefetch_count)
+            def callback(ch, method, properties, body):
+                on_message_callback(body)
+                ch.basic_ack(delivery_tag=method.delivery_tag)
+            for queue_name in self.queues.keys():
+                self.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=False)
+        else:
+            def callback(ch, method, properties, body):
+                on_message_callback(body)
+            for queue_name in self.queues.keys():
+                self.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=True)
 
         self.channel.start_consuming()
 

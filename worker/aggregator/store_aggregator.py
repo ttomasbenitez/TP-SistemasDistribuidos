@@ -52,7 +52,7 @@ class StoreAggregator(Worker):
         eof_self_queue.start_consuming(on_eof_message)
         
     def _consume_data_queue(self, queue: MessageMiddlewareQueue):
-        queue.start_consuming(self.__on_message__)
+        queue.start_consuming(self.__on_message__, prefetch_count=1)
 
     def __on_message__(self, message):
         try:

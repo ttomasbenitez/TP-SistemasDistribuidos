@@ -116,7 +116,7 @@ class FilterYearNode(Worker):
                     self._dec_inflight(message.request_id)
 
         # Mantener el loop vivo para heartbeats
-        data_input_queue.start_consuming(_on)
+        data_input_queue.start_consuming(_on, prefetch_count=1)
 
     def _consume_eof(self):
         setup_process_logger('name=filter_year_node:eof', level=logging.getLevelName(logging.getLogger().level))

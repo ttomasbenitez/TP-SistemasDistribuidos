@@ -38,7 +38,7 @@ class AggregatorMonth(Worker):
         for p in (p_data, p_eof): p.join()
 
     def _consume_data_queue(self, queue: MessageMiddlewareQueue):
-        queue.start_consuming(self.__on_message__)
+        queue.start_consuming(self.__on_message__, prefetch_count=1)
 
     def _consume_eof(self): 
         eof_service_queue = MessageMiddlewareQueue(self.host, self.eof_service_queue_name)
