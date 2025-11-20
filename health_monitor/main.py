@@ -15,8 +15,7 @@ def main():
     logging_level = os.getenv('LOG_LEVEL', 'INFO')
     initialize_log(logging_level)
     
-    hostname = os.getenv('HOSTNAME') # This might be the container ID by default, we should pass a specific name or use container_name
-    # Better to pass a specific env var for the logical name
+    hostname = os.getenv('HOSTNAME')
     node_name = os.getenv('NODE_NAME')
     
     monitors_str = os.getenv('HEALTH_MONITORS', '')

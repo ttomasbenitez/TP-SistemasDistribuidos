@@ -4,9 +4,7 @@ import time
 import random
 import sys
 
-# Configuration
-EXCLUDED_CONTAINERS = ['rabbitmq', 'gateway'] # Gateway might be critical too, but user only asked for rabbitmq. I'll add gateway as it's the entry point, but maybe they want to test gateway failure too. The plan said "exclude rabbitmq". I'll stick to just rabbitmq as per plan, maybe add a flag for others.
-# Actually, let's just exclude rabbitmq as agreed.
+EXCLUDED_CONTAINERS = ['rabbitmq', 'gateway']
 
 def get_running_containers():
     """Returns a list of running container names for the current project."""
@@ -29,7 +27,6 @@ def kill_container(container_name):
     """Kills a specific container."""
     print(f"💥 Killing container: {container_name}")
     try:
-        # We need to find the actual container name or ID for the service
         # docker compose kill takes the service name
         subprocess.run(
             ['docker', 'compose', '-f', 'docker-compose-dev.yaml', 'kill', container_name],
