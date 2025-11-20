@@ -7,6 +7,7 @@ import os
 from pkg.message.q3_result import Q3IntermediateResult
 from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT
 from multiprocessing import Process, Value
+from utils.heartbeat import start_heartbeat_sender
 
 
 class SemesterAggregator(Worker):
@@ -36,6 +37,9 @@ class SemesterAggregator(Worker):
         logging.info(f"Starting EOF node process")
         p_eof = Process(target=self._consume_eof)
         
+        # Start Heartbeat in the main process
+        self.heartbeat_sender = start_heartbeat_sender()
+
         # Esperamos que terminen
         for p in (p_data, p_eof): p.start()
         for p in (p_data, p_eof): p.join()

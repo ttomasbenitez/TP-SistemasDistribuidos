@@ -21,6 +21,8 @@ services:
       PORT: 3000
       LOG_LEVEL: DEBUG
       LISTEN_BACKLOG: '5'
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: gateway
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: results-queue
       OUTPUT_QUEUE_1: stores-queue-1
@@ -40,6 +42,8 @@ services:
     image: worker:latest
     command: "/worker/filter/year.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: filter-year-1
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: batches-queue
       OUTPUT_QUEUE_1: year-filtered-queue-q1-q3
@@ -63,6 +67,8 @@ services:
     image: worker:latest
     command: "/worker/filter/year.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: filter-year-2
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: batches-queue
       OUTPUT_QUEUE_1: year-filtered-queue-q1-q3
@@ -86,6 +92,8 @@ services:
     image: worker:latest
     command: "/worker/eof/eof_service_year.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: filter-year-eof-service
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE: eof-service-filter-year
       OUTPUT_QUEUE: eof-final-filter-year
@@ -101,6 +109,8 @@ services:
     image: worker:latest
     command: "/worker/filter/time.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: filter-time-1
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: year-filtered-queue-q1-q3
       EOF_SELF_QUEUE: EOF-filter-time-1
@@ -122,6 +132,8 @@ services:
     image: worker:latest
     command: "/worker/filter/time.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: filter-time-2
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: year-filtered-queue-q1-q3
       EOF_SELF_QUEUE: EOF-filter-time-2
@@ -143,6 +155,8 @@ services:
     image: worker:latest
     command: "/worker/eof/eof_service_time.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: filter-time-eof-service
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE: eof-service-filter-time
       OUTPUT_QUEUE_1: time-filtered-queue-q1
@@ -160,6 +174,8 @@ services:
     image: worker:latest
     command: "/worker/filter/amount.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: filter-amount-1
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: time-filtered-queue-q1
       OUTPUT_QUEUE_1: results-queue
@@ -182,6 +198,8 @@ services:
     image: worker:latest
     command: "/worker/filter/amount.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: filter-amount-2
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: time-filtered-queue-q1
       OUTPUT_QUEUE_1: results-queue
@@ -204,6 +222,8 @@ services:
     image: worker:latest
     command: "/worker/filter/amount.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: filter-amount-3
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: time-filtered-queue-q1
       OUTPUT_QUEUE_1: results-queue
@@ -226,6 +246,8 @@ services:
     image: worker:latest
     command: "/worker/eof/eof_service_amount.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: filter-amount-eof-service
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE: eof-service-filter-amount
       OUTPUT_QUEUE: eof-final-filter-amount
@@ -241,6 +263,8 @@ services:
     image: worker:latest
     command: "/worker/aggregator/month.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: aggregator-month-1
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: year-filtered-queue-q2
       EOF_SELF_QUEUE: EOF-aggregator-month-1
@@ -260,6 +284,8 @@ services:
     image: worker:latest
     command: "/worker/aggregator/month.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: aggregator-month-2
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: year-filtered-queue-q2
       EOF_SELF_QUEUE: EOF-aggregator-month-2
@@ -279,6 +305,8 @@ services:
     image: worker:latest
     command: "/worker/eof/eof_service_month.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: aggregator-month-eof-service
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE: eof-service-aggregator-month
       OUTPUT_QUEUE: aggregated-month-queue
@@ -294,6 +322,8 @@ services:
     image: worker:latest
     command: "/worker/aggregator/max_quantity_profit.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: aggregator-quantity-profit
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-month-queue
       OUTPUT_QUEUE_1: products-results-queue
@@ -308,6 +338,8 @@ services:
     image: worker:latest
     command: "/worker/joiner/menu_items.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: joiner-menu-items
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: products-results-queue
       INPUT_QUEUE_2: menu-items-queue
@@ -324,6 +356,8 @@ services:
     image: worker:latest
     command: "/worker/aggregator/semester_aggregator.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: aggregator-semester-1
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-store-q3-queue
       OUTPUT_QUEUE_1: aggregated-semester-queue
@@ -343,6 +377,8 @@ services:
     image: worker:latest
     command: "/worker/aggregator/semester_aggregator.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: aggregator-semester-2
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-store-q3-queue
       OUTPUT_QUEUE_1: aggregated-semester-queue
@@ -362,6 +398,8 @@ services:
     image: worker:latest
     command: "/worker/eof/eof_service_aggregator_store.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: aggregator-semester-eof-service
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE: eof-service-aggregator-semester
       OUTPUT_QUEUE: aggregated-semester-queue
@@ -377,6 +415,8 @@ services:
     image: worker:latest
     command: "/worker/aggregator/store_aggregator.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: aggregator-store-q3-1
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: time-filtered-queue-q3
       OUTPUT_QUEUE_1: aggregated-store-q3-queue
@@ -397,6 +437,8 @@ services:
     image: worker:latest
     command: "/worker/aggregator/store_aggregator.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: aggregator-store-q3-2
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: time-filtered-queue-q3
       OUTPUT_QUEUE_1: aggregated-store-q3-queue
@@ -417,6 +459,8 @@ services:
     image: worker:latest
     command: "/worker/eof/eof_service_aggregator_store.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: aggregator-store-q3-eof-service
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE: eof-service-aggregator-store-q3
       OUTPUT_QUEUE: aggregated-store-q3-queue
@@ -432,6 +476,8 @@ services:
     image: worker:latest
     command: "/worker/joiner/q3_stores_joiner.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: joiner-stores-q3
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-semester-queue
       INPUT_QUEUE_2: stores-queue-1
@@ -451,6 +497,8 @@ services:
     image: worker:latest
     command: "/worker/aggregator/store_aggregator.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: aggregator-store-q4-1
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: year-filtered-queue-q4
       OUTPUT_QUEUE_1: aggregated-store-q4-queue
@@ -471,6 +519,8 @@ services:
     image: worker:latest
     command: "/worker/aggregator/store_aggregator.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: aggregator-store-q4-2
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: year-filtered-queue-q4
       OUTPUT_QUEUE_1: aggregated-store-q4-queue
@@ -491,6 +541,8 @@ services:
     image: worker:latest
     command: "/worker/eof/eof_service_aggregator_store.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: aggregator-store-q4-eof-service
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE: eof-service-aggregator-store-q4
       OUTPUT_QUEUE: aggregated-store-q4-queue
@@ -506,6 +558,8 @@ services:
     image: worker:latest
     command: "/worker/joiner/top_three_clients.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: top-three-clients
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-store-q4-queue
       INPUT_QUEUE_2: users-queue
@@ -521,6 +575,8 @@ services:
     image: worker:latest
     command: "/worker/joiner/join_stores_q4.py"
     environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: join-stores-q4
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: top-clients-queue
       INPUT_QUEUE_2: stores-queue-2
@@ -581,6 +637,73 @@ services:
     - ./client/data/transactions/:/data/transactions/
     - ./client/data/transaction_items/:/data/transaction_items/
     - ./client/storage/:/storage/
+
+  client_3:
+    container_name: client_3
+    image: client:latest
+    environment:
+      GATEWAY_HOST: gateway
+      GATEWAY_PORT: 3000
+      LOG_LEVEL: INFO
+      STORES_FOLDER_PATH: data/stores/
+      MENU_ITEMS_FOLDER_PATH: data/menu_items/
+      USERS_FOLDER_PATH: data/users/
+      TRANSACTIONS_FOLDER_PATH: data/transactions/
+      TRANSACTION_ITEMS_FOLDER_PATH: data/transaction_items/
+      MAX_BATCH_SIZE: 200000
+    depends_on:
+      - gateway
+    networks:
+    - testing_net
+    volumes:
+    - ./client/data/menu_items/:/data/menu_items/
+    - ./client/data/stores/:/data/stores/
+    - ./client/data/users/:/data/users/
+    - ./client/data/transactions/:/data/transactions/
+    - ./client/data/transaction_items/:/data/transaction_items/
+    - ./client/storage/:/storage/
+
+  health-monitor-1:
+    container_name: health-monitor-1
+    image: health-monitor:latest
+    build:
+      context: .
+      dockerfile: health_monitor/Dockerfile
+    environment:
+      NODE_NAME: health-monitor-1
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: health-monitor-1
+      LOG_LEVEL: DEBUG
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - testing_net
+
+  health-monitor-2:
+    container_name: health-monitor-2
+    image: health-monitor:latest
+    environment:
+      NODE_NAME: health-monitor-2
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: health-monitor-2
+      LOG_LEVEL: DEBUG
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - testing_net
+
+  health-monitor-3:
+    container_name: health-monitor-3
+    image: health-monitor:latest
+    environment:
+      NODE_NAME: health-monitor-3
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: health-monitor-3
+      LOG_LEVEL: DEBUG
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - testing_net
 
 networks:
   testing_net:

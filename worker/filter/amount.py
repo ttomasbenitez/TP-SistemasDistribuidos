@@ -7,6 +7,7 @@ from utils.custom_logging import initialize_log, setup_process_logger
 import os
 from pkg.message.constants import MESSAGE_TYPE_EOF, QUERY_1, MESSAGE_TYPE_QUERY_1_RESULT
 from multiprocessing import Process, Manager, Value, Lock
+from utils.heartbeat import start_heartbeat_sender
 
 class FilterAmountNode(Worker):
     
@@ -34,6 +35,10 @@ class FilterAmountNode(Worker):
         
         logging.info(f"Starting EOF FINAL process")
         p_eof_final = Process(target=self._consume_eof_final)
+        
+        # Start Heartbeat in the main process
+        self.heartbeat_sender = start_heartbeat_sender()
+
         # Esperamos que terminen
         for p in (p_data, p_eof, p_eof_final): p.start()
         for p in (p_data, p_eof, p_eof_final): p.join()

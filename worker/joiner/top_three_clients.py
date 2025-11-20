@@ -7,6 +7,7 @@ from utils.custom_logging import initialize_log
 import os
 from pkg.message.q4_result import Q4IntermediateResult
 import threading
+from utils.heartbeat import start_heartbeat_sender
 
 EXPECTED_EOFS = 2
 
@@ -34,6 +35,9 @@ class TopThreeClientsJoiner(Worker):
         self.eofs_lock = threading.Lock()
 
     def start(self):
+        # Start Heartbeat
+        self.heartbeat_sender = start_heartbeat_sender()
+
         t_data = threading.Thread(target=self.data_input_queue.start_consuming, args=(self.__on_message__,))
         t_stores = threading.Thread(target=self.users_input_queue.start_consuming, args=(self.__on_users_message__,))
         t_data.start()

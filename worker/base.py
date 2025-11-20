@@ -6,6 +6,7 @@ import signal
 import logging
 from utils.custom_logging import setup_process_logger
 from multiprocessing import Manager
+from utils.heartbeat import start_heartbeat_sender
 
 class Worker(ABC):
     
@@ -28,6 +29,9 @@ class Worker(ABC):
     def start(self):
         self._running = True
         
+        # Start Heartbeat
+        self.heartbeat_sender = start_heartbeat_sender()
+        
         while self._running:
             try:
                 self.in_middleware.start_consuming(self.__on_message__)
@@ -35,6 +39,8 @@ class Worker(ABC):
                 print(f"Error al consumir: {type(e).__name__}: {e}")
 
         self.stop()
+        if hasattr(self, 'heartbeat_sender') and self.heartbeat_sender:
+            self.heartbeat_sender.stop()
         self.close()
     def __on_message__(self, raw):
         pass

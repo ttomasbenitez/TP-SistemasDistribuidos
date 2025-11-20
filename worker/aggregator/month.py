@@ -7,6 +7,7 @@ from utils.custom_logging import initialize_log
 from pkg.message.q2_result import Q2IntermediateResult
 import os
 from multiprocessing import Process, Value
+from utils.heartbeat import start_heartbeat_sender
 
 
 class AggregatorMonth(Worker):
@@ -33,6 +34,9 @@ class AggregatorMonth(Worker):
         logging.info(f"Starting EOF node process")
         p_eof = Process(target=self._consume_eof)
         
+        # Start Heartbeat in the main process
+        self.heartbeat_sender = start_heartbeat_sender()
+
         # Esperamos que terminen
         for p in (p_data, p_eof): p.start()
         for p in (p_data, p_eof): p.join()
