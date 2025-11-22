@@ -85,23 +85,34 @@ class StoresJoiner(Worker):
 
     def _consume_stores_queue(self):
         stores_input_queue = MessageMiddlewareQueue(self.host, self.stores_input_queue)
-        stores_input_queue.start_consuming(self.__on_stores_message__)
-    
-    def __on_stores_message__(self, message):
-        message = Message.deserialize(message)
+        out_exchange = MessageMiddlewareExchange(self.host, self.out_exchange, {})
+        
+            
+        def __on_stores_message__(message):
+            message = Message.deserialize(message)
 
-        if message.type == MESSAGE_TYPE_EOF:
-            with self.eofs_lock:
-                self.eofs_by_client[message.request_id] = self.eofs_by_client.get(message.request_id, 0) + 1
-            return
+            if message.type == MESSAGE_TYPE_EOF:
+                with self.eofs_lock:
+                    self.eofs_by_client[message.request_id] = self.eofs_by_client.get(message.request_id, 0) + 1
+                    if self.eofs_by_client[message.request_id] < EXPECTED_EOFS:
+                        return
+                try:
+                    self._process_pending()
+                    self.send_joined_transactions_by_request(message, message.request_id, out_exchange)
+                    self._send_eof(message, out_exchange)
+                except Exception as e:
+                    logging.exception(f"Error publicando resultados finales: {type(e).__name__}: {e}")
+                return
 
-        items = message.process_message()
-        if message.type == MESSAGE_TYPE_STORES:
-            for item in items:
-                with self.stores_lock:
-                    if message.request_id not in self.stores:
-                        self.stores[message.request_id] = {}
-                    self.stores[message.request_id][item.get_id()] = item.get_name()
+            items = message.process_message()
+            if message.type == MESSAGE_TYPE_STORES:
+                for item in items:
+                    with self.stores_lock:
+                        if message.request_id not in self.stores:
+                            self.stores[message.request_id] = {}
+                        self.stores[message.request_id][item.get_id()] = item.get_name()
+        
+        stores_input_queue.start_consuming(__on_stores_message__)
 
  
     def _process_pending(self):

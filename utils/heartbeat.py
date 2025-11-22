@@ -32,6 +32,7 @@ class HeartbeatSender:
 
     def stop(self):
         self.running = False
+        self.sock.close()
         if self.thread:
             self.thread.join()
         logging.info("HeartbeatSender stopped")

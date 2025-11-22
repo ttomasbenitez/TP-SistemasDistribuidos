@@ -67,7 +67,7 @@ class HealthMonitor:
                 if service_name and timestamp:
                     with self.lock:
                         self.last_heartbeats[service_name] = time.time()
-                        logging.info(f"Received heartbeat from {service_name}")
+                        logging.debug(f"Received heartbeat from {service_name}")
                         
             except Exception as e:
                 logging.error(f"Error receiving heartbeat: {e}")

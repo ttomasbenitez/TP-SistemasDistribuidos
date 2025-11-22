@@ -4,7 +4,6 @@ from pkg.message.constants import MESSAGE_TYPE_EOF
 from pkg.message.message import Message
 import signal
 import logging
-from utils.custom_logging import setup_process_logger
 from multiprocessing import Manager
 from utils.heartbeat import start_heartbeat_sender
 
@@ -15,9 +14,14 @@ class Worker(ABC):
         self.host = host
         self.eof_self_queue = eof_self_queue
         self.eof_service_queue = eof_service_queue
+        self.__init_manager__()
+        self.__init_middlewares_handler__()
         
         signal.signal(signal.SIGTERM, self.__handle_shutdown)
         signal.signal(signal.SIGINT, self.__handle_shutdown)
+        
+    def __init_middlewares_handler__(self):
+        self.message_middlewares = []
         
     def __init_manager__(self):
         self.manager = Manager()
@@ -64,10 +68,11 @@ class Worker(ABC):
                 self.inflight[request_id] = 0
                 self.drained[request_id].set()
                 
-    def _consume_eof(self): 
-        setup_process_logger('name=filter_amount_node', level="INFO")
+    def _consume_eof(self):
         eof_service_queue = MessageMiddlewareQueue(self.host, self.eof_service_queue)
         eof_self_queue = MessageMiddlewareQueue(self.host, self.eof_self_queue)
+        self.message_middlewares.extend([eof_service_queue, eof_self_queue])
+        
         def on_eof_message(message):
             try:
                 message = Message.deserialize(message)
@@ -83,7 +88,10 @@ class Worker(ABC):
     
     def stop(self):
         try:
-            self.in_middleware.stop_consuming()
+            for message_middleware in self.message_middlewares:
+                message_middleware.stop_consuming()
+            if hasattr(self, 'heartbeat_sender') and self.heartbeat_sender:
+                self.heartbeat_sender.stop()
         except Exception as e:
             print(f"Error al detener: {type(e).__name__}: {e}")
            
@@ -93,12 +101,15 @@ class Worker(ABC):
             new_message = original_message.new_from_original(new_chunk)
             serialized = new_message.serialize()
             out_middleware.send(serialized)
-     
-    @abstractmethod      
+         
     def close(self):
-        pass
-    
+        try:
+            for message_middleware in self.message_middlewares:
+                message_middleware.close()
             
+        except Exception as e:
+            print(f"Error al detener: {type(e).__name__}: {e}")
+    
     def __handle_shutdown(self, signum, frame):
         """
         Closes all worker connections and shuts down the worker.
