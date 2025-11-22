@@ -16,7 +16,7 @@ class AggregatorMonth(Worker):
                  data_input_queue: str,
                  data_output_queue: str,
                  eof_output_exchange: str,
-                 eof_output_queues: list,
+                 eof_output_queues: dict,
                  eof_self_queue: str,
                  eof_service_queue: str,
                  host: str):
@@ -43,8 +43,7 @@ class AggregatorMonth(Worker):
         for p in (p_data, p_eof): p.join()
 
     def _consume_data_queue(self):
-        eof_out_exchange = MessageMiddlewareExchange(self.host, self.eof_output_exchange, 
-                                            {queue: [str(MESSAGE_TYPE_EOF)] for queue in self.eof_output_queues})
+        eof_out_exchange = MessageMiddlewareExchange(self.host, self.eof_output_exchange, self.eof_output_queues)
         data_out_queue = MessageMiddlewareQueue(self.host, self.data_output_queue)
         data_in_queue = MessageMiddlewareQueue(self.host, self.data_input_queue)
         self.message_middlewares.extend([eof_out_exchange, data_out_queue, data_in_queue])
@@ -124,11 +123,14 @@ def main():
     config_params = initialize_config()
 
     initialize_log(config_params["logging_level"])
+    
+    eof_output_queues = {config_params["eof_queue_1"]: [str(MESSAGE_TYPE_EOF)],
+                            config_params["eof_queue_2"]: [str(MESSAGE_TYPE_EOF)]}
 
     aggregator = AggregatorMonth(config_params["input_queue"], 
                                 config_params["output_queue"], 
                                 config_params["eof_exchange_name"], 
-                                [config_params["eof_queue_1"],config_params["eof_queue_2"]],
+                                eof_output_queues,
                                 config_params["eof_self_queue"],
                                 config_params["eof_service_queue"],
                                 config_params["rabbitmq_host"])
