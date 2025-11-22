@@ -64,14 +64,12 @@ class MessageMiddlewareQueue(MessageMiddleware):
     def start_consuming(self, on_message_callback, prefetch_count=None):
         if prefetch_count:
             self.channel.basic_qos(prefetch_count=prefetch_count)
-            def callback(ch, method, properties, body):
-                on_message_callback(body)
-                ch.basic_ack(delivery_tag=method.delivery_tag)
-            self.channel.basic_consume(queue=self.queue_name, on_message_callback=callback, auto_ack=False)
-        else:
-            def callback(ch, method, properties, body):
-                on_message_callback(body)
-            self.channel.basic_consume(queue=self.queue_name, on_message_callback=callback, auto_ack=True)
+        
+        def callback(ch, method, properties, body):
+            on_message_callback(body)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+            
+        self.channel.basic_consume(queue=self.queue_name, on_message_callback=callback, auto_ack=False)
             
         self.channel.start_consuming()
 
@@ -147,18 +145,29 @@ class MessageMiddlewareExchange(MessageMiddleware):
     def start_consuming(self, on_message_callback, prefetch_count=None):
         if prefetch_count:
             self.channel.basic_qos(prefetch_count=prefetch_count)
-            def callback(ch, method, properties, body):
-                on_message_callback(body)
-                ch.basic_ack(delivery_tag=method.delivery_tag)
-            for queue_name in self.queues.keys():
-                self.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=False)
-        else:
-            def callback(ch, method, properties, body):
-                on_message_callback(body)
-            for queue_name in self.queues.keys():
-                self.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=True)
+
+        def callback(ch, method, properties, body):
+            on_message_callback(body)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+
+        for queue_name in self.queues.keys():
+            self.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=False)
 
         self.channel.start_consuming()
+
+    def add_queue_to_exchange(self, queue_name, routing_key):
+        """
+        Crea una cola, la bindea al exchange y la agrega al diccionario interno.
+        Si la cola ya existe, no falla.
+        """
+        queue = MessageMiddlewareQueue(self.host, queue_name)
+
+        # Bindear al exchange
+        self.channel.queue_bind(exchange=self.exchange_name, queue=queue_name, routing_key=routing_key)
+
+        # Guardar en el diccionario
+        self.queues[queue_name] = {"queue": queue, "routing_key": routing_key}
+        self.exchange_queues[queue_name] = routing_key
 
     def stop_consuming(self):
         self.connection.close()
