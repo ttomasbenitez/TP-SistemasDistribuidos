@@ -30,6 +30,7 @@ services:
       OUTPUT_QUEUE_3: menu-items-queue
       OUTPUT_QUEUE_4: users-queue
       OUTPUT_QUEUE_5: batches-queue
+      OUTPUT_EXCHANGE_NAME: results-exchange
       EXCHANGE_NAME: gateway-exchange
     depends_on:
       rabbitmq:
@@ -344,7 +345,7 @@ services:
       INPUT_QUEUE_1: products-results-queue
       INPUT_QUEUE_2: menu-items-queue
       OUTPUT_QUEUE_PREFIX: results-queue
-      OUTPUT_EXCHANGE: output_exchange_q2
+      OUTPUT_EXCHANGE: results-exchange
       LOG_LEVEL: INFO
     networks:
     - testing_net
@@ -420,7 +421,6 @@ services:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: time-filtered-queue-q3
       OUTPUT_QUEUE_1: aggregated-store-q3-queue
-      EXCHANGE_NAME: aggregated-stores-q3-exchange
       EOF_EXCHANGE_NAME: eof-exchange-aggregator-store-q3
       EOF_SELF_QUEUE: eof-aggregator-store-q3-1
       EOF_QUEUE_1: eof-aggregator-store-q3-1
@@ -442,7 +442,6 @@ services:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: time-filtered-queue-q3
       OUTPUT_QUEUE_1: aggregated-store-q3-queue
-      EXCHANGE_NAME: aggregated-stores-q3-exchange
       EOF_EXCHANGE_NAME: eof-exchange-aggregator-store-q3
       EOF_SELF_QUEUE: eof-aggregator-store-q3-2
       EOF_QUEUE_1: eof-aggregator-store-q3-1

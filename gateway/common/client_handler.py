@@ -23,10 +23,9 @@ class ClientHandler(threading.Thread):
             logging.info(f"action: client_handler_start | result: success | queue name: {self._in_queue.queue_name}")
 
             self._protocol.send_message(Message(self._request_id, MESSAGE_TYPE_REQUEST_ID, 0, '').serialize())
-            # Recibir datos del cliente y enviarlos al exchange
+
             self._receive_and_publish()
 
-            # Enviar request_id y levantar consumo de resultados
             self._start_results_consumer()
         except Exception as e:
             logging.error(f"action: client_handler_run | result: fail | error: {e}")
@@ -51,7 +50,6 @@ class ClientHandler(threading.Thread):
 
     def _start_results_consumer(self):
         """Levanta un hilo separado para consumir los resultados de RabbitMQ."""
-        # self._protocol.send_message(Message(self._request_id, MESSAGE_TYPE_REQUEST_ID, 0, '').serialize())
 
         logging.info(f"action: start_results_consumer | result: in_progress from queue {self._in_queue.queue_name}")
 

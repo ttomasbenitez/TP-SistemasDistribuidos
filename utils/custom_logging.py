@@ -29,7 +29,6 @@ def setup_process_logger(name: str, level: str = "INFO"):
     to_file=True -> escribe a /logs/<name>.<pid>.log
     """
     root = logging.getLogger()
-    # limpiar handlers previos en este proceso
     for h in list(root.handlers):
         root.removeHandler(h)
     root.setLevel(getattr(logging, level.upper(), logging.INFO))
@@ -40,6 +39,5 @@ def setup_process_logger(name: str, level: str = "INFO"):
     sh.setFormatter(formatter)
     root.addHandler(sh)
 
-    # opcional: ver warnings como logs
     logging.captureWarnings(True)
     logging.info("Logger inicializado para '%s'", name)

@@ -102,6 +102,9 @@ class MessageMiddlewareQueue(MessageMiddleware):
 
     def delete(self):
         self.channel.queue_delete(queue=self.queue_name)
+    
+    def bind_queue(self, exchange_name, routing_key):
+        self.channel.queue_bind(exchange=exchange_name, queue=self.queue_name, routing_key=routing_key)
         
     def reconnect(self):
         try:
@@ -156,20 +159,6 @@ class MessageMiddlewareExchange(MessageMiddleware):
                 self.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=True)
 
         self.channel.start_consuming()
-
-    def add_queue_to_exchange(self, queue_name, routing_key):
-        """
-        Crea una cola, la bindea al exchange y la agrega al diccionario interno.
-        Si la cola ya existe, no falla.
-        """
-        queue = MessageMiddlewareQueue(self.host, queue_name)
-
-        # Bindear al exchange
-        self.channel.queue_bind(exchange=self.exchange_name, queue=queue_name, routing_key=routing_key)
-
-        # Guardar en el diccionario
-        self.queues[queue_name] = {"queue": queue, "routing_key": routing_key}
-        self.exchange_queues[queue_name] = routing_key
 
     def stop_consuming(self):
         self.connection.close()

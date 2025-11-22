@@ -36,10 +36,8 @@ class FilterAmountNode(Worker):
         logging.info(f"Starting EOF FINAL process")
         p_eof_final = Process(target=self._consume_eof_final)
         
-        # Start Heartbeat in the main process
         self.heartbeat_sender = start_heartbeat_sender()
 
-        # Esperamos que terminen
         for p in (p_data, p_eof, p_eof_final): p.start()
         for p in (p_data, p_eof, p_eof_final): p.join()
 
@@ -69,16 +67,12 @@ class FilterAmountNode(Worker):
         try:
             message = Message.deserialize(message)
 
-            if message.request_id not in self.clients:
-                out_queue_name = f"{self.data_out_queue_prefix}_{message.request_id}"
-                self.data_out_exchange.add_queue_to_exchange(out_queue_name, str(message.request_id))
-                self.clients.append(message.request_id)
-            
             if message.type == MESSAGE_TYPE_EOF:
                 logging.info(f"EOF recibido en Self EOF Queue | request_id: {message.request_id}")
                 self.eof_out_exchange.send(message.serialize(), str(message.type))
                 return
-            
+        
+            logging.info(f"Mensaje recibido | request_id: {message.request_id} | type: {message.type}")
             self._ensure_request(message.request_id)
 
             self._inc_inflight(message.request_id)
@@ -104,6 +98,7 @@ class FilterAmountNode(Worker):
         finally:
             self._dec_inflight(message.request_id)
     
+    # TODO: Cerrar colas y exchanges
     def close(self):
         try:
             # for in_queue in self.eof_in_queues:
@@ -156,12 +151,9 @@ def initialize_config():
     return config_params
 
 def main():
-    logging.info("Iniciando Filter Amount Node SIN ERROR ALGUNO")
     config_params = initialize_config()
 
     initialize_log(config_params["logging_level"])
-
-    logging.info(f"Configuración cargada RABBITMQHOSTAMOUNT: {config_params['rabbitmq_host']}")
 
     data_output_exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["exchange"], {})
     data_input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue"])

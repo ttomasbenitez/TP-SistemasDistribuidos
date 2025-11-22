@@ -13,36 +13,37 @@ EXPECTED_EOFS = 2
 
 class Q4StoresJoiner(Worker):
 
-    def __init__(self, data_input_queue: MessageMiddlewareQueue, stores_input_queue: MessageMiddlewareQueue,
-                 out_exchange: MessageMiddlewareExchange, out_queue_name: str):
+    def __init__(self, data_input_queue: str, stores_input_queue: str,
+                 out_exchange: str, out_queue_name: str, host: str):
         self.data_input_queue = data_input_queue
         self.stores_input_queue = stores_input_queue
         self.out_exchange = out_exchange
         self.out_queue_prefix = out_queue_name
+        self.host = host
 
-        # estructuras compartidas entre threads
         self.stores = {}
         self.eofs_by_client = {}
         self.pending_clients = {}
         self.processed_clients = dict()
         self.clients = []
 
-        # locks
         self.stores_lock = threading.Lock()
         self.eofs_lock = threading.Lock()
 
     def start(self):
-        # Start Heartbeat
         self.heartbeat_sender = start_heartbeat_sender()
 
-        t_data = threading.Thread(target=self.data_input_queue.start_consuming, args=(self.__on_message__,))
-        t_stores = threading.Thread(target=self.stores_input_queue.start_consuming, args=(self.__on_stores_message__,))
+        t_data = threading.Thread(target=self._consume_data_queue)
+        t_stores = threading.Thread(target=self._consume_stores_queue)
         t_data.start()
         t_stores.start()
         t_data.join()
         t_stores.join()
 
-
+    def _consume_stores_queue(self):
+        stores_input_queue = MessageMiddlewareQueue(self.host, self.stores_input_queue)
+        stores_input_queue.start_consuming(self.__on_stores_message__)
+        
     def __on_stores_message__(self, message):
         logging.info("Procesando mensaje de Stores")
         message = Message.deserialize(message)
@@ -59,49 +60,49 @@ class Q4StoresJoiner(Worker):
                 with self.stores_lock:
                     self.stores[key] = item.get_name()
 
-    def __on_message__(self, msg):
-        message = Message.deserialize(msg)
-        logging.info(f"Received message | request_id: {message.request_id} | type: {message.type}")
+    def _consume_data_queue(self):
+        out_exchange = MessageMiddlewareExchange(self.host, self.out_exchange, {})
+        data_input_queue = MessageMiddlewareQueue(self.host, self.data_input_queue)
 
-        if message.request_id not in self.clients:
-            out_queue_name = f"{self.out_queue_prefix}_{message.request_id}"
-            self.out_exchange.add_queue_to_exchange(out_queue_name, str(message.request_id))
-            self.clients.append(message.request_id)
+        def __on_message__(msg):
+            message = Message.deserialize(msg)
+            logging.info(f"Received message | request_id: {message.request_id} | type: {message.type}")
 
+            if message.type == MESSAGE_TYPE_EOF:
+                with self.eofs_lock:
+                    self.eofs_by_client[message.request_id] = self.eofs_by_client.get(message.request_id, 0) + 1
+                    if self.eofs_by_client[message.request_id] < EXPECTED_EOFS:
+                        logging.info(f"EOF recibido {self.eofs_by_client[message.request_id]}/{EXPECTED_EOFS} | request_id: {message.request_id} | type: {message.type}")
+                        return
+                try:
+                    self._process_pending(request_id=message.request_id)
+                    self.send_processed_clients(message, out_exchange)
+                    self._send_eof(message, out_exchange)
+                except Exception as e:
+                    logging.exception(f"Error publicando resultados finales: {type(e).__name__}: {e}")
+                return
 
-        if message.type == MESSAGE_TYPE_EOF:
-            with self.eofs_lock:
-                self.eofs_by_client[message.request_id] = self.eofs_by_client.get(message.request_id, 0) + 1
-                if self.eofs_by_client[message.request_id] < EXPECTED_EOFS:
-                    logging.info(f"EOF recibido {self.eofs_by_client[message.request_id]}/{EXPECTED_EOFS} | request_id: {message.request_id} | type: {message.type}")
-                    return
-            try:
-                self._process_pending(request_id=message.request_id)
-                self.send_processed_clients(message)
-                self._send_eof(message)
-            except Exception as e:
-                logging.exception(f"Error publicando resultados finales: {type(e).__name__}: {e}")
-            return
+            items = message.process_message()
 
-        items = message.process_message()
+            logging.info(f"Mensaje recibido | request_id: {message.request_id} | type: {message.type}")
+            if message.type == MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT:
+                for item in items:
+                    with self.stores_lock:
+                        store_name = self.stores.get((item.get_store(), message.request_id), 0)
+                    if store_name:
+                        self.processed_clients.setdefault(message.request_id, []).append(Q4Result(store_name, item.get_birthdate(), item.get_purchases_qty()))
+                    else:
+                        self.pending_clients[(item.get_store(), message.request_id)] = item
+                        
+        data_input_queue.start_consuming(__on_message__)
 
-        if message.type == MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT:
-            for item in items:
-                logging.info(f"Store_id: {item.store_id} | birthday: {item.birthdate} | quantity: {item.purchases_qty}")
-                with self.stores_lock:
-                    store_name = self.stores.get((item.get_store(), message.request_id), 0)
-                if store_name:
-                    self.processed_clients.setdefault(message.request_id, []).append(Q4Result(store_name, item.get_birthdate(), item.get_purchases_qty()))
-                else:
-                    self.pending_clients[(item.get_store(), message.request_id)] = item
-
-    def send_processed_clients(self, message):
+    def send_processed_clients(self, message, out_exchange):
         total_chunk = ''
         results = self.processed_clients.get(message.request_id, [])
         for q4Result in results:
             total_chunk += q4Result.serialize()
         msg = Message(message.request_id, MESSAGE_TYPE_QUERY_4_RESULT, message.msg_num, total_chunk)
-        self.out_exchange.send(msg.serialize(), str(message.request_id))
+        out_exchange.send(msg.serialize(), str(message.request_id))
 
     def _process_pending(self, request_id):
         for (store, req_id), item in self.pending_clients.items():
@@ -111,11 +112,12 @@ class Q4StoresJoiner(Worker):
                     self.processed_clients.setdefault(req_id, []).append(Q4Result(store_name, item.get_birthdate(), item.get_purchases_qty()))
                 del self.pending_clients[(store, req_id)]
 
-    def _send_eof(self, message):
-        self.out_exchange.send(message.serialize(), str(message.request_id))
+    def _send_eof(self, message, out_exchange):
+        out_exchange.send(message.serialize(), str(message.request_id))
         self.clients.remove(message.request_id)
         logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")
 
+    # TODO: esto no va aca
     def close(self):
         try:
             self.out_exchange.close()
@@ -144,12 +146,8 @@ def initialize_config():
 def main():
     config_params = initialize_config()
     initialize_log(config_params["logging_level"])
-
-    output_exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["output_exchange_q4"], {})
-    data_input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue_1"])
-    stores_input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue_2"])
-
-    joiner = Q4StoresJoiner(data_input_queue, stores_input_queue, output_exchange, config_params["output_queue_name"])
+    
+    joiner = Q4StoresJoiner(config_params["input_queue_1"], config_params["input_queue_2"], config_params["output_exchange_q4"], config_params["output_queue_name"], config_params["rabbitmq_host"])
     joiner.start()
 
 

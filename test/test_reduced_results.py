@@ -1,6 +1,7 @@
 # subset_compare_ndjson.py
 import os, json, math, argparse
 from typing import Any, Iterable, Dict, Tuple, List, Optional, Set
+import datetime
 
 # --------- carga NDJSON ---------
 def load_ndjson(path: str) -> Iterable[dict]:
@@ -90,6 +91,23 @@ def canon_tuple(rec: dict, atol: float) -> Tuple:
                 _to_int(rec.get("purchases_qty")))
     else:
         return ("unknown",)
+    
+def pretty_missing_examples(missing):
+    formatted = []
+    for tpl in missing:
+        if tpl[0] == "q4":
+            qid, store, birth_ts, qty = tpl
+            try:
+                ts = int(birth_ts)
+                if abs(ts) > 10**10:
+                    ts //= 1000
+                birth_str = datetime.utcfromtimestamp(ts).strftime("%Y-%m-%d")
+            except Exception:
+                birth_str = birth_ts
+            formatted.append((qid, store, birth_str, qty))
+        else:
+            formatted.append(tpl)
+    return formatted
 
 # --------- comparación A ⊆ B ---------
 def subset_check_ndjson(expected_path: str, actual_path: str, atol: float = 1e-6) -> dict:
@@ -105,22 +123,15 @@ def subset_check_ndjson(expected_path: str, actual_path: str, atol: float = 1e-6
         "actual_count": len(act_set),
         "same_length": len(exp_set) == len(act_set),
         "missing_count": len(missing),
-        "missing_examples": missing[:50],  # muestra
+        "missing_examples": missing[:50],
     }
 
 # --------- CLI opcional ---------
 def main():
-    # ap = argparse.ArgumentParser(description="Verifica que expected.ndjson ⊆ actual.ndjson")
-    # ap.add_argument("--expected", required=True, help="archivo NDJSON con resultados a validar (A)")
-    # ap.add_argument("--actual",   required=True, help="archivo NDJSON generado por tu proceso (B)")
-    # ap.add_argument("--atol", type=float, default=1e-6, help="tolerancia absoluta para floats")
-    # args = ap.parse_args()
-    # res = subset_check_ndjson(args.expected, args.actual, args.atol)
-    # print(json.dumps(res, ensure_ascii=False, indent=2))
-    # exit code útil en CI
-    # res = subset_check_ndjson("data/kaggle/results.ndjson", "../client/storage/client-0.ndjson", atol=1e-6)
-    res = subset_check_ndjson("data/kaggle/results-test-case.ndjson", "../client/storage/client-0.ndjson", atol=1e-6)
-    print(res)
+    res = subset_check_ndjson("data/kaggle/results.ndjson", "../client/storage/client-2.ndjson", atol=1e-6)
+    res["missing_examples"] = pretty_missing_examples(res["missing_examples"])
+    print(json.dumps(res, ensure_ascii=False, indent=2))
+
 
     raise SystemExit(0 if res["ok"] else 1)
 

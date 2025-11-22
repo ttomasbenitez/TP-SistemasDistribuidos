@@ -37,10 +37,8 @@ class SemesterAggregator(Worker):
         logging.info(f"Starting EOF node process")
         p_eof = Process(target=self._consume_eof)
         
-        # Start Heartbeat in the main process
         self.heartbeat_sender = start_heartbeat_sender()
 
-        # Esperamos que terminen
         for p in (p_data, p_eof): p.start()
         for p in (p_data, p_eof): p.join()
 
@@ -75,6 +73,7 @@ class SemesterAggregator(Worker):
                     eof_exchange.send(message.serialize(), str(message.type))
                     return
                 
+                logging.info(f"Mensaje recibido | request_id: {message.request_id} | type: {message.type}")
                 self._ensure_request(message.request_id)
                 
                 self._inc_inflight(message.request_id) 
@@ -109,9 +108,9 @@ class SemesterAggregator(Worker):
     def _send_grouped_item(self, message, item, data_output_queue):
         new_chunk = item.serialize()
         new_message = Message(message.request_id, MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT, message.msg_num, new_chunk)
-        logging.info(f"Enviando mensaje | request_id: {new_message.request_id} | type: {new_message.type}")
         data_output_queue.send(new_message.serialize())
 
+    # TODO: Cerrar colas y exchanges
     def close(self):
         try:
             # self.data_input_queue.close()

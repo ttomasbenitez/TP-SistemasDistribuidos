@@ -9,7 +9,7 @@ from pkg.message.constants import MESSAGE_TYPE_USERS, MESSAGE_TYPE_MENU_ITEMS, M
 import os
 
 class Gateway:
-    def __init__(self, port, listen_backlog, exchange_name, in_queue_prefix, rabbitmq_host):
+    def __init__(self, port, listen_backlog, exchange_name, in_queue_prefix, output_exchange_name,  rabbitmq_host):
         self._listen_backlog = listen_backlog
         self._exchange_name = exchange_name
         self._in_queue_prefix = in_queue_prefix
@@ -17,11 +17,11 @@ class Gateway:
         self._clients = []
         self._rabbitmq_host = rabbitmq_host
         self._request_id = 0
+        self._output_exchange_name = output_exchange_name
 
         self._gateway_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._gateway_socket.bind(('', port))
 
-        # Manejo de señales para apagar el gateway limpiamente
         signal.signal(signal.SIGTERM, self.__handle_shutdown)
         signal.signal(signal.SIGINT, self.__handle_shutdown)
 
@@ -37,16 +37,20 @@ class Gateway:
 
                 results_queue_name = f"{self._in_queue_prefix}_{self._request_id}"
                 results_in_queue = MessageMiddlewareQueue(self._rabbitmq_host, results_queue_name)
+                results_in_queue.bind_queue(
+                    self._output_exchange_name,
+                     str(self._request_id),
+                )
+                logging.info(f"action: bind_results_queue | queue name: {results_queue_name} | exchange: {self._output_exchange_name} | result: success")
 
                 queues_dict = self.create_queues_dict()
                 exchange = MessageMiddlewareExchange(self._rabbitmq_host, self._exchange_name, queues_dict)
 
-                # Crear un handler por cliente
                 handler = ClientHandler(self._request_id, client_sock, exchange, results_in_queue)
                 self._request_id += 1
 
                 self._clients.append(handler)
-                handler.start()  # arranca el hilo del cliente
+                handler.start()
 
             except OSError as e:
                 if self._running:
@@ -63,14 +67,12 @@ class Gateway:
         logging.info("action: gateway_shutdown | result: in_progress")
         self._running = False
 
-        # Cerrar socket principal
         try:
             if self._gateway_socket:
                 self._gateway_socket.close()
         except Exception:
             pass
 
-        # Esperar a que todos los clientes terminen
         for handler in self._clients:
             try:
                 handler.join(timeout=5)

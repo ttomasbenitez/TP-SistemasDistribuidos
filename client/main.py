@@ -36,7 +36,6 @@ def main():
 
     initialize_log(logging_level)
 
-    # Initialize client
     client = Client(gateway_host, gateway_port)
     client.run()
 

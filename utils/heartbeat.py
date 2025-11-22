@@ -49,7 +49,7 @@ class HeartbeatSender:
                     try:
                         self.sock.sendto(message, (monitor, self.port))
                     except Exception as e:
-                        logging.debug(f"Failed to send heartbeat to {monitor}: {e}")
+                        logging.info(f"Failed to send heartbeat to {monitor}: {e}")
                         
             except Exception as e:
                 logging.error(f"Error in HeartbeatSender: {e}")

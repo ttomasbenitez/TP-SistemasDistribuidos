@@ -25,6 +25,7 @@ def initialize_config():
     config_params["exchange_name"] = os.getenv('EXCHANGE_NAME')
     config_params["rabbitmq_host"] = os.getenv('RABBITMQ_HOST')
     config_params["input_queue"] = os.getenv('INPUT_QUEUE_1')
+    config_params["output_exchange_name"] = os.getenv('OUTPUT_EXCHANGE_NAME')
 
     if config_params["port"] is None or config_params["listen_backlog"] is None or config_params["exchange_name"] is None or config_params["rabbitmq_host"] is None:
         raise ValueError("Expected value not found. Aborting gateway.")
@@ -41,11 +42,11 @@ def main():
 
     # Log config parameters at the beginning of the program to verify the configuration
     # of the component
-    logging.debug(f"action: config | result: success | port: {port} | "
+    logging.info(f"action: config | result: success | port: {port} | "
                   f"listen_backlog: {listen_backlog} | logging_level: {logging_level}")
 
     # Initialize gateway and start gateway loop
-    gateway = Gateway(port, listen_backlog, config_params["exchange_name"], config_params["input_queue"], config_params["rabbitmq_host"])
+    gateway = Gateway(port, listen_backlog, config_params["exchange_name"], config_params["input_queue"], config_params["output_exchange_name"], config_params["rabbitmq_host"])
     gateway.run()
 
 def initialize_log(logging_level):

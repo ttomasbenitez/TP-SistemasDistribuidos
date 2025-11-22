@@ -1,6 +1,7 @@
 from worker.base import Worker 
 from Middleware.middleware import MessageMiddlewareQueue, MessageMiddleware
 import logging
+import signal
 from pkg.message.message import Message
 from pkg.message.constants import MESSAGE_TYPE_EOF
 from abc import ABC, abstractmethod
@@ -12,6 +13,9 @@ class EofService(Worker, ABC):
         self.eof_out_middleware = eof_out_middleware
         self.expected_acks = expected_acks
         self.acks_by_client = dict()
+        
+        signal.signal(signal.SIGTERM, self.__handle_shutdown)
+        signal.signal(signal.SIGINT, self.__handle_shutdown)
       
     def __on_message__(self, message):
         try:
@@ -39,5 +43,17 @@ class EofService(Worker, ABC):
     def close(self):
         try:
             self.in_middleware.close()
+            self.eof_out_middleware.close()
         except Exception as e:
             print(f"Error al cerrar: {type(e).__name__}: {e}")
+            
+    def __handle_shutdown(self, signum, frame):
+        """
+        Closes all worker connections and shuts down the worker.
+        """ 
+        try:
+            self.close()
+        except Exception:
+            pass
+        logging.info(f'action: gateway shutdown | result: success')
+        

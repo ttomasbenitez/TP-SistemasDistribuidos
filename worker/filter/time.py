@@ -34,10 +34,8 @@ class FilterTimeNode(Worker):
         logging.info(f"Starting EOF node process")
         p_eof = Process(target=self._consume_eof)
         
-        # Start Heartbeat in the main process
         self.heartbeat_sender = start_heartbeat_sender()
 
-        # Esperamos que terminen
         for p in (p_data, p_eof): p.start()
         for p in (p_data, p_eof): p.join()
         
@@ -72,6 +70,7 @@ class FilterTimeNode(Worker):
                 self.eof_out_exchange.send(message.serialize(), str(message.type))
                 return
 
+            logging.info(f"Mensaje recibido | request_id: {message.request_id} | type: {message.type}")
             self._ensure_request(message.request_id)
 
             self._inc_inflight(message.request_id)

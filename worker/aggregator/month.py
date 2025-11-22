@@ -34,10 +34,8 @@ class AggregatorMonth(Worker):
         logging.info(f"Starting EOF node process")
         p_eof = Process(target=self._consume_eof)
         
-        # Start Heartbeat in the main process
         self.heartbeat_sender = start_heartbeat_sender()
 
-        # Esperamos que terminen
         for p in (p_data, p_eof): p.start()
         for p in (p_data, p_eof): p.join()
 
@@ -70,13 +68,14 @@ class AggregatorMonth(Worker):
                 self.eof_out_exchange.send(message.serialize(), str(message.type))
                 return
 
+            logging.info(f"Mensaje recibido | request_id: {message.request_id} | type: {message.type}")
             self._ensure_request(message.request_id)
             self._inc_inflight(message.request_id)
 
             items = message.process_message()
             groups = self._group_items_by_month(items)
             new_message = Message(message.request_id, MESSAGE_TYPE_QUERY_2_INTERMEDIATE_RESULT, message.msg_num, '')
-            self._send_groups(new_message, groups)
+            self._send_groups(new_message, groups, self.data_out_queue)
         except Exception as e:
             logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
 
@@ -91,14 +90,6 @@ class AggregatorMonth(Worker):
             q4_intermediate = Q2IntermediateResult(f"{year}-0{month}", item.item_id, item.quantity, item.subtotal)
             groups.setdefault(f"{year}-{month}", []).append(q4_intermediate)
         return groups
-    
-    def _send_groups(self, original_message, groups):
-        for month, month_items in groups.items():
-            new_chunk = ''.join(item.serialize() for item in month_items)
-            new_message = original_message.new_from_original(new_chunk)
-            serialized = new_message.serialize()
-            self.data_out_queue.send(serialized)
-            logging.info(f"Agregado correctamente | request_id: {new_message.request_id} | type: {new_message.type} | month: {month}")
     
     def close(self):
         try:

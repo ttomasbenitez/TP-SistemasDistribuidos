@@ -11,7 +11,6 @@ from utils.heartbeat import start_heartbeat_sender
 class Worker(ABC):
     
     def __init__(self, in_middleware: MessageMiddleware, host: str = '', eof_self_queue: str = '', eof_service_queue: str = ''):
-        self._running = False
         self.in_middleware = in_middleware
         self.host = host
         self.eof_self_queue = eof_self_queue
@@ -27,21 +26,19 @@ class Worker(ABC):
         self.drained = self.manager.dict()
         
     def start(self):
-        self._running = True
         
-        # Start Heartbeat
         self.heartbeat_sender = start_heartbeat_sender()
-        
-        while self._running:
-            try:
-                self.in_middleware.start_consuming(self.__on_message__)
-            except Exception as e:
-                print(f"Error al consumir: {type(e).__name__}: {e}")
+       
+        try:
+            self.in_middleware.start_consuming(self.__on_message__)
+        except Exception as e:
+            print(f"Error al consumir: {type(e).__name__}: {e}")
 
         self.stop()
         if hasattr(self, 'heartbeat_sender') and self.heartbeat_sender:
             self.heartbeat_sender.stop()
         self.close()
+    
     def __on_message__(self, raw):
         pass
 
@@ -85,7 +82,6 @@ class Worker(ABC):
         eof_self_queue.start_consuming(on_eof_message)
     
     def stop(self):
-        self._running = False
         try:
             self.in_middleware.stop_consuming()
         except Exception as e:
@@ -97,7 +93,7 @@ class Worker(ABC):
             new_message = original_message.new_from_original(new_chunk)
             serialized = new_message.serialize()
             out_middleware.send(serialized)
-            
+     
     @abstractmethod      
     def close(self):
         pass

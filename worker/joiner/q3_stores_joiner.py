@@ -27,19 +27,16 @@ class StoresJoiner(Worker):
         self.out_exchange = out_exchange
         self.out_queue_prefix = out_queue_name
 
-        # estructuras compartidas entre threads
         self.stores = {}
         self.eofs_by_client = {}
         self.pending_transactions = []
         self.processed_transactions = {}
         self.clients = []
 
-        # locks
         self.stores_lock = threading.Lock()
         self.eofs_lock = threading.Lock()
 
     def start(self):
-        # Start Heartbeat
         self.heartbeat_sender = start_heartbeat_sender()
 
         t_data = threading.Thread(target=self._consume_data_queue)
@@ -55,12 +52,6 @@ class StoresJoiner(Worker):
         
         def __on_message__(msg):
             message = Message.deserialize(msg)
-            logging.info(f"Received message | request_id: {message.request_id} | type: {message.type}")
-
-            if message.request_id not in self.clients:
-                out_queue_name = f"{self.out_queue_prefix}_{message.request_id}"
-                out_exchange.add_queue_to_exchange(out_queue_name, str(message.request_id))
-                self.clients.append(message.request_id)
 
             if message.type == MESSAGE_TYPE_EOF:
                 logging.info(f"EOF recibido | request_id: {message.request_id}")
@@ -79,6 +70,7 @@ class StoresJoiner(Worker):
 
             items = message.process_message()
 
+            logging.info(f"Mensaje recibido | request_id: {message.request_id} | type: {message.type}")
             if message.type == MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT:
                 for item in items:
                     with self.stores_lock:
@@ -119,7 +111,8 @@ class StoresJoiner(Worker):
             if store_name:
                 key = (request_id, store_name, item.get_period())
                 self.processed_transactions[key] = self.processed_transactions.get(key, 0.0) + item.get_tpv()
-                self.pending_transactions.remove((item, request_id))
+        
+        self.pending_transactions = []
 
     def send_joined_transactions_by_request(self, message, request_id, out_exchange):
         total_chunk = ''
@@ -138,6 +131,7 @@ class StoresJoiner(Worker):
         self.clients.remove(message.request_id)
         logging.info(f"EOF enviado | request_id: {message.request_id}")
 
+    #TODO: revisar si es necesario cerrar algo
     def close(self):
         try:
             # self.out_exchange.close()

@@ -21,6 +21,8 @@ class QuantityAndProfit(Worker):
                 self._send_results_by_date(message.request_id)
                 self.__received_EOF__(message)
                 return
+
+            logging.info(f"Mensaje recibido | request_id: {message.request_id} | type: {message.type}")
             items = message.process_message()
             if items:
                 self._accumulate_items(items, message.request_id)

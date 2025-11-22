@@ -23,14 +23,12 @@ def generate_service_env(service, i, queue_consumers):
     name = service["name"]
     env_vars = {}
 
-    # Input queues
     for k, v in service.get("input_queues", {}).items():
         if "join" in name and v in REPLICATED_QUEUES:
             env_vars[k] = f"{v}-{i}"
         else:
             env_vars[k] = v
 
-    # Output queues
     if name == "gateway":
         idx = 1
         for v in service.get("output_queues", {}).values():
@@ -47,7 +45,6 @@ def generate_service_env(service, i, queue_consumers):
         for k, v in service.get("output_queues", {}).items():
             env_vars[k] = v
 
-    # EXCHANGE_NAME si existe
     if "EXCHANGE_NAME" in service:
         env_vars["EXCHANGE_NAME"] = service["EXCHANGE_NAME"]
 

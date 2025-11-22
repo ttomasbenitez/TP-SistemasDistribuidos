@@ -33,7 +33,6 @@ class JoinerMenuItems:
         self.eofs_lock = threading.Lock()
 
     def start(self):
-        # Start Heartbeat
         self.heartbeat_sender = start_heartbeat_sender()
 
         t_data = threading.Thread(target=self.data_input_queue.start_consuming, args=(self.__on_message__,))
@@ -49,6 +48,7 @@ class JoinerMenuItems:
         message = Message.deserialize(message)
 
         if message.type == MESSAGE_TYPE_EOF:
+            logging.info(f"EOF recibido | menu_items_queue | request_id: {message.request_id}")
             with self.eofs_lock:
                 self.eofs_by_client[message.request_id] = self.eofs_by_client.get(message.request_id, 0) + 1
             return
@@ -63,15 +63,10 @@ class JoinerMenuItems:
             logging.info(f"Menu Items actualizados: {self.menu_items[message.request_id]} para request_id {message.request_id}")
 
     def __on_message__(self, message):
-        logging.info("Procesando mensaje de Data Input Joiner Q2")
         message = Message.deserialize(message)
 
-        if message.request_id not in self.clients:
-            out_queue_name = f"{self.out_queue_prefix}_{message.request_id}"
-            self.output_exchange.add_queue_to_exchange(out_queue_name, str(message.request_id))
-            self.clients.append(message.request_id)
-
         if message.type == MESSAGE_TYPE_EOF:
+            logging.info(f"EOF recibido | data_queue | request_id: {message.request_id}")
             with self.eofs_lock:
                 self.eofs_by_client[message.request_id] = self.eofs_by_client.get(message.request_id, 0) + 1
                 if self.eofs_by_client[message.request_id] < EXPECTED_EOFS:
@@ -84,6 +79,8 @@ class JoinerMenuItems:
 
         items = message.process_message()
 
+        logging.info(f"Mensaje recibido | request_id: {message.request_id} | type: {message.type}")
+        
         if message.type == MESSAGE_TYPE_QUERY_2_RESULT:
             ready_to_send = ''
             for item in items:
@@ -99,8 +96,7 @@ class JoinerMenuItems:
                 message.update_content(ready_to_send)
                 serialized = message.serialize()
                 self.output_exchange.send(serialized, str(message.request_id))
-                logging.info(f"Sending message: {serialized}")
-
+                
     def _process_pending(self, request_id):
         ready_to_send = ''
         for (item, req_id) in list(self.pending_items):
@@ -115,8 +111,7 @@ class JoinerMenuItems:
         if ready_to_send:
             serialized = Message(request_id, MESSAGE_TYPE_QUERY_2_RESULT, 0, ready_to_send).serialize()
             self.output_exchange.send(serialized, str(request_id))
-            logging.info(f"Sending message: {serialized}")
-
+           
     def close(self):
         try:
             self.output_exchange.close()

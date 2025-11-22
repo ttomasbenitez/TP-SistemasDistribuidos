@@ -10,7 +10,7 @@ class QueryBuf:
     def __init__(self, file_path: str, lock: threading.Lock):
         self.file_path = file_path
         self.eof = False
-        self._lock = lock  # lock compartido entre escrituras
+        self._lock = lock
 
     def append(self, message: Message):
         """Agrega un chunk de resultados al archivo NDJSON (una línea por item)."""
@@ -45,7 +45,7 @@ class ResultStorage:
     def __init__(self, file_path: str):
         self._runs: Dict[str, RunBuf] = {}
         self.file_path = file_path
-        self._lock = threading.Lock()  # protege escrituras concurrentes
+        self._lock = threading.Lock()
 
     def start_run(self, request_id: str):
         """Inicializa un nuevo buffer de resultados para este request_id."""
@@ -62,7 +62,6 @@ class ResultStorage:
         rb = self._runs.get(rid)
 
         if not rb:
-            # Autocrea si llega un chunk antes del start_run
             rb = RunBuf(rid, self.base_path, self._lock)
             self._runs[rid] = rb
 
