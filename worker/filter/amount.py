@@ -86,7 +86,7 @@ class FilterAmountNode(Worker):
                     data_output_exchange.send(serialized, str(message.request_id))
 
             except Exception as e:
-                logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
+                logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
             finally:
                 self._dec_inflight(message.request_id)
 
@@ -101,13 +101,12 @@ class FilterAmountNode(Worker):
             try:
                 message = Message.deserialize(message)
                 if message.type == MESSAGE_TYPE_EOF:
-                    logging.info(f"EOF FINAL recibido en Self EOF Queue | request_id: {message.request_id}")            
+                    logging.info(f"action: final EOF message received | request_id: {message.request_id}")   
                     self._ensure_request(message.request_id)
                     self.drained[message.request_id].wait()
                     data_output_exchange.send(message.serialize(), str(message.request_id))
-                    logging.info(f"EOF FINAL enviado | request_id: {message.request_id} | type: {message.type}")
             except Exception as e:
-                logging.error(f"Error al procesar el mensaje EOF FINAL: {type(e).__name__}: {e}")
+                logging.error(f"action: ERROR processing final EOF message | error: {type(e).__name__}: {e}")
         
         eof_final_queue.start_consuming(__on_eof_final_message__)
 
@@ -138,7 +137,6 @@ def initialize_config():
     
     required_keys = [
         "rabbitmq_host",
-        "out_queue_name",
         "input_queue",
         "exchange",
     ]
