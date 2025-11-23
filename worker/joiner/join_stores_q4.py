@@ -1,94 +1,59 @@
 from pkg.message.q4_result import Q4Result
-from worker.base import Worker 
+from worker.joiner.joiner import Joiner 
 from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
 import logging
 from pkg.message.message import Message
-from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT, MESSAGE_TYPE_QUERY_4_RESULT, MESSAGE_TYPE_STORES, MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT, MESSAGE_TYPE_QUERY_3_RESULT
+from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT, MESSAGE_TYPE_QUERY_4_RESULT, MESSAGE_TYPE_STORES
 from utils.custom_logging import initialize_log
 import os
-import threading
-from utils.heartbeat import start_heartbeat_sender
 
 EXPECTED_EOFS = 2
 
-class Q4StoresJoiner(Worker):
+class Q4StoresJoiner(Joiner):
 
-    def __init__(self, data_input_queue: str, stores_input_queue: str,
-                 out_exchange: str, out_queue_name: str, host: str):
+    def __init__(self, 
+                 data_input_queue: str, 
+                 data_output_exchange: str, 
+                 stores_input_queue: str,
+                 host: str):
+        super().__init_client_handler__(stores_input_queue, host, EXPECTED_EOFS)
         self.data_input_queue = data_input_queue
-        self.stores_input_queue = stores_input_queue
-        self.out_exchange = out_exchange
-        self.out_queue_prefix = out_queue_name
-        self.host = host
-
-        self.stores = {}
-        self.eofs_by_client = {}
+        self.data_output_exchange = data_output_exchange
         self.pending_clients = {}
         self.processed_clients = dict()
-        self.clients = []
-
-        self.stores_lock = threading.Lock()
-        self.eofs_lock = threading.Lock()
-
-    def start(self):
-        self.heartbeat_sender = start_heartbeat_sender()
-
-        t_data = threading.Thread(target=self._consume_data_queue)
-        t_stores = threading.Thread(target=self._consume_stores_queue)
-        t_data.start()
-        t_stores.start()
-        t_data.join()
-        t_stores.join()
-
-    def _consume_stores_queue(self):
-        stores_input_queue = MessageMiddlewareQueue(self.host, self.stores_input_queue)
-        stores_input_queue.start_consuming(self.__on_stores_message__)
         
-    def __on_stores_message__(self, message):
-        logging.info("Procesando mensaje de Stores")
-        message = Message.deserialize(message)
-
-        if message.type == MESSAGE_TYPE_EOF:
-            with self.eofs_lock:
-                self.eofs_by_client[message.request_id] = self.eofs_by_client.get(message.request_id, 0) + 1
-            return
-
+    def _process_items_to_join(self, message):
         items = message.process_message()
+        
         if message.type == MESSAGE_TYPE_STORES:
             for item in items:
                 key = (item.get_id(), message.request_id)
-                with self.stores_lock:
-                    self.stores[key] = item.get_name()
-
+                with self.items_to_join_lock:
+                    self.items_to_join[key] = item.get_name()
+                    
+    def _send_results(self, message):
+        data_output_exchange = MessageMiddlewareExchange(self.host, self.data_output_exchange, {})
+        
+        self._process_pending(request_id=message.request_id)
+        self._send_processed_clients(message, data_output_exchange)
+        self._send_eof(message, data_output_exchange)
+        
     def _consume_data_queue(self):
-        out_exchange = MessageMiddlewareExchange(self.host, self.out_exchange, {})
         data_input_queue = MessageMiddlewareQueue(self.host, self.data_input_queue)
 
         def __on_message__(msg):
             message = Message.deserialize(msg)
-            logging.info(f"Received message | request_id: {message.request_id} | type: {message.type}")
+            logging.debug(f"action: message received | request_id: {message.request_id} | type: {message.type}")
 
             if message.type == MESSAGE_TYPE_EOF:
-                with self.eofs_lock:
-                    self.eofs_by_client[message.request_id] = self.eofs_by_client.get(message.request_id, 0) + 1
-                    if self.eofs_by_client[message.request_id] < EXPECTED_EOFS:
-                        logging.info(f"EOF recibido {self.eofs_by_client[message.request_id]}/{EXPECTED_EOFS} | request_id: {message.request_id} | type: {message.type}")
-                        return
-                try:
-                    self._process_pending(request_id=message.request_id)
-                    self.send_processed_clients(message, out_exchange)
-                    self._send_eof(message, out_exchange)
-                except Exception as e:
-                    logging.exception(f"Error publicando resultados finales: {type(e).__name__}: {e}")
-                return
+                return self._process_on_eof_message__(message)
 
             items = message.process_message()
-
-            logging.info(f"Mensaje recibido | request_id: {message.request_id} | type: {message.type}")
+            
             if message.type == MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT:
                 for item in items:
-                    with self.stores_lock:
-                        store_name = self.stores.get((item.get_store(), message.request_id), 0)
+                    with self.items_to_join_lock:
+                        store_name = self.items_to_join.get((item.get_store(), message.request_id), 0)
                     if store_name:
                         self.processed_clients.setdefault(message.request_id, []).append(Q4Result(store_name, item.get_birthdate(), item.get_purchases_qty()))
                     else:
@@ -96,35 +61,27 @@ class Q4StoresJoiner(Worker):
                         
         data_input_queue.start_consuming(__on_message__)
 
-    def send_processed_clients(self, message, out_exchange):
+    def _send_processed_clients(self, message, data_output_exchange):
         total_chunk = ''
         results = self.processed_clients.get(message.request_id, [])
         for q4Result in results:
             total_chunk += q4Result.serialize()
         msg = Message(message.request_id, MESSAGE_TYPE_QUERY_4_RESULT, message.msg_num, total_chunk)
-        out_exchange.send(msg.serialize(), str(message.request_id))
+        data_output_exchange.send(msg.serialize(), str(message.request_id))
 
     def _process_pending(self, request_id):
         for (store, req_id), item in self.pending_clients.items():
             if req_id == request_id:
-                store_name = self.stores.get((store, req_id))
+                store_name = self.items_to_join.get((store, req_id))
                 if store_name:
                     self.processed_clients.setdefault(req_id, []).append(Q4Result(store_name, item.get_birthdate(), item.get_purchases_qty()))
-                del self.pending_clients[(store, req_id)]
+        
+        self.pending_clients = {k: v for k, v in self.pending_clients.items() if v.request_id != request_id}
 
-    def _send_eof(self, message, out_exchange):
-        out_exchange.send(message.serialize(), str(message.request_id))
+    def _send_eof(self, message, data_output_exchange):
+        data_output_exchange.send(message.serialize(), str(message.request_id))
         self.clients.remove(message.request_id)
-        logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")
-
-    # TODO: esto no va aca
-    def close(self):
-        try:
-            self.out_exchange.close()
-            self.data_input_queue.close()
-            self.stores_input_queue.close()
-        except Exception as e:
-            logging.error(f"Error al cerrar: {type(e).__name__}: {e}")
+        logging.info(f"action: EOF sent | request_id: {message.request_id} | type: {message.type}")
 
 
 def initialize_config():
@@ -132,12 +89,11 @@ def initialize_config():
     config_params["rabbitmq_host"] = os.getenv('RABBITMQ_HOST')
     config_params["input_queue_1"] = os.getenv('INPUT_QUEUE_1')
     config_params["input_queue_2"] = os.getenv('INPUT_QUEUE_2')
-    config_params["output_queue_name"] = os.getenv('OUTPUT_QUEUE')
     config_params["output_exchange_q4"] = os.getenv('OUTPUT_EXCHANGE_NAME')
     config_params["logging_level"] = os.getenv('LOG_LEVEL', 'INFO')
 
     if None in [config_params["rabbitmq_host"], config_params["input_queue_1"],
-                config_params["input_queue_2"], config_params["output_queue_name"]]:
+                config_params["input_queue_2"]]:
         raise ValueError("Expected value not found. Aborting.")
 
     return config_params
@@ -147,7 +103,10 @@ def main():
     config_params = initialize_config()
     initialize_log(config_params["logging_level"])
     
-    joiner = Q4StoresJoiner(config_params["input_queue_1"], config_params["input_queue_2"], config_params["output_exchange_q4"], config_params["output_queue_name"], config_params["rabbitmq_host"])
+    joiner = Q4StoresJoiner(config_params["input_queue_1"], 
+                            config_params["output_exchange_q4"],
+                            config_params["input_queue_2"],
+                            config_params["rabbitmq_host"])
     joiner.start()
 
 

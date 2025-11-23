@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from Middleware.middleware import MessageMiddleware, MessageMiddlewareQueue
 from pkg.message.constants import MESSAGE_TYPE_EOF
 from pkg.message.message import Message
