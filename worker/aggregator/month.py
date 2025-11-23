@@ -43,10 +43,10 @@ class AggregatorMonth(Worker):
         for p in (p_data, p_eof): p.join()
 
     def _consume_data_queue(self):
-        eof_out_exchange = MessageMiddlewareExchange(self.host, self.eof_output_exchange, self.eof_output_queues)
-        data_out_queue = MessageMiddlewareQueue(self.host, self.data_output_queue)
-        data_in_queue = MessageMiddlewareQueue(self.host, self.data_input_queue)
-        self.message_middlewares.extend([eof_out_exchange, data_out_queue, data_in_queue])
+        eof_output_exchange = MessageMiddlewareExchange(self.host, self.eof_output_exchange, self.eof_output_queues)
+        data_output_queue = MessageMiddlewareQueue(self.host, self.data_output_queue)
+        data_input_queue = MessageMiddlewareQueue(self.host, self.data_input_queue)
+        self.message_middlewares.extend([eof_output_exchange, data_output_queue, data_input_queue])
         
         def __on_message__(message):
             try:
@@ -54,7 +54,7 @@ class AggregatorMonth(Worker):
 
                 if message.type == MESSAGE_TYPE_EOF:
                     logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
-                    eof_out_exchange.send(message.serialize(), str(message.type))
+                    eof_output_exchange.send(message.serialize(), str(message.type))
                     return
 
                 logging.debug(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
@@ -64,13 +64,13 @@ class AggregatorMonth(Worker):
                 items = message.process_message()
                 groups = self._group_items_by_month(items)
                 new_message = Message(message.request_id, MESSAGE_TYPE_QUERY_2_INTERMEDIATE_RESULT, message.msg_num, '')
-                self._send_groups(new_message, groups, data_out_queue)
+                self._send_groups(new_message, groups, data_output_queue)
             except Exception as e:
                 logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
             finally:
                 self._dec_inflight(message.request_id)
             
-        data_in_queue.start_consuming(__on_message__, prefetch_count=1)
+        data_input_queue.start_consuming(__on_message__, prefetch_count=1)
 
     def _group_items_by_month(self, items):
         groups = {}
