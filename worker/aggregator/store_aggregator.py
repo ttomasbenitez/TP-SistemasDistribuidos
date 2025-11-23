@@ -11,22 +11,29 @@ from utils.heartbeat import start_heartbeat_sender
 
 class StoreAggregator(Worker):
 
-    def __init__(self, data_input_queue: MessageMiddlewareQueue, data_output_queue: MessageMiddlewareQueue,
-                eof_exchange: MessageMiddlewareExchange, rabbitmq_host: str, eof_service_queue: str,
-                eof_self_queue: str):
+    def __init__(self, 
+                 data_input_queue: str, 
+                 data_output_queue: str,
+                 eof_output_exchange: str, 
+                 eof_output_queues: str,
+                 eof_self_queue: str,
+                 eof_service_queue: str,
+                 host: str):
         
         self.__init_manager__()
+        self.__init_middlewares_handler__()
         self.data_input_queue = data_input_queue
         self.data_output_queue = data_output_queue
-        self.eof_exchange = eof_exchange
-        self.rabbitmq_host = rabbitmq_host
+        self.eof_output_exchange = eof_output_exchange
+        self.eof_output_queues = eof_output_queues
+        self.host = host
         self.eof_service_queue = eof_service_queue
         self.eof_self_queue = eof_self_queue
 
     def start(self):
        
         logging.info(f"Starting process")
-        p_data = Process(target=self._consume_data_queue, args=(self.data_input_queue,))
+        p_data = Process(target=self._consume_data_queue)
         
         logging.info(f"Starting EOF node process")
         p_eof = Process(target=self._consume_eof)
@@ -36,49 +43,34 @@ class StoreAggregator(Worker):
         for p in (p_data, p_eof): p.start()
         for p in (p_data, p_eof): p.join()
 
-    def _consume_eof(self): 
-        eof_service_queue = MessageMiddlewareQueue(self.rabbitmq_host, self.eof_service_queue)
-        eof_self_queue = MessageMiddlewareQueue(self.rabbitmq_host, self.eof_self_queue)
-    
-        def on_eof_message(message):
+    def _consume_data_queue(self):
+        data_input_queue = MessageMiddlewareQueue(self.host, self.data_input_queue)
+        data_output_queue = MessageMiddlewareQueue(self.host, self.data_output_queue)
+        eof_output_exchange = MessageMiddlewareExchange(self.host, self.eof_output_exchange, self.eof_output_queues)
+        self.message_middlewares.extend([data_input_queue, data_output_queue, eof_output_exchange])
+        
+        def __on_message__(message):
             try:
                 message = Message.deserialize(message)
+
                 if message.type == MESSAGE_TYPE_EOF:
-                    logging.info(f"EOF recibido en EOF Queue Propia | request_id: {message.request_id} | type: {message.type}")
-                    self._ensure_request(message.request_id)
-                    self.drained[message.request_id].wait()
-                    eof_service_queue.send(message.serialize())
+                    logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
+                    eof_output_exchange.send(message.serialize(), str(message.type))
+                    return
+                
+                logging.debug(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
+                self._ensure_request(message.request_id)
+                self._inc_inflight(message.request_id) 
+                
+                items = message.process_message()
+                groups = self._group_items_by_store(items)
+                self._send_groups(message, groups, data_output_queue)
             except Exception as e:
-                logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
+                logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
+            finally:
+                self._dec_inflight(message.request_id)
         
-        eof_self_queue.start_consuming(on_eof_message)
-        
-    def _consume_data_queue(self, queue: MessageMiddlewareQueue):
-        queue.start_consuming(self.__on_message__, prefetch_count=1)
-
-    def __on_message__(self, message):
-        try:
-            message = Message.deserialize(message)
-
-            if message.type == MESSAGE_TYPE_EOF:
-                logging.info(f"EOF recibido en data queue | request_id: {message.request_id}")
-                self.eof_exchange.send(message.serialize(), str(message.type))
-                return
-
-
-            logging.info(f"Mensaje recibido | request_id: {message.request_id} | type: {message.type}")
-            self._ensure_request(message.request_id)
-            
-            self._inc_inflight(message.request_id) 
-            
-            items = message.process_message()
-            groups = self._group_items_by_store(items)
-            self._send_groups(message, groups, self.data_output_queue)
-        except Exception as e:
-            logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
-
-        finally:
-            self._dec_inflight(message.request_id)
+        data_input_queue.start_consuming(__on_message__, prefetch_count=1)
 
     def _group_items_by_store(self, items):
         groups = {}
@@ -87,15 +79,6 @@ class StoreAggregator(Worker):
             groups.setdefault(store, []).append(item)
         return groups
                
-    def close(self):
-        try:
-            self.data_input_queue.close()
-            self.data_output_queue.close()
-            self.eof_exchange.close()
-        except Exception as e:
-            print(f"Error al cerrar: {type(e).__name__}: {e}")
-
-
 def initialize_config():
     """ Parse env variables to find program config params
 
@@ -134,13 +117,16 @@ def main():
 
     initialize_log(config_params["logging_level"])
     
-    data_input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue"])
-    data_output_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["output_queue"])
-    eof_exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["eof_exchange_name"], 
-                                    {config_params["eof_queue_1"]: [str(MESSAGE_TYPE_EOF)],
-                                     config_params["eof_queue_2"]: [str(MESSAGE_TYPE_EOF)]})
+    eof_output_queues = {config_params["eof_queue_1"]: [str(MESSAGE_TYPE_EOF)],
+                    config_params["eof_queue_2"]: [str(MESSAGE_TYPE_EOF)]}
     
-    aggregator = StoreAggregator(data_input_queue, data_output_queue, eof_exchange, config_params["rabbitmq_host"], config_params["eof_service_queue"],  config_params["eof_self_queue"])
+    aggregator = StoreAggregator(config_params["input_queue"],
+                                 config_params["output_queue"], 
+                                 config_params["eof_exchange_name"], 
+                                 eof_output_queues,
+                                 config_params["eof_self_queue"],
+                                 config_params["eof_service_queue"],
+                                 config_params["rabbitmq_host"])
     aggregator.start()
 
 if __name__ == "__main__":

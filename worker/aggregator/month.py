@@ -66,7 +66,7 @@ class AggregatorMonth(Worker):
                 new_message = Message(message.request_id, MESSAGE_TYPE_QUERY_2_INTERMEDIATE_RESULT, message.msg_num, '')
                 self._send_groups(new_message, groups, data_output_queue)
             except Exception as e:
-                logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
+                logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
             finally:
                 self._dec_inflight(message.request_id)
             
