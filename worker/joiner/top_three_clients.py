@@ -12,9 +12,6 @@ from utils.heartbeat import start_heartbeat_sender
 EXPECTED_EOFS = 2
 
 class TopThreeClientsJoiner(Worker):
-    """
-    Wrapper para manejar menu_items y procesar mensajes de varias colas en procesos separados
-    """
 
     def __init__(self, data_input_queue: MessageMiddlewareQueue, users_input_queue: MessageMiddlewareQueue,
                  output_queue: MessageMiddlewareQueue):

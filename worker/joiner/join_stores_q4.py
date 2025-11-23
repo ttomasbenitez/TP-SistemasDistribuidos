@@ -42,6 +42,7 @@ class Q4StoresJoiner(Joiner):
     def _consume_data_queue(self):
         data_input_queue = MessageMiddlewareQueue(self.host, self.data_input_queue)
         self.message_middlewares.append(data_input_queue)
+        
         def __on_message__(msg):
             message = Message.deserialize(msg)
             logging.debug(f"action: message received | request_id: {message.request_id} | type: {message.type}")
