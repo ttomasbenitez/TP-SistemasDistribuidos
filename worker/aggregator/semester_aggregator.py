@@ -12,20 +12,22 @@ from utils.heartbeat import start_heartbeat_sender
 
 class SemesterAggregator(Worker):
 
-    def __init__(self, host: str,
-                 input_queue_name: str,
+    def __init__(self, 
+                 data_input_queue: str,
                  data_output_queue: str,
-                eof_exchange: str,
-                eof_exchange_queues: dict, 
-                eof_service_queue: str,
-                eof_self_queue: str):
+                 eof_output_exchange: str,
+                 eof_output_queues: dict, 
+                 eof_self_queue: str,
+                 eof_service_queue: str,
+                 host: str):
         
         self.__init_manager__()
+        self.__init_middlewares_handler__()
         self.host = host
-        self.input_queue_name = input_queue_name
+        self.data_input_queue = data_input_queue
         self.data_output_queue = data_output_queue
-        self.eof_exchange = eof_exchange
-        self.eof_exchange_queues = eof_exchange_queues
+        self.eof_output_exchange = eof_output_exchange
+        self.eof_output_queues = eof_output_queues
         self.eof_service_queue = eof_service_queue
         self.eof_self_queue = eof_self_queue
 
@@ -42,40 +44,23 @@ class SemesterAggregator(Worker):
         for p in (p_data, p_eof): p.start()
         for p in (p_data, p_eof): p.join()
 
-    def _consume_eof(self): 
-        eof_service_queue = MessageMiddlewareQueue(self.host, self.eof_service_queue)
-        eof_self_queue = MessageMiddlewareQueue(self.host, self.eof_self_queue)
-    
-        def on_eof_message(message):
-            try:
-                message = Message.deserialize(message)
-                if message.type == MESSAGE_TYPE_EOF:
-                    logging.info(f"EOF recibido en EOF Queue Propia | request_id: {message.request_id} | type: {message.type}")
-                    self._ensure_request(message.request_id)
-                    self.drained[message.request_id].wait()
-                    eof_service_queue.send(message.serialize())
-            except Exception as e:
-                logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
-        
-        eof_self_queue.start_consuming(on_eof_message)
-        
     def _consume_data_queue(self):
-        queue = MessageMiddlewareQueue(self.host, self.input_queue_name)
+        data_input_queue = MessageMiddlewareQueue(self.host, self.data_input_queue)
         data_output_queue = MessageMiddlewareQueue(self.host, self.data_output_queue)
+        eof_output_exchange = MessageMiddlewareExchange(self.host, self.eof_output_exchange, self.eof_output_queues)
+        self.message_middlewares.extend([data_input_queue, data_output_queue, eof_output_exchange])
         
         def __on_message__(message):
             try:
                 message = Message.deserialize(message)
 
                 if message.type == MESSAGE_TYPE_EOF:
-                    logging.info(f"EOF recibido en data queue | request_id: {message.request_id}")
-                    eof_exchange = MessageMiddlewareExchange(self.host, self.eof_exchange, self.eof_exchange_queues)
-                    eof_exchange.send(message.serialize(), str(message.type))
+                    logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
+                    eof_output_exchange.send(message.serialize(), str(message.type))
                     return
                 
-                logging.info(f"Mensaje recibido | request_id: {message.request_id} | type: {message.type}")
+                logging.debug(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
                 self._ensure_request(message.request_id)
-                
                 self._inc_inflight(message.request_id) 
 
                 items = message.process_message()
@@ -83,7 +68,6 @@ class SemesterAggregator(Worker):
                 store_id = None
 
                 for it in items:
-                
                     year = it.get_year()
                     sem  = it.get_semester()
                     period = f"{year}-H{sem}"
@@ -97,29 +81,17 @@ class SemesterAggregator(Worker):
                     self._send_grouped_item(message, res, data_output_queue)
 
             except Exception as e:
-                logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
-
+                logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
             finally:
                 self._dec_inflight(message.request_id)
         
-        queue.start_consuming(__on_message__, prefetch_count=1)
+        data_input_queue.start_consuming(__on_message__, prefetch_count=1)
 
    
     def _send_grouped_item(self, message, item, data_output_queue):
         new_chunk = item.serialize()
         new_message = Message(message.request_id, MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT, message.msg_num, new_chunk)
         data_output_queue.send(new_message.serialize())
-
-    # TODO: Cerrar colas y exchanges
-    def close(self):
-        try:
-            # self.data_input_queue.close()
-            # self.data_output_queue.close()
-            # self.eof_exchange.close()
-            pass
-        except Exception as e:
-            print(f"Error al cerrar: {type(e).__name__}: {e}")
-
 
 def initialize_config():
     """ Parse env variables to find program config params
@@ -162,13 +134,13 @@ def main():
     eof_exchange_queues =  {config_params["eof_queue_1"]: [str(MESSAGE_TYPE_EOF)],
                                  config_params["eof_queue_2"]: [str(MESSAGE_TYPE_EOF)]}
     
-    aggregator = SemesterAggregator(config_params["rabbitmq_host"], 
-                                    config_params["input_queue"], 
+    aggregator = SemesterAggregator(config_params["input_queue"], 
                                     config_params["output_queue"], 
                                     config_params["eof_exchange_name"], 
                                     eof_exchange_queues,
+                                    config_params["eof_self_queue"],
                                     config_params["eof_service_queue"],  
-                                    config_params["eof_self_queue"])
+                                    config_params["rabbitmq_host"])
     aggregator.start()
 
 if __name__ == "__main__":
