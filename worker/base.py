@@ -17,11 +17,10 @@ class Worker(ABC):
         self.__init_manager__()
         self.__init_middlewares_handler__()
         
-        signal.signal(signal.SIGTERM, self.__handle_shutdown)
-        signal.signal(signal.SIGINT, self.__handle_shutdown)
-        
     def __init_middlewares_handler__(self):
         self.message_middlewares = []
+        signal.signal(signal.SIGTERM, self.__handle_shutdown)
+        signal.signal(signal.SIGINT, self.__handle_shutdown)
         
     def __init_manager__(self):
         self.manager = Manager()

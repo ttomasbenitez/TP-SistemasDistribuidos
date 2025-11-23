@@ -1,5 +1,5 @@
 from worker.base import Worker 
-from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
+from Middleware.middleware import MessageMiddlewareQueue
 import logging
 from pkg.message.message import Message
 from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_USERS, MESSAGE_TYPE_TRANSACTIONS, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT

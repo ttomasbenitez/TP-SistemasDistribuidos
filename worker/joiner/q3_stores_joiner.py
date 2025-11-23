@@ -20,18 +20,16 @@ EXPECTED_EOFS = 2
 class StoresJoiner(Worker):
 
     def __init__(self, data_input_queue: str, stores_input_queue: str,
-                 host: str, out_exchange: str, out_queue_name: str):
+                 host: str, out_exchange: str):
         self.data_input_queue = data_input_queue
         self.stores_input_queue = stores_input_queue
         self.host = host
         self.out_exchange = out_exchange
-        self.out_queue_prefix = out_queue_name
 
         self.stores = {}
         self.eofs_by_client = {}
         self.pending_transactions = []
         self.processed_transactions = {}
-        self.clients = []
 
         self.stores_lock = threading.Lock()
         self.eofs_lock = threading.Lock()
@@ -139,16 +137,7 @@ class StoresJoiner(Worker):
 
     def _send_eof(self, message, out_exchange):
         out_exchange.send(message.serialize(), str(message.request_id))
-        self.clients.remove(message.request_id)
         logging.info(f"EOF enviado | request_id: {message.request_id}")
-
-    #TODO: revisar si es necesario cerrar algo
-    def close(self):
-        try:
-            # self.out_exchange.close()
-            pass
-        except Exception as e:
-            logging.error(f"Error al cerrar: {type(e).__name__}: {e}")
 
 
 def initialize_config():
@@ -157,12 +146,11 @@ def initialize_config():
     config_params["input_queue_1"] = os.getenv('INPUT_QUEUE_1')
     config_params["input_queue_2"] = os.getenv('INPUT_QUEUE_2')
     config_params["input_exchange_q3"] = os.getenv('INPUT_EXCHANGE_NAME')
-    config_params["output_queue_name"] = os.getenv('OUTPUT_QUEUE')
     config_params["output_exchange_q3"] = os.getenv('OUTPUT_EXCHANGE_NAME')
     config_params["logging_level"] = os.getenv('LOG_LEVEL', 'INFO')
 
     if None in [config_params["rabbitmq_host"], config_params["input_queue_1"],
-                config_params["input_queue_2"], config_params["output_queue_name"]]:
+                config_params["input_queue_2"]]:
         raise ValueError("Expected value not found. Aborting.")
 
     return config_params
@@ -172,7 +160,7 @@ def main():
     config_params = initialize_config()
     initialize_log(config_params["logging_level"])
 
-    joiner = StoresJoiner(config_params["input_queue_1"],  config_params["input_queue_2"], config_params["rabbitmq_host"], config_params["output_exchange_q3"], config_params["output_queue_name"])
+    joiner = StoresJoiner(config_params["input_queue_1"],  config_params["input_queue_2"], config_params["rabbitmq_host"], config_params["output_exchange_q3"])
     joiner.start()
 
 

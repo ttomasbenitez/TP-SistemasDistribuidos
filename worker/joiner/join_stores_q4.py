@@ -30,21 +30,22 @@ class Q4StoresJoiner(Joiner):
                 key = (item.get_id(), message.request_id)
                 with self.items_to_join_lock:
                     self.items_to_join[key] = item.get_name()
+        logging.debug(f"action: Stores updated | request_id: {message.request_id}")
                     
     def _send_results(self, message):
         data_output_exchange = MessageMiddlewareExchange(self.host, self.data_output_exchange, {})
-        
+        self.message_middlewares.append(data_output_exchange)
         self._process_pending(request_id=message.request_id)
         self._send_processed_clients(message, data_output_exchange)
         self._send_eof(message, data_output_exchange)
         
     def _consume_data_queue(self):
         data_input_queue = MessageMiddlewareQueue(self.host, self.data_input_queue)
-
+        self.message_middlewares.append(data_input_queue)
         def __on_message__(msg):
             message = Message.deserialize(msg)
             logging.debug(f"action: message received | request_id: {message.request_id} | type: {message.type}")
-
+            
             if message.type == MESSAGE_TYPE_EOF:
                 return self._process_on_eof_message__(message)
 
@@ -80,7 +81,6 @@ class Q4StoresJoiner(Joiner):
 
     def _send_eof(self, message, data_output_exchange):
         data_output_exchange.send(message.serialize(), str(message.request_id))
-        self.clients.remove(message.request_id)
         logging.info(f"action: EOF sent | request_id: {message.request_id} | type: {message.type}")
 
 
@@ -108,7 +108,6 @@ def main():
                             config_params["input_queue_2"],
                             config_params["rabbitmq_host"])
     joiner.start()
-
 
 if __name__ == "__main__":
     main()
