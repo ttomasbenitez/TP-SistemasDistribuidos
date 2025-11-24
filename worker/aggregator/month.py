@@ -8,13 +8,14 @@ from pkg.message.q2_result import Q2IntermediateResult
 import os
 from multiprocessing import Process, Value
 from utils.heartbeat import start_heartbeat_sender
+import hashlib
 
 
 class AggregatorMonth(Worker):
     
     def __init__(self,
                  data_input_queue: str,
-                 data_output_queue: str,
+                 data_output_queues: list,
                  eof_output_exchange: str,
                  eof_output_queues: dict,
                  eof_self_queue: str,
@@ -23,7 +24,7 @@ class AggregatorMonth(Worker):
         self.__init_manager__()
         self.__init_middlewares_handler__()
         self.data_input_queue = data_input_queue
-        self.data_output_queue = data_output_queue
+        self.data_output_queues = data_output_queues
         self.eof_output_exchange = eof_output_exchange
         self.eof_output_queues = eof_output_queues
         self.host = host
@@ -44,9 +45,9 @@ class AggregatorMonth(Worker):
 
     def _consume_data_queue(self):
         eof_output_exchange = MessageMiddlewareExchange(self.host, self.eof_output_exchange, self.eof_output_queues)
-        data_output_queue = MessageMiddlewareQueue(self.host, self.data_output_queue)
+        data_output_queues = [MessageMiddlewareQueue(self.host, queue) for queue in self.data_output_queues]
         data_input_queue = MessageMiddlewareQueue(self.host, self.data_input_queue)
-        self.message_middlewares.extend([eof_output_exchange, data_output_queue, data_input_queue])
+        self.message_middlewares.extend([eof_output_exchange, data_input_queue] + data_output_queues)
         
         def __on_message__(message):
             try:
@@ -64,7 +65,7 @@ class AggregatorMonth(Worker):
                 items = message.process_message()
                 groups = self._group_items_by_month(items)
                 new_message = Message(message.request_id, MESSAGE_TYPE_QUERY_2_INTERMEDIATE_RESULT, message.msg_num, '')
-                self._send_groups(new_message, groups, data_output_queue)
+                self._send_groups_sharded(new_message, groups, data_output_queues)
             except Exception as e:
                 logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
             finally:
@@ -81,6 +82,19 @@ class AggregatorMonth(Worker):
             groups.setdefault(f"{year}-{month}", []).append(q4_intermediate)
         return groups
     
+    def _send_groups_sharded(self, original_message: Message, groups: dict, output_queues: list):
+        for key, items in groups.items():
+            # key is "YYYY-MM"
+            # Use hash to select queue
+            hash_val = int(hashlib.sha256(key.encode()).hexdigest(), 16)
+            queue_index = hash_val % len(output_queues)
+            target_queue = output_queues[queue_index]
+            
+            new_chunk = ''.join(item.serialize() for item in items)
+            new_message = original_message.new_from_original(new_chunk)
+            serialized = new_message.serialize()
+            target_queue.send(serialized)
+
     def close(self):
         try:
             for middleware in self.message_middlewares:
@@ -106,7 +120,25 @@ def initialize_config():
     config_params["rabbitmq_host"] = os.getenv('RABBITMQ_HOST')
     config_params["input_queue"] = os.getenv('INPUT_QUEUE_1')
     config_params["eof_self_queue"] = os.getenv('EOF_SELF_QUEUE')
-    config_params["output_queue"] = os.getenv('OUTPUT_QUEUE_1')
+    
+    # Read multiple output queues
+    output_queues = []
+    i = 1
+    while True:
+        queue = os.getenv(f'OUTPUT_QUEUE_{i}')
+        if not queue:
+            break
+        output_queues.append(queue)
+        i += 1
+    
+    if not output_queues:
+        # Fallback to OUTPUT_QUEUE_1 if loop didn't find anything (though loop starts at 1)
+        # Actually if OUTPUT_QUEUE_1 is missing it breaks immediately.
+        # Let's check if we found any.
+        pass
+
+    config_params["output_queues"] = output_queues
+    
     config_params["eof_exchange_name"] = os.getenv('EOF_EXCHANGE_NAME')
     config_params["eof_queue_1"] = os.getenv('EOF_QUEUE_1')
     config_params["eof_queue_2"] = os.getenv('EOF_QUEUE_2')
@@ -114,7 +146,7 @@ def initialize_config():
     config_params["logging_level"] = os.getenv('LOG_LEVEL', 'INFO')
     config_params["logger_name"] = os.getenv('CONTAINER_NAME')
 
-    if config_params["rabbitmq_host"] is None or config_params["input_queue"] is None or config_params["output_queue"] is None:
+    if config_params["rabbitmq_host"] is None or config_params["input_queue"] is None or not config_params["output_queues"]:
         raise ValueError("Expected value not found. Aborting filter.")
     
     return config_params
@@ -128,7 +160,7 @@ def main():
                             config_params["eof_queue_2"]: [str(MESSAGE_TYPE_EOF)]}
 
     aggregator = AggregatorMonth(config_params["input_queue"], 
-                                config_params["output_queue"], 
+                                config_params["output_queues"], 
                                 config_params["eof_exchange_name"], 
                                 eof_output_queues,
                                 config_params["eof_self_queue"],

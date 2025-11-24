@@ -2,16 +2,13 @@ from worker.eof.eof_service import EofService
 import logging
 import os
 from utils.custom_logging import initialize_log
-from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
-from pkg.message.constants import MESSAGE_TYPE_EOF
+from Middleware.middleware import MessageMiddlewareQueue
 
-class EofServiceMonth(EofService):
+class EofServiceQuantityProfit(EofService):
     
     def send_message_to_output(self, message):
         try:
-            # eof_out_middleware is now a list of middlewares
-            for middleware in self.eof_out_middleware:
-                middleware.send(message.serialize())
+            self.eof_out_middleware.send(message.serialize())
         except Exception as e:
             logging.error(f"Error al enviar el mensaje: {type(e).__name__}: {e}")
             
@@ -27,39 +24,21 @@ def initialize_config():
     config_params = {
         "rabbitmq_host": os.getenv('RABBITMQ_HOST'),
         "input_queue": os.getenv('INPUT_QUEUE'),
+        "output_queue": os.getenv('OUTPUT_QUEUE'),
         "expected_acks": int(os.getenv('EXPECTED_ACKS')),
         "logging_level": os.getenv('LOG_LEVEL', 'INFO'),
     }
 
-    # Read multiple output queues
-    output_queues = []
-    i = 1
-    while True:
-        queue = os.getenv(f'OUTPUT_QUEUE_{i}')
-        if not queue:
-            # Fallback for backward compatibility or if only OUTPUT_QUEUE is defined
-            if i == 1:
-                queue = os.getenv('OUTPUT_QUEUE')
-                if queue:
-                    output_queues.append(queue)
-            break
-        output_queues.append(queue)
-        i += 1
-    
-    config_params["output_queues"] = output_queues
-
     required_keys = [
         "rabbitmq_host",
         "input_queue",
+        "output_queue",
     ]
 
     missing_keys = [key for key in required_keys if config_params[key] is None]
     if missing_keys:
         raise ValueError(f"Expected value(s) not found for: {', '.join(missing_keys)}. Aborting filter.")
     
-    if not config_params["output_queues"]:
-        raise ValueError("Expected at least one output queue.")
-
     return config_params
 
 def main():
@@ -69,12 +48,12 @@ def main():
 
     eof_input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue"])
 
-    eof_output_queues = [MessageMiddlewareQueue(config_params["rabbitmq_host"], queue) for queue in config_params["output_queues"]]
+    eof_output_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["output_queue"])
 
-    eof_service = EofServiceMonth(
+    eof_service = EofServiceQuantityProfit(
         expected_acks=config_params["expected_acks"],
         eof_in_queque=eof_input_queue,
-        eof_out_middleware=eof_output_queues
+        eof_out_middleware=eof_output_queue
     )
     eof_service.start()
     

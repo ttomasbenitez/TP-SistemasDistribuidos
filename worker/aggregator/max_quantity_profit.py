@@ -9,9 +9,10 @@ from pkg.message.q2_result import Q2Result, Q2IntermediateResult
 
 class QuantityAndProfit(Worker):
     
-    def __init__(self, in_queue: MessageMiddlewareQueue, out_queue: MessageMiddlewareQueue, storage_dir: str):
+    def __init__(self, in_queue: MessageMiddlewareQueue, out_queue: MessageMiddlewareQueue, eof_service_queue: MessageMiddlewareQueue, storage_dir: str):
         super().__init__(in_queue)
         self.out_queue = out_queue
+        self.eof_service_queue_middleware = eof_service_queue
         self.storage_dir = storage_dir
         # Structure: {request_id: {ym: {item_id: Q2IntermediateResult}}}
         self.data_by_request = dict()
@@ -111,8 +112,8 @@ class QuantityAndProfit(Worker):
             logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
 
     def __received_EOF__(self, message):
-        self.out_queue.send(message.serialize())
-        logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")
+        self.eof_service_queue_middleware.send(message.serialize())
+        logging.info(f"EOF enviado a service queue | request_id: {message.request_id} | type: {message.type}")
             
     def _accumulate_items(self, items, request_id):
         """
@@ -181,6 +182,7 @@ class QuantityAndProfit(Worker):
         try:
             self.in_middleware.close()
             self.out_queue.close()
+            self.eof_service_queue_middleware.close()
         except Exception as e:
             print(f"Error al cerrar: {type(e).__name__}: {e}")
 
@@ -199,10 +201,11 @@ def initialize_config():
     config_params["rabbitmq_host"] = os.getenv('RABBITMQ_HOST')
     config_params["input_queue"] = os.getenv('INPUT_QUEUE_1')
     config_params["output_queue"] = os.getenv('OUTPUT_QUEUE_1')
+    config_params["eof_service_queue"] = os.getenv('EOF_SERVICE_QUEUE')
     config_params["logging_level"] = os.getenv('LOG_LEVEL', 'INFO')
     config_params["storage_dir"] = os.getenv('STORAGE_DIR', './data')
 
-    if config_params["rabbitmq_host"] is None or config_params["input_queue"] is None or config_params["output_queue"] is None:
+    if config_params["rabbitmq_host"] is None or config_params["input_queue"] is None or config_params["output_queue"] is None or config_params["eof_service_queue"] is None:
         raise ValueError("Expected value not found. Aborting filter.")
     
     return config_params
@@ -214,8 +217,9 @@ def main():
 
     input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue"])
     output_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["output_queue"])
+    eof_service_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["eof_service_queue"])
     
-    aggregator = QuantityAndProfit(input_queue, output_queue, config_params["storage_dir"])
+    aggregator = QuantityAndProfit(input_queue, output_queue, eof_service_queue, config_params["storage_dir"])
     aggregator.start()
 
 if __name__ == "__main__":
