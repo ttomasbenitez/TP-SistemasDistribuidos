@@ -104,7 +104,7 @@ class HealthMonitor:
                     dead_nodes.append(service)
         
         active_monitors = self._get_active_monitors()
-        logging.info(f"Active monitors: {active_monitors}")
+        logging.debug(f"Active monitors: {active_monitors}")
 
         for node in dead_nodes:
             if self._am_i_responsible(node, active_monitors):
