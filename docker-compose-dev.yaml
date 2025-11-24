@@ -19,7 +19,7 @@ services:
     image: gateway:latest
     environment:
       PORT: 3000
-      LOG_LEVEL: DEBUG
+      LOG_LEVEL: INFO
       LISTEN_BACKLOG: '5'
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
       CONTAINER_NAME: gateway
@@ -401,7 +401,7 @@ services:
       INPUT_QUEUE_1: products-results-queue
       INPUT_QUEUE_2: menu-items-queue
       OUTPUT_EXCHANGE: results-exchange
-      LOG_LEVEL: DEBUG
+      LOG_LEVEL: INFO
     networks:
     - testing_net
     depends_on:
@@ -635,7 +635,7 @@ services:
       INPUT_QUEUE_1: top-clients-queue
       INPUT_QUEUE_2: stores-queue-2
       OUTPUT_EXCHANGE_NAME: results-exchange
-      LOG_LEVEL: DEBUG
+      LOG_LEVEL: INFO
     networks:
     - testing_net
     depends_on:
@@ -653,7 +653,7 @@ services:
       USERS_FOLDER_PATH: data/users/
       TRANSACTIONS_FOLDER_PATH: data/transactions/
       TRANSACTION_ITEMS_FOLDER_PATH: data/transaction_items/
-      MAX_BATCH_SIZE: 100000
+      MAX_BATCH_SIZE: 50000
     depends_on:
       - gateway
     networks:

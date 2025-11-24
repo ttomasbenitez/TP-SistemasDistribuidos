@@ -30,7 +30,7 @@ class Q4StoresJoiner(Joiner):
                 key = (item.get_id(), message.request_id)
                 with self.items_to_join_lock:
                     self.items_to_join[key] = item.get_name()
-        logging.debug(f"action: Stores updated | request_id: {message.request_id}")
+        logging.info(f"action: Stores updated | request_id: {message.request_id}")
                     
     def _send_results(self, message):
         data_output_exchange = MessageMiddlewareExchange(self.host, self.data_output_exchange, {})
@@ -45,7 +45,7 @@ class Q4StoresJoiner(Joiner):
         
         def __on_message__(msg):
             message = Message.deserialize(msg)
-            logging.debug(f"action: message received | request_id: {message.request_id} | type: {message.type}")
+            logging.info(f"action: message received | request_id: {message.request_id} | type: {message.type}")
             
             if message.type == MESSAGE_TYPE_EOF:
                 return self._process_on_eof_message__(message)

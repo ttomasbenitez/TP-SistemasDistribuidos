@@ -32,7 +32,7 @@ class JoinerMenuItems(Joiner):
                         self.items_to_join[message.request_id] = {}
                     self.items_to_join[message.request_id][item.get_id()] = item.get_name()
         
-        logging.debug(f"action: Menu Items updated | request_id: {message.request_id}")
+        logging.info(f"action: Menu Items updated | request_id: {message.request_id}")
     
     def _send_results(self, message):
         data_output_exchange = MessageMiddlewareExchange(self.host, self.data_output_exchange, {})
@@ -61,7 +61,7 @@ class JoinerMenuItems(Joiner):
         
         def __on_message__(message):
             message = Message.deserialize(message)
-            logging.debug(f"action: message received | request_id: {message.request_id} | type: {message.type}")
+            logging.info(f"action: message received | request_id: {message.request_id} | type: {message.type}")
 
             if message.type == MESSAGE_TYPE_EOF:
                 return self._process_on_eof_message__(message)

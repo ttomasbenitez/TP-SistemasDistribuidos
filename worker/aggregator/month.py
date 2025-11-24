@@ -58,7 +58,7 @@ class AggregatorMonth(Worker):
                     eof_output_exchange.send(message.serialize(), str(message.type))
                     return
 
-                logging.debug(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
+                logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
                 self._ensure_request(message.request_id)
                 self._inc_inflight(message.request_id)
 

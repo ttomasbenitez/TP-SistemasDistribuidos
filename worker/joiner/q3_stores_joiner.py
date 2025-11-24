@@ -34,7 +34,7 @@ class StoresJoiner(Joiner):
         
         def __on_message__(msg):
             message = Message.deserialize(msg)
-            logging.debug(f"action: message received | request_id: {message.request_id} | type: {message.type}")
+            logging.info(f"action: message received | request_id: {message.request_id} | type: {message.type}")
 
             if message.type == MESSAGE_TYPE_EOF:
                 return self._process_on_eof_message__(message)
@@ -61,7 +61,7 @@ class StoresJoiner(Joiner):
                     if message.request_id not in self.items_to_join:
                         self.items_to_join[message.request_id] = {}
                     self.items_to_join[message.request_id][item.get_id()] = item.get_name()
-        logging.debug(f"action: Stores updated | request_id: {message.request_id}")
+        logging.info(f"action: Stores updated | request_id: {message.request_id}")
                     
     def _send_results(self, message):
         data_output_exchange = MessageMiddlewareExchange(self.host, self.data_output_exchange, {})
@@ -90,7 +90,7 @@ class StoresJoiner(Joiner):
             total_chunk += q3Result.serialize()
         msg = Message(message.request_id, MESSAGE_TYPE_QUERY_3_RESULT, message.msg_num, total_chunk)
         data_output_exchange.send(msg.serialize(), str(message.request_id))
-        logging.debug(f"action: results sent | request_id: {message.request_id}")
+        logging.info(f"action: results sent | request_id: {message.request_id}")
 
     def _send_eof(self, message, data_output_exchange):
         data_output_exchange.send(message.serialize(), str(message.request_id))

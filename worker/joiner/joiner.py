@@ -62,7 +62,7 @@ class Joiner(Worker, ABC):
         self.message_middlewares.append(items_input_queue)
         def __on_items_message__(message):
             message = Message.deserialize(message)
-            logging.debug(f"action: message received in items to join queue | request_id: {message.request_id} | msg_type: {message.type}")
+            logging.info(f"action: message received in items to join queue | request_id: {message.request_id} | msg_type: {message.type}")
              
             if message.type == MESSAGE_TYPE_EOF:
                 return self._process_on_eof_message__(message)

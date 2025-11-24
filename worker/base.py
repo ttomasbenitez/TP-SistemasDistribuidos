@@ -116,10 +116,10 @@ class Worker(ABC):
         try:
             self.stop()
         except Exception:
-            pass  
+            logging.error(f'action: worker shutdown | result: failed to stop consuming | signal: {signum}')  
         try:
             self.close()
         except Exception:
-            pass
-        logging.info(f'action: gateway shutdown | result: success')
+            logging.error(f'action: worker shutdown | result: failed to close | signal: {signum}')  
+        logging.info(f'action: worker shutdown | result: success')
         

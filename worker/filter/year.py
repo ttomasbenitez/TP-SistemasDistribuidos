@@ -82,7 +82,7 @@ class FilterYearNode(Worker):
             
             try:
                 message = Message.deserialize(message_bytes)
-                logging.debug(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
+                logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
                 if message.type == MESSAGE_TYPE_EOF:
                     logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
                     eof_exchange.send(message.serialize(), str(message.type))

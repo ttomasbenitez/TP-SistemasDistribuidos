@@ -101,7 +101,7 @@ class QuantityAndProfit(Worker):
             if message.type == MESSAGE_TYPE_EOF:
                 logging.info(f"EOF recibido en data queue | request_id: {message.request_id}")
                 self._send_results_by_date(message.request_id)
-                self.__received_EOF__(message)
+                self._send_eof(message)
                 return
 
             logging.info(f"Mensaje recibido | request_id: {message.request_id} | type: {message.type}")
@@ -111,7 +111,7 @@ class QuantityAndProfit(Worker):
         except Exception as e:
             logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
 
-    def __received_EOF__(self, message):
+    def _send_eof(self, message):
         self.eof_service_queue_middleware.send(message.serialize())
         logging.info(f"EOF enviado a service queue | request_id: {message.request_id} | type: {message.type}")
             
