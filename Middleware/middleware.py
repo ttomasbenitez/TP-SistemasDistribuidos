@@ -120,7 +120,7 @@ class MessageMiddlewareExchange(MessageMiddleware):
         self._connect(host, exchange_name, queues_dict)
         
     def _connect(self, host, exchange_name, queues_dict):
-        self.connection = pika.BlockingConnection(pika.ConnectionParameters(host))
+        self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=host, heartbeat=6000))
         self.channel = self.connection.channel()
         self.channel.exchange_declare(exchange=exchange_name, exchange_type='direct', durable=True)
         self.route_keys = list(queues_dict.values())
