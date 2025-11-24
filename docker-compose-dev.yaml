@@ -266,7 +266,9 @@ services:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: year-filtered-queue-q2
       EOF_SELF_QUEUE: EOF-aggregator-month-1
-      OUTPUT_QUEUE_1: aggregated-month-queue
+      OUTPUT_QUEUE_1: aggregated-month-queue-1
+      OUTPUT_QUEUE_2: aggregated-month-queue-2
+      OUTPUT_QUEUE_3: aggregated-month-queue-3
       EOF_EXCHANGE_NAME: eof-exchange-aggregator-month
       EOF_QUEUE_1: EOF-aggregator-month-1
       EOF_QUEUE_2: EOF-aggregator-month-2
@@ -287,7 +289,9 @@ services:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: year-filtered-queue-q2
       EOF_SELF_QUEUE: EOF-aggregator-month-2
-      OUTPUT_QUEUE_1: aggregated-month-queue
+      OUTPUT_QUEUE_1: aggregated-month-queue-1
+      OUTPUT_QUEUE_2: aggregated-month-queue-2
+      OUTPUT_QUEUE_3: aggregated-month-queue-3
       EOF_EXCHANGE_NAME: eof-exchange-aggregator-month
       EOF_QUEUE_1: EOF-aggregator-month-1
       EOF_QUEUE_2: EOF-aggregator-month-2
@@ -307,7 +311,9 @@ services:
       CONTAINER_NAME: aggregator-month-eof-service
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE: eof-service-aggregator-month
-      OUTPUT_QUEUE: aggregated-month-queue
+      OUTPUT_QUEUE_1: aggregated-month-queue-1
+      OUTPUT_QUEUE_2: aggregated-month-queue-2
+      OUTPUT_QUEUE_3: aggregated-month-queue-3
       EXPECTED_ACKS: 2
       LOG_LEVEL: INFO
     networks:
@@ -315,21 +321,74 @@ services:
     depends_on:
     - gateway
 
-  aggregator-quantity-profit:
-    container_name: aggregator-quantity-profit
+  aggregator-quantity-profit-1:
+    container_name: aggregator-quantity-profit-1
     image: worker:latest
     command: "/worker/aggregator/max_quantity_profit.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-      CONTAINER_NAME: aggregator-quantity-profit
+      CONTAINER_NAME: aggregator-quantity-profit-1
       RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE_1: aggregated-month-queue
+      INPUT_QUEUE_1: aggregated-month-queue-1
       OUTPUT_QUEUE_1: products-results-queue
+      EOF_SERVICE_QUEUE: eof-service-aggregator-quantity-profit
       LOG_LEVEL: INFO
     networks:
     - testing_net
     depends_on:
     - gateway
+
+  aggregator-quantity-profit-2:
+    container_name: aggregator-quantity-profit-2
+    image: worker:latest
+    command: "/worker/aggregator/max_quantity_profit.py"
+    environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: aggregator-quantity-profit-2
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: aggregated-month-queue-2
+      OUTPUT_QUEUE_1: products-results-queue
+      EOF_SERVICE_QUEUE: eof-service-aggregator-quantity-profit
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
+
+  aggregator-quantity-profit-3:
+    container_name: aggregator-quantity-profit-3
+    image: worker:latest
+    command: "/worker/aggregator/max_quantity_profit.py"
+    environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: aggregator-quantity-profit-3
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: aggregated-month-queue-3
+      OUTPUT_QUEUE_1: products-results-queue
+      EOF_SERVICE_QUEUE: eof-service-aggregator-quantity-profit
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
+
+  aggregator-quantity-profit-eof-service:
+    container_name: aggregator-quantity-profit-eof-service
+    image: worker:latest
+    command: "/worker/eof/eof_service_quantity_profit.py"
+    environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: aggregator-quantity-profit-eof-service
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE: eof-service-aggregator-quantity-profit
+      OUTPUT_QUEUE: products-results-queue
+      EXPECTED_ACKS: 3
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
+
     
   joiner-menu-items:
     container_name: joiner-menu-items
@@ -346,7 +405,9 @@ services:
     networks:
     - testing_net
     depends_on:
-    - aggregator-quantity-profit
+    - aggregator-quantity-profit-1
+    - aggregator-quantity-profit-2
+    - aggregator-quantity-profit-3
 
   aggregator-semester-1:
     container_name: aggregator-semester-1
@@ -592,7 +653,7 @@ services:
       USERS_FOLDER_PATH: data/users/
       TRANSACTIONS_FOLDER_PATH: data/transactions/
       TRANSACTION_ITEMS_FOLDER_PATH: data/transaction_items/
-      MAX_BATCH_SIZE: 50000
+      MAX_BATCH_SIZE: 100000
     depends_on:
       - gateway
     networks:
@@ -630,30 +691,30 @@ services:
     - ./client/data/transaction_items/:/data/transaction_items/
     - ./client/storage/:/storage/
 
-  client_3:
-   container_name: client_3
-   image: client:latest
-   environment:
-     GATEWAY_HOST: gateway
-     GATEWAY_PORT: 3000
-     LOG_LEVEL: INFO
-     STORES_FOLDER_PATH: data/stores/
-     MENU_ITEMS_FOLDER_PATH: data/menu_items/
-     USERS_FOLDER_PATH: data/users/
-     TRANSACTIONS_FOLDER_PATH: data/transactions/
-     TRANSACTION_ITEMS_FOLDER_PATH: data/transaction_items/
-     MAX_BATCH_SIZE: 200000
-   depends_on:
-     - gateway
-   networks:
-   - testing_net
-   volumes:
-   - ./client/data/menu_items/:/data/menu_items/
-   - ./client/data/stores/:/data/stores/
-   - ./client/data/users/:/data/users/
-   - ./client/data/transactions/:/data/transactions/
-   - ./client/data/transaction_items/:/data/transaction_items/
-   - ./client/storage/:/storage/
+  #client_3:
+  # container_name: client_3
+  # image: client:latest
+  # environment:
+  #   GATEWAY_HOST: gateway
+  #   GATEWAY_PORT: 3000
+  #   LOG_LEVEL: INFO
+  #   STORES_FOLDER_PATH: data/stores/
+  #   MENU_ITEMS_FOLDER_PATH: data/menu_items/
+  #   USERS_FOLDER_PATH: data/users/
+  #   TRANSACTIONS_FOLDER_PATH: data/transactions/
+  #   TRANSACTION_ITEMS_FOLDER_PATH: data/transaction_items/
+  #   MAX_BATCH_SIZE: 200000
+  # depends_on:
+  #   - gateway
+  # networks:
+  # - testing_net
+  # volumes:
+  # - ./client/data/menu_items/:/data/menu_items/
+  # - ./client/data/stores/:/data/stores/
+  # - ./client/data/users/:/data/users/
+  # - ./client/data/transactions/:/data/transactions/
+  # - ./client/data/transaction_items/:/data/transaction_items/
+  # - ./client/storage/:/storage/
 
   health-monitor-1:
     container_name: health-monitor-1
