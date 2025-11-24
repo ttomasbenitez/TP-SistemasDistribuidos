@@ -107,7 +107,7 @@ class FilterYearNode(Worker):
                 if message is not None:
                     self._dec_inflight(message.request_id)
 
-        data_input_queue.start_consuming(__on_message__, prefetch_count=1)
+        data_input_queue.start_consuming(__on_message__)
 
 def initialize_config():
     config_params = {

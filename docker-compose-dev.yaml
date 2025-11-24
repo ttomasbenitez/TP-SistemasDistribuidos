@@ -657,14 +657,14 @@ services:
     depends_on:
       - gateway
     networks:
-    - testing_net
+      - testing_net
     volumes:
-    - ./client/data/menu_items/:/data/menu_items/
-    - ./client/data/stores/:/data/stores/
-    - ./client/data/users/:/data/users/
-    - ./client/data/transactions/:/data/transactions/
-    - ./client/data/transaction_items/:/data/transaction_items/
-    - ./client/storage/:/storage/
+      - ./client/data/menu_items/:/data/menu_items/
+      - ./client/data/stores/:/data/stores/
+      - ./client/data/users/:/data/users/
+      - ./client/data/transactions/:/data/transactions/
+      - ./client/data/transaction_items/:/data/transaction_items/
+      - ./client/storage/:/storage/
 
   client_2:
     container_name: client_2
@@ -682,39 +682,39 @@ services:
     depends_on:
       - gateway
     networks:
-    - testing_net
+      - testing_net
     volumes:
-    - ./client/data/menu_items/:/data/menu_items/
-    - ./client/data/stores/:/data/stores/
-    - ./client/data/users/:/data/users/
-    - ./client/data/transactions/:/data/transactions/
-    - ./client/data/transaction_items/:/data/transaction_items/
-    - ./client/storage/:/storage/
+      - ./client/data/menu_items/:/data/menu_items/
+      - ./client/data/stores/:/data/stores/
+      - ./client/data/users/:/data/users/
+      - ./client/data/transactions/:/data/transactions/
+      - ./client/data/transaction_items/:/data/transaction_items/
+      - ./client/storage/:/storage/
 
-  #client_3:
-  # container_name: client_3
-  # image: client:latest
-  # environment:
-  #   GATEWAY_HOST: gateway
-  #   GATEWAY_PORT: 3000
-  #   LOG_LEVEL: INFO
-  #   STORES_FOLDER_PATH: data/stores/
-  #   MENU_ITEMS_FOLDER_PATH: data/menu_items/
-  #   USERS_FOLDER_PATH: data/users/
-  #   TRANSACTIONS_FOLDER_PATH: data/transactions/
-  #   TRANSACTION_ITEMS_FOLDER_PATH: data/transaction_items/
-  #   MAX_BATCH_SIZE: 200000
-  # depends_on:
-  #   - gateway
-  # networks:
-  # - testing_net
-  # volumes:
-  # - ./client/data/menu_items/:/data/menu_items/
-  # - ./client/data/stores/:/data/stores/
-  # - ./client/data/users/:/data/users/
-  # - ./client/data/transactions/:/data/transactions/
-  # - ./client/data/transaction_items/:/data/transaction_items/
-  # - ./client/storage/:/storage/
+  # client_3:
+  #   container_name: client_3
+  #   image: client:latest
+  #   environment:
+  #     GATEWAY_HOST: gateway
+  #     GATEWAY_PORT: 3000
+  #     LOG_LEVEL: INFO
+  #     STORES_FOLDER_PATH: data/stores/
+  #     MENU_ITEMS_FOLDER_PATH: data/menu_items/
+  #     USERS_FOLDER_PATH: data/users/
+  #     TRANSACTIONS_FOLDER_PATH: data/transactions/
+  #     TRANSACTION_ITEMS_FOLDER_PATH: data/transaction_items/
+  #     MAX_BATCH_SIZE: 50000
+  #   depends_on:
+  #     - gateway
+  #   networks:
+  #     - testing_net
+  #   volumes:
+  #     - ./client/data/menu_items/:/data/menu_items/
+  #     - ./client/data/stores/:/data/stores/
+  #     - ./client/data/users/:/data/users/
+  #     - ./client/data/transactions/:/data/transactions/
+  #     - ./client/data/transaction_items/:/data/transaction_items/
+  #     - ./client/storage/:/storage/
 
   health-monitor-1:
     container_name: health-monitor-1

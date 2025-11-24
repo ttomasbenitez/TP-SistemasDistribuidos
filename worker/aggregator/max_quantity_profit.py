@@ -1,11 +1,12 @@
 from worker.base import Worker 
+from pkg.storage.state_storage.max_quantiry_profit import QuantityAndProfitStateStorage
 from Middleware.middleware import MessageMiddlewareQueue
 import logging
 from pkg.message.message import Message
 from pkg.message.constants import MESSAGE_TYPE_QUERY_2_RESULT, MESSAGE_TYPE_EOF, MAX_PROFIT, MAX_QUANTITY
 from utils.custom_logging import initialize_log
 import os
-from pkg.message.q2_result import Q2Result, Q2IntermediateResult
+from pkg.message.q2_result import Q2Result
 
 class QuantityAndProfit(Worker):
     
@@ -13,87 +14,7 @@ class QuantityAndProfit(Worker):
         super().__init__(in_queue)
         self.out_queue = out_queue
         self.eof_service_queue_middleware = eof_service_queue
-        self.storage_dir = storage_dir
-        # Structure: {request_id: {ym: {item_id: Q2IntermediateResult}}}
-        self.data_by_request = dict()
-        
-        if not os.path.exists(self.storage_dir):
-            os.makedirs(self.storage_dir)
-            
-        self._load_state()
-        
-    def _load_state(self):
-        """Carga el estado desde los archivos en el directorio de almacenamiento."""
-        logging.info(f"Cargando estado desde {self.storage_dir}")
-        for filename in os.listdir(self.storage_dir):
-            if not filename.endswith(".txt"):
-                continue
-                
-            try:
-                request_id = int(filename.split(".")[0])
-                filepath = os.path.join(self.storage_dir, filename)
-                
-                with open(filepath, "r") as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line:
-                            continue
-                        
-                        # Format: ym;item_id;quantity;subtotal                        
-                        parts = line.split(";", 1)
-                        ym = parts[0]
-                        item_data = parts[1]
-                        
-                        item = Q2IntermediateResult.deserialize(item_data)
-                        
-                        if request_id not in self.data_by_request:
-                            self.data_by_request[request_id] = {}
-                        
-                        if ym not in self.data_by_request[request_id]:
-                            self.data_by_request[request_id][ym] = {}
-                            
-                        self.data_by_request[request_id][ym][item.item_id] = item
-                        
-                logging.info(f"Estado cargado para request_id: {request_id}")
-            except Exception as e:
-                logging.error(f"Error al cargar estado de {filename}: {e}")
-
-    def _save_state(self, request_id):
-        """Guarda el estado de un request_id atomicamente."""
-        if request_id not in self.data_by_request:
-            return
-
-        temp_filepath = os.path.join(self.storage_dir, f"{request_id}.tmp")
-        final_filepath = os.path.join(self.storage_dir, f"{request_id}.txt")
-        
-        try:
-            with open(temp_filepath, "w") as f:
-                for ym, items_by_id in self.data_by_request[request_id].items():
-                    for item in items_by_id.values():
-                        # Format: ym;item.serialize()
-                        f.write(f"{ym};{item.serialize()}")
-                f.flush()
-                os.fsync(f.fileno())
-            
-            os.rename(temp_filepath, final_filepath)
-            # logging.debug(f"Estado guardado para request_id: {request_id}")
-        except Exception as e:
-            logging.error(f"Error al guardar estado para request_id {request_id}: {e}")
-            if os.path.exists(temp_filepath):
-                os.remove(temp_filepath)
-
-    def _delete_state(self, request_id):
-        """Borra el estado de un request_id de memoria y disco."""
-        if request_id in self.data_by_request:
-            del self.data_by_request[request_id]
-            
-        filepath = os.path.join(self.storage_dir, f"{request_id}.txt")
-        if os.path.exists(filepath):
-            try:
-                os.remove(filepath)
-                logging.info(f"Estado borrado para request_id: {request_id}")
-            except Exception as e:
-                logging.error(f"Error al borrar archivo de estado {filepath}: {e}")
+        self.state_storage = QuantityAndProfitStateStorage(storage_dir)
 
     def __on_message__(self, message):
         try:
@@ -125,13 +46,13 @@ class QuantityAndProfit(Worker):
             item_id = it.item_id               
 
             # Ensure structure exists
-            if request_id not in self.data_by_request:
-                self.data_by_request[request_id] = {}
+            if request_id not in self.state_storage.data_by_request:
+                self.state_storage.data_by_request[request_id] = {}
             
-            if ym not in self.data_by_request[request_id]:
-                self.data_by_request[request_id][ym] = {}
+            if ym not in  self.state_storage.data_by_request[request_id]:
+                 self.state_storage.data_by_request[request_id][ym] = {}
 
-            month_bucket = self.data_by_request[request_id][ym]
+            month_bucket = self.state_storage.data_by_request[request_id][ym]
             agg_item = month_bucket.get(item_id)
 
             if agg_item is None:
@@ -142,17 +63,17 @@ class QuantityAndProfit(Worker):
             updated = True
             
         if updated:
-            self._save_state(request_id)
+            self.state_storage.save_state(request_id)
     
     def _send_results_by_date(self, request_id_of_eof):
         chunk = ''
 
         # Check if we have data for this request
-        if request_id_of_eof not in self.data_by_request:
+        if request_id_of_eof not in  self.state_storage.data_by_request:
             logging.warning(f"No hay datos para request_id: {request_id_of_eof}")
             return
 
-        data_for_request = self.data_by_request[request_id_of_eof]
+        data_for_request = self.state_storage.data_by_request[request_id_of_eof]
 
         for ym, items_by_id in data_for_request.items():
 
@@ -176,7 +97,7 @@ class QuantityAndProfit(Worker):
             self.out_queue.send(serialized_message)
         
         # Clean up state
-        self._delete_state(request_id_of_eof)
+        self.state_storage.delete_state(request_id_of_eof)
 
     def close(self):
         try:

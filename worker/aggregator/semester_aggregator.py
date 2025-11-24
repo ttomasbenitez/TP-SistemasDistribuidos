@@ -85,7 +85,7 @@ class SemesterAggregator(Worker):
             finally:
                 self._dec_inflight(message.request_id)
         
-        data_input_queue.start_consuming(__on_message__, prefetch_count=1)
+        data_input_queue.start_consuming(__on_message__)
 
    
     def _send_grouped_item(self, message, item, data_output_queue):
