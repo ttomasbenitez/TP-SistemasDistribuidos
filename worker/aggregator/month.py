@@ -9,6 +9,8 @@ import os
 from multiprocessing import Process, Value
 from utils.heartbeat import start_heartbeat_sender
 import hashlib
+from pkg.message.utils import calculate_sub_message_id
+from pkg.message.constants import SUB_MESSAGE_START_ID
 
 
 class AggregatorMonth(Worker):
@@ -83,6 +85,7 @@ class AggregatorMonth(Worker):
         return groups
     
     def _send_groups_sharded(self, original_message: Message, groups: dict, output_queues: list):
+        sub_msg_id = SUB_MESSAGE_START_ID
         for key, items in groups.items():
             # key is "YYYY-MM"
             # Use hash to select queue
@@ -91,9 +94,11 @@ class AggregatorMonth(Worker):
             target_queue = output_queues[queue_index]
             
             new_chunk = ''.join(item.serialize() for item in items)
-            new_message = original_message.new_from_original(new_chunk)
+            new_msg_num = calculate_sub_message_id(original_message.msg_num, sub_msg_id)
+            new_message = original_message.new_from_original(new_chunk, msg_num=new_msg_num)
             serialized = new_message.serialize()
             target_queue.send(serialized)
+            sub_msg_id += 1
 
     def close(self):
         try:

@@ -1,4 +1,5 @@
 import datetime
+from pkg.message.constants import SUB_MESSAGE_MULTIPLIER
 
 def get_items_from_csv_bytes(data: bytes, item_class):
     """
@@ -61,3 +62,12 @@ def parse_date(part):
         return datetime.datetime.fromisoformat(part)
     except (ValueError, TypeError):
         return ''
+
+def calculate_sub_message_id(original_id, sub_id):
+    """
+    Calcula el ID del sub-mensaje basado en el ID original y el sub-ID.
+    :param original_id: ID del mensaje original.
+    :param sub_id: ID del sub-mensaje.
+    :return: ID del sub-mensaje calculado.
+    """
+    return original_id * SUB_MESSAGE_MULTIPLIER + sub_id

@@ -6,6 +6,8 @@ import signal
 import logging
 from multiprocessing import Manager
 from utils.heartbeat import start_heartbeat_sender
+from pkg.message.utils import calculate_sub_message_id
+from pkg.message.constants import SUB_MESSAGE_START_ID
 
 class Worker(ABC):
     
@@ -95,11 +97,14 @@ class Worker(ABC):
             print(f"Error al detener: {type(e).__name__}: {e}")
            
     def _send_groups(self, original_message: Message, groups: dict, out_middleware: MessageMiddleware):
+        sub_msg_id = SUB_MESSAGE_START_ID
         for key, items in groups.items():
             new_chunk = ''.join(item.serialize() for item in items)
-            new_message = original_message.new_from_original(new_chunk)
+            new_msg_num = calculate_sub_message_id(original_message.msg_num, sub_msg_id)
+            new_message = original_message.new_from_original(new_chunk, msg_num=new_msg_num)
             serialized = new_message.serialize()
             out_middleware.send(serialized)
+            sub_msg_id += 1
          
     def close(self):
         try:

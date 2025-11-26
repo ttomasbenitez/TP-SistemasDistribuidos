@@ -30,3 +30,7 @@ QUERY_4 = 'q4'
 
 MAX_PROFIT = 'profit_sum'
 MAX_QUANTITY = 'sellings_qty'
+
+# Sub-message constants
+SUB_MESSAGE_MULTIPLIER = 100
+SUB_MESSAGE_START_ID = 1

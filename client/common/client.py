@@ -20,6 +20,7 @@ class Client:
         self._socket.bind(('', 0))
         self._protocol = None
         self._request_id = None
+        self._msg_num = 0
     
         signal.signal(signal.SIGTERM, self.__handle_shutdown)
         signal.signal(signal.SIGINT, self.__handle_shutdown)
@@ -65,7 +66,8 @@ class Client:
             file_reader = FileReader(file_path, int(os.getenv('MAX_BATCH_SIZE')))
             while file_reader.has_more_data():
                 data = file_reader.get_chunk()
-                self._protocol.send_message(Message(self._request_id, message_type, 0, data).serialize())
+                self._msg_num += 1
+                self._protocol.send_message(Message(self._request_id, message_type, self._msg_num, data).serialize())
             file_reader.close()
 
         logging.info(f'action: send_data_folder | folder: {folder_path} | result: success')
@@ -75,7 +77,8 @@ class Client:
         Sends an EOF message to the gateway to indicate the end of data transmission.
         """
         try:
-            self._protocol.send_message(Message(self._request_id, MESSAGE_TYPE_EOF, 0, '').serialize())
+            self._msg_num += 1
+            self._protocol.send_message(Message(self._request_id, MESSAGE_TYPE_EOF, self._msg_num, '').serialize())
             logging.info(f'action: send_eof | result: success')
         except Exception as e:
             logging.error(f'action: send_eof | result: fail | error: {e}')
