@@ -618,11 +618,14 @@ services:
       INPUT_QUEUE_1: aggregated-store-q4-queue
       INPUT_QUEUE_2: users-queue
       OUTPUT_QUEUE_1: top-clients-queue
+      STORAGE_DIR: ./data/top-three-clients
       LOG_LEVEL: INFO
     networks:
     - testing_net
     depends_on:
     - gateway
+    volumes:
+      - ./data/top-three-clients:/data/top-three-clients
 
   join-stores-q4:
     container_name: join-stores-q4

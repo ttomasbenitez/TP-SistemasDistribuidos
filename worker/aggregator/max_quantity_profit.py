@@ -49,7 +49,7 @@ class QuantityAndProfit(Worker):
             if request_id not in self.state_storage.data_by_request:
                 self.state_storage.data_by_request[request_id] = {}
             
-            if ym not in  self.state_storage.data_by_request[request_id]:
+            if ym not in self.state_storage.data_by_request[request_id]:
                  self.state_storage.data_by_request[request_id][ym] = {}
 
             month_bucket = self.state_storage.data_by_request[request_id][ym]

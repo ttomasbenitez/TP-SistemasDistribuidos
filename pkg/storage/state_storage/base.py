@@ -45,7 +45,7 @@ class StateStorage(ABC):
         
         try:
             with open(temp_filepath, "w") as f:
-                self.save_state_to_file(f, request_id)
+                self._save_state_to_file(f, request_id)
                 f.flush()
                 os.fsync(f.fileno())
             
