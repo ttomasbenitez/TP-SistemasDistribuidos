@@ -115,8 +115,10 @@ services:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: year-filtered-queue-q1-q3
       EOF_SELF_QUEUE: EOF-filter-time-1
-      OUTPUT_QUEUE_1: time-filtered-queue-q1
-      OUTPUT_QUEUE_2: time-filtered-queue-q3
+      OUTPUT_QUEUE_Q1_1: time-filtered-queue-q1-1
+      OUTPUT_QUEUE_Q1_2: time-filtered-queue-q1-2
+      OUTPUT_QUEUE_Q1_3: time-filtered-queue-q1-3
+      OUTPUT_QUEUE_Q3: time-filtered-queue-q3
       EOF_QUEUE_NODO_1: EOF-filter-time-1
       EOF_QUEUE_NODO_2: EOF-filter-time-2
       EXCHANGE_NAME: time-filtered-exchange
@@ -138,8 +140,10 @@ services:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: year-filtered-queue-q1-q3
       EOF_SELF_QUEUE: EOF-filter-time-2
-      OUTPUT_QUEUE_1: time-filtered-queue-q1
-      OUTPUT_QUEUE_2: time-filtered-queue-q3
+      OUTPUT_QUEUE_Q1_1: time-filtered-queue-q1-1
+      OUTPUT_QUEUE_Q1_2: time-filtered-queue-q1-2
+      OUTPUT_QUEUE_Q1_3: time-filtered-queue-q1-3
+      OUTPUT_QUEUE_Q3: time-filtered-queue-q3
       EOF_QUEUE_NODO_1: EOF-filter-time-1
       EOF_QUEUE_NODO_2: EOF-filter-time-2
       EXCHANGE_NAME: time-filtered-exchange
@@ -160,8 +164,10 @@ services:
       CONTAINER_NAME: filter-time-eof-service
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE: eof-service-filter-time
-      OUTPUT_QUEUE_1: time-filtered-queue-q1
-      OUTPUT_QUEUE_2: time-filtered-queue-q3
+      OUTPUT_QUEUE_1: time-filtered-queue-q1-1
+      OUTPUT_QUEUE_2: time-filtered-queue-q1-2
+      OUTPUT_QUEUE_3: time-filtered-queue-q1-3
+      OUTPUT_QUEUE_4: time-filtered-queue-q3
       EXCHANGE_NAME: time-filtered-exchange
       LOG_LEVEL: INFO
       EXPECTED_ACKS: 2
@@ -178,7 +184,7 @@ services:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
       CONTAINER_NAME: filter-amount-1
       RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE_1: time-filtered-queue-q1
+      INPUT_QUEUE_1: time-filtered-queue-q1-1
       EXCHANGE_NAME: results-exchange
       EOF_SELF_QUEUE: EOF-filter-amount-1
       EOF_QUEUE_NODO_1: EOF-filter-amount-1
@@ -201,7 +207,7 @@ services:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
       CONTAINER_NAME: filter-amount-2
       RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE_1: time-filtered-queue-q1
+      INPUT_QUEUE_1: time-filtered-queue-q1-2
       EXCHANGE_NAME: results-exchange
       EOF_SELF_QUEUE: EOF-filter-amount-2
       EOF_QUEUE_NODO_1: EOF-filter-amount-1
@@ -224,7 +230,7 @@ services:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
       CONTAINER_NAME: filter-amount-3
       RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE_1: time-filtered-queue-q1
+      INPUT_QUEUE_1: time-filtered-queue-q1-3
       EXCHANGE_NAME: results-exchange
       EOF_SELF_QUEUE: EOF-filter-amount-3
       EOF_QUEUE_NODO_1: EOF-filter-amount-1
@@ -681,7 +687,7 @@ services:
       USERS_FOLDER_PATH: data/users/
       TRANSACTIONS_FOLDER_PATH: data/transactions/
       TRANSACTION_ITEMS_FOLDER_PATH: data/transaction_items/
-      MAX_BATCH_SIZE: 70000
+      MAX_BATCH_SIZE: 100000
     depends_on:
       - gateway
     networks:

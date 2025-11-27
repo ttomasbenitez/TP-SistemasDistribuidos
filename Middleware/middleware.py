@@ -61,11 +61,15 @@ class MessageMiddlewareQueue(MessageMiddleware):
         self.channel = self.connection.channel()
         self.channel.queue_declare(queue=queue_name, durable=True)
 
-    def start_consuming(self, on_message_callback):
+    def start_consuming(self, on_message_callback, manual_ack=False, prefetch_count=2):
         def callback(ch, method, properties, body):
-            on_message_callback(body)
-            ch.basic_ack(delivery_tag=method.delivery_tag)
+            if manual_ack:
+                on_message_callback(body, ch, method)
+            else:
+                on_message_callback(body)
+                ch.basic_ack(delivery_tag=method.delivery_tag)
             
+        self.channel.basic_qos(prefetch_count=prefetch_count)
         self.channel.basic_consume(queue=self.queue_name, on_message_callback=callback, auto_ack=False)
             
         self.channel.start_consuming()

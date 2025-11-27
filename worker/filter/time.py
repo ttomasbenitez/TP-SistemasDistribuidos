@@ -8,12 +8,15 @@ from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_TRANSACTIONS
 from multiprocessing import Process
 from utils.heartbeat import start_heartbeat_sender
 
+import hashlib
+
 class FilterTimeNode(Worker):
     
     def __init__(self, 
                  data_input_queue: str, 
                  data_output_exchange: str, 
-                 output_exchange_queues: dict,
+                 q1_output_queues: list,
+                 q3_output_queue: str,
                  eof_output_exchange: str,
                  eof_output_queues: dict,
                  eof_self_queue: str,
@@ -25,7 +28,8 @@ class FilterTimeNode(Worker):
         self.__init_middlewares_handler__()
         self.data_input_queue = data_input_queue
         self.data_output_exchange = data_output_exchange
-        self.output_exchange_queues = output_exchange_queues
+        self.q1_output_queues = q1_output_queues
+        self.q3_output_queue = q3_output_queue
         self.eof_output_exchange = eof_output_exchange
         self.eof_output_queues = eof_output_queues
         self.host = host
@@ -48,9 +52,12 @@ class FilterTimeNode(Worker):
         
     def _consume_data_queue(self):
         data_in_queue = MessageMiddlewareQueue(self.host, self.data_input_queue)
-        data_output_exchange = MessageMiddlewareExchange(self.host, self.data_output_exchange, self.output_exchange_queues)
+        
+        q1_queues = [MessageMiddlewareQueue(self.host, q) for q in self.q1_output_queues]
+        q3_queue = MessageMiddlewareQueue(self.host, self.q3_output_queue)
+        
         eof_output_exchange = MessageMiddlewareExchange(self.host, self.eof_output_exchange, self.eof_output_queues)
-        self.message_middlewares.extend([data_in_queue, data_output_exchange, eof_output_exchange])
+        self.message_middlewares.extend([data_in_queue, q3_queue, eof_output_exchange] + q1_queues)
         
         def __on_message__(message):
             try:
@@ -59,6 +66,13 @@ class FilterTimeNode(Worker):
                 if message.type == MESSAGE_TYPE_EOF:
                     logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
                     eof_output_exchange.send(message.serialize(), str(message.type))
+                    
+                    # Broadcast EOF to all Q1 queues
+                    for q in q1_queues:
+                        q.send(message.serialize())
+                    
+                    # Send EOF to Q3 queue
+                    q3_queue.send(message.serialize())
                     return
 
                 logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
@@ -82,7 +96,15 @@ class FilterTimeNode(Worker):
                 if new_chunk:
                     message.update_content(new_chunk)
                     serialized = message.serialize()
-                    data_output_exchange.send(serialized, str(message.type))
+                    
+                    # Send to Q3 (broadcast/single)
+                    q3_queue.send(serialized)
+                    
+                    # Send to Q1 (sharded)
+                    # Hash msg_num to select queue
+                    hash_val = int(hashlib.sha256(str(message.msg_num).encode()).hexdigest(), 16)
+                    queue_index = hash_val % len(q1_queues)
+                    q1_queues[queue_index].send(serialized)
                     
             except Exception as e:
                 logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
@@ -93,19 +115,12 @@ class FilterTimeNode(Worker):
 
 def initialize_config():
     """ Parse env variables to find program config params
-
-    Function that search and parse program configuration parameters in the
-    program environment variables first and the in a config file. 
-    If at least one of the config parameters is not found a KeyError exception 
-    is thrown. If a parameter could not be parsed, a ValueError is thrown. 
-    If parsing succeeded, the function returns a dict with config parameters
     """
     config_params = {
         "rabbitmq_host": os.getenv('RABBITMQ_HOST'),
         "input_queue": os.getenv('INPUT_QUEUE_1'),
         "eof_self_queue": os.getenv('EOF_SELF_QUEUE'),
-        "output_queue_1": os.getenv('OUTPUT_QUEUE_1'),
-        "output_queue_2": os.getenv('OUTPUT_QUEUE_2'),
+        "q3_output_queue": os.getenv('OUTPUT_QUEUE_Q3'),
         "eof_queue_1": os.getenv('EOF_QUEUE_NODO_1'),
         "eof_queue_2": os.getenv('EOF_QUEUE_NODO_2'),
         "output_exchange_filter_time": os.getenv('EXCHANGE_NAME'),
@@ -113,18 +128,31 @@ def initialize_config():
         "eof_service_queue": os.getenv('EOF_SERVICE_QUEUE'),
         "logging_level": os.getenv('LOG_LEVEL', 'INFO')
     }
+    
+    # Read Q1 output queues
+    q1_queues = []
+    i = 1
+    while True:
+        queue = os.getenv(f'OUTPUT_QUEUE_Q1_{i}')
+        if not queue:
+            break
+        q1_queues.append(queue)
+        i += 1
+    config_params["q1_output_queues"] = q1_queues
 
     required_keys = [
         "rabbitmq_host",
         "input_queue",
-        "output_queue_1",
-        "output_queue_2",
+        "q3_output_queue",
         "output_exchange_filter_time",
     ]
 
     missing_keys = [key for key in required_keys if config_params[key] is None]
     if missing_keys:
         raise ValueError(f"Expected value(s) not found for: {', '.join(missing_keys)}. Aborting filter.")
+    
+    if not config_params["q1_output_queues"]:
+         raise ValueError("Expected at least one Q1 output queue. Aborting filter.")
     
     return config_params
 
@@ -134,15 +162,15 @@ def main():
 
     initialize_log(config_params["logging_level"])
 
-    output_exchange_queues = {config_params["output_queue_1"]: [str(MESSAGE_TYPE_TRANSACTIONS), str(MESSAGE_TYPE_EOF)], 
-                            config_params["output_queue_2"]: [str(MESSAGE_TYPE_TRANSACTIONS), str(MESSAGE_TYPE_EOF)]}
+    # output_exchange_queues no longer used for data, but maybe for EOF? No, EOF uses eof_output_queues
     
     eof_output_queues = {config_params["eof_queue_1"]: [str(MESSAGE_TYPE_EOF)],
                         config_params["eof_queue_2"]: [str(MESSAGE_TYPE_EOF)]}
 
     filter = FilterTimeNode(config_params["input_queue"], 
                             config_params["output_exchange_filter_time"],
-                            output_exchange_queues,
+                            config_params["q1_output_queues"],
+                            config_params["q3_output_queue"],
                             config_params["eof_exchange_name"],
                             eof_output_queues,
                             config_params["eof_self_queue"],
