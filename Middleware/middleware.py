@@ -66,8 +66,12 @@ class MessageMiddlewareQueue(MessageMiddleware):
             if manual_ack:
                 on_message_callback(body, ch, method)
             else:
-                on_message_callback(body)
-                ch.basic_ack(delivery_tag=method.delivery_tag)
+                try:
+                    on_message_callback(body)
+                    ch.basic_ack(delivery_tag=method.delivery_tag)
+                except Exception as e:
+                    logging.error(f"[Middleware] Error processing message: {e}")
+                    ch.basic_nack(delivery_tag=method.delivery_tag)
             
         self.channel.basic_qos(prefetch_count=prefetch_count)
         self.channel.basic_consume(queue=self.queue_name, on_message_callback=callback, auto_ack=False)

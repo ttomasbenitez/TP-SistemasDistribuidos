@@ -193,6 +193,7 @@ services:
       EOF_EXCHANGE_NAME: eof-exchange-filter-amount
       EOF_SERVICE_QUEUE: eof-service-filter-amount
       EOF_FINAL_QUEUE: eof-final-filter-amount
+      TOTAL_SHARDS: 3
       LOG_LEVEL: INFO
     networks:
     - testing_net
@@ -216,6 +217,7 @@ services:
       EOF_EXCHANGE_NAME: eof-exchange-filter-amount
       EOF_SERVICE_QUEUE: eof-service-filter-amount
       EOF_FINAL_QUEUE: eof-final-filter-amount
+      TOTAL_SHARDS: 3
       LOG_LEVEL: INFO
     networks:
     - testing_net
@@ -239,6 +241,7 @@ services:
       EOF_EXCHANGE_NAME: eof-exchange-filter-amount
       EOF_SERVICE_QUEUE: eof-service-filter-amount
       EOF_FINAL_QUEUE: eof-final-filter-amount
+      TOTAL_SHARDS: 3
       LOG_LEVEL: INFO
     networks:
     - testing_net
@@ -662,7 +665,7 @@ services:
       USERS_FOLDER_PATH: data/users/
       TRANSACTIONS_FOLDER_PATH: data/transactions/
       TRANSACTION_ITEMS_FOLDER_PATH: data/transaction_items/
-      MAX_BATCH_SIZE: 50000
+      MAX_BATCH_SIZE: 150000
     depends_on:
       - gateway
     networks:
@@ -687,7 +690,7 @@ services:
       USERS_FOLDER_PATH: data/users/
       TRANSACTIONS_FOLDER_PATH: data/transactions/
       TRANSACTION_ITEMS_FOLDER_PATH: data/transaction_items/
-      MAX_BATCH_SIZE: 100000
+      MAX_BATCH_SIZE: 200000
     depends_on:
       - gateway
     networks:

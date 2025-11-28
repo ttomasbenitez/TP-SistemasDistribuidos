@@ -101,9 +101,8 @@ class FilterTimeNode(Worker):
                     q3_queue.send(serialized)
                     
                     # Send to Q1 (sharded)
-                    # Hash msg_num to select queue
-                    hash_val = int(hashlib.sha256(str(message.msg_num).encode()).hexdigest(), 16)
-                    queue_index = hash_val % len(q1_queues)
+                    # Modulo msg_num to select queue
+                    queue_index = message.msg_num % len(q1_queues)
                     q1_queues[queue_index].send(serialized)
                     
             except Exception as e:

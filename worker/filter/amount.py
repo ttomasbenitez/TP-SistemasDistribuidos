@@ -9,7 +9,8 @@ from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_QUERY_1_RESULT
 from multiprocessing import Process
 from utils.heartbeat import start_heartbeat_sender
 
-BATCH_SIZE = 100
+MAX_PENDING_SIZE = 1000
+AMOUNT_THRESHOLD = 75
 
 class FilterAmountNode(Worker):
     
@@ -22,7 +23,8 @@ class FilterAmountNode(Worker):
                  eof_service_queue: str, 
                  eof_final_queue: str, 
                  host: str, 
-                 amount_to_filter: int):
+                 amount_to_filter: int,
+                 total_shards: int):
         
         self.__init_manager__()
         self.__init_middlewares_handler__()
@@ -36,6 +38,7 @@ class FilterAmountNode(Worker):
         self.eof_final_queue = eof_final_queue
         self.clients = []
         self.amount_to_filter = amount_to_filter
+        self.total_shards = total_shards
         
     def start(self):
        
@@ -56,64 +59,96 @@ class FilterAmountNode(Worker):
         eof_output_exchange = MessageMiddlewareExchange(self.host, self.eof_output_exchange, self.eof_output_queues)
         self.message_middlewares.extend([data_input_queue, data_output_exchange, eof_output_exchange])
         
-        # Diccionario para guardar request_id -> set(msg_num)
-        self.seen_messages = {}
-        self.unacked_count = 0
+        # Diccionario para guardar request_id -> last_contiguous_msg_num
+        self.last_contiguous_msg_num = {}
+        # Diccionario para guardar request_id -> set(pending_messages)
+        self.pending_messages = {}
 
-        def __on_message__(message_body, ch, method):
+        def __on_message__(message_body):
             try:
                 message = Message.deserialize(message_body)
 
                 if message.type == MESSAGE_TYPE_EOF:
-                    self._handle_eof(message, eof_output_exchange, ch, method)
+                    self._handle_eof(message, eof_output_exchange)
                     return
 
-                self._handle_message(message, data_output_exchange, ch, method)
+                self._handle_message(message, data_output_exchange)
 
             except Exception as e:
                 logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
+                raise e
 
-        data_input_queue.start_consuming(__on_message__, manual_ack=True, prefetch_count=BATCH_SIZE)
+        data_input_queue.start_consuming(__on_message__, manual_ack=False)
 
-    def _handle_eof(self, message, eof_output_exchange, ch, method):
+    def _handle_eof(self, message, eof_output_exchange):
         logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
         # Send EOF to service queue
         eof_output_exchange.send(message.serialize(), str(message.type))
         
         # Limpiar estado de duplicados para este request_id
-        if message.request_id in self.seen_messages:
-            del self.seen_messages[message.request_id]
+        if message.request_id in self.last_contiguous_msg_num:
+            del self.last_contiguous_msg_num[message.request_id]
+        if message.request_id in self.pending_messages:
+            del self.pending_messages[message.request_id]
         
-        # ACK acumulado al recibir EOF
-        ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
-        logging.info(f"action: ACK EOF | count: {self.unacked_count}")
-        self.unacked_count = 0
+        logging.info(f"action: ACK EOF")
 
-    def _handle_message(self, message, data_output_exchange, ch, method):
-        # Deduplicación
-        if message.request_id not in self.seen_messages:
-            self.seen_messages[message.request_id] = set()
+    def _handle_message(self, message, data_output_exchange):
+        self._initialize_request_state(message.request_id)
         
-        if message.msg_num in self.seen_messages[message.request_id]:
-            logging.info(f"action: Duplicate message received | request_id: {message.request_id} | msg_num: {message.msg_num}")
-            self.unacked_count += 1
-        else:
-            self.seen_messages[message.request_id].add(message.msg_num)
-            
-            logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
-            self._ensure_request(message.request_id)
-            self._inc_inflight(message.request_id)
+        if self._is_duplicate(message):
+            return
 
-            self._process_and_send_items(message, data_output_exchange)
-            
-            self._dec_inflight(message.request_id)
-            self.unacked_count += 1
+        self.pending_messages[message.request_id].add(message.msg_num)
+        self._clean_window_if_needed(message.request_id)
+        
+        # Procesar mensaje
+        logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type} | msg_num: {message.msg_num}")
+        self._ensure_request(message.request_id)
+        self._inc_inflight(message.request_id)
 
-        # Batch ACK
-        if self.unacked_count >= BATCH_SIZE:
-            logging.info(f"action: Sending batch ACK | count: {self.unacked_count}")
-            ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
-            self.unacked_count = 0
+        self._process_and_send_items(message, data_output_exchange)
+        
+        self._dec_inflight(message.request_id)
+
+        self._update_contiguous_sequence(message)
+
+    def _initialize_request_state(self, request_id):
+        if request_id not in self.last_contiguous_msg_num:
+            self.last_contiguous_msg_num[request_id] = 0
+            self.pending_messages[request_id] = set()
+
+    def _is_duplicate(self, message):
+        last_cont = self.last_contiguous_msg_num[message.request_id]
+        
+        if message.msg_num <= last_cont:
+            logging.info(f"action: Duplicate message received | request_id: {message.request_id} | msg_num: {message.msg_num} | last_contiguous: {last_cont}")
+            return True
+        
+        if message.msg_num in self.pending_messages[message.request_id]:
+             logging.info(f"action: Duplicate pending message received | request_id: {message.request_id} | msg_num: {message.msg_num}")
+             return True
+             
+        return False
+
+    def _clean_window_if_needed(self, request_id):
+        if len(self.pending_messages[request_id]) > MAX_PENDING_SIZE:
+            logging.info(f"action: Clearing pending messages window | request_id: {request_id} | size: {len(self.pending_messages[request_id])}")
+            self.pending_messages[request_id].clear()
+
+    def _update_contiguous_sequence(self, message):
+        last_cont = self.last_contiguous_msg_num[message.request_id]
+        prev_expected = message.msg_num - self.total_shards
+        
+        if prev_expected <= last_cont:
+            self.last_contiguous_msg_num[message.request_id] = message.msg_num
+            self.pending_messages[message.request_id].remove(message.msg_num)
+            
+            current_check = message.msg_num + self.total_shards
+            while current_check in self.pending_messages[message.request_id]:
+                self.last_contiguous_msg_num[message.request_id] = current_check
+                self.pending_messages[message.request_id].remove(current_check)
+                current_check += self.total_shards
 
     def _process_and_send_items(self, message, data_output_exchange):
         items = message.process_message()
@@ -166,6 +201,7 @@ def initialize_config():
         "eof_self_queue": os.getenv('EOF_SELF_QUEUE'),
         "eof_service_queue": os.getenv('EOF_SERVICE_QUEUE'),
         "eof_final_queue": os.getenv('EOF_FINAL_QUEUE'),
+        "total_shards": int(os.getenv('TOTAL_SHARDS', 3)),
     }
     
     required_keys = [
@@ -196,7 +232,8 @@ def main():
                             config_params["eof_service_queue"],
                             config_params["eof_final_queue"],
                             config_params["rabbitmq_host"],  
-                            75)
+                            AMOUNT_THRESHOLD,
+                            config_params["total_shards"])
     filter.start()
 
 if __name__ == "__main__":
