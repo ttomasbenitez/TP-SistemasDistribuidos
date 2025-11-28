@@ -13,24 +13,20 @@ class StateStorage(ABC):
         if not os.path.exists(self.storage_dir):
             os.makedirs(self.storage_dir)
         
-    def _load_state(self):
+    def load_state(self, request_id):
         """Carga el estado desde los archivos en el directorio de almacenamiento."""
         logging.info(f"Cargando estado desde {self.storage_dir}")
-        for filename in os.listdir(self.storage_dir):
-            if not filename.endswith(".txt"):
-                continue
+        
+        filepath = os.path.join(self.storage_dir, f"{request_id}.txt")
                 
-            try:
-                request_id = int(filename.split(".")[0])
-                filepath = os.path.join(self.storage_dir, filename)
-                
-                with self._lock:
-                    with open(filepath, "r") as f:
-                        self._load_state_from_file(f, request_id)
-                        
-                logging.info(f"Estado cargado para request_id: {request_id}")
-            except Exception as e:
-                logging.error(f"Error al cargar estado de {filename}: {e}")
+        try:
+            with self._lock:
+                with open(filepath, "r") as f:
+                    self._load_state_from_file(f, request_id)
+                    
+            logging.info(f"Estado cargado para request_id: {request_id}")
+        except Exception as e:
+            logging.error(f"Error al cargar estado de {filepath}: {e}")
 
     @abstractmethod
     def _load_state_from_file(self, file_handle, request_id):

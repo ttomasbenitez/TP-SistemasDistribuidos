@@ -67,7 +67,7 @@ class QuantityAndProfit(Worker):
     
     def _send_results_by_date(self, request_id_of_eof):
         chunk = ''
-        self.state_storage._load_state(request_id_of_eof)
+        self.state_storage.load_state(request_id_of_eof)
         # Check if we have data for this request
         if request_id_of_eof not in  self.state_storage.data_by_request:
             logging.warning(f"No hay datos para request_id: {request_id_of_eof}")

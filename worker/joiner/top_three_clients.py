@@ -90,7 +90,7 @@ class TopThreeClientsJoiner(Joiner):
     def _send_results(self, message):
         data_output_queue = MessageMiddlewareQueue(self.host, self.data_output_queue)
         self.message_middlewares.append(data_output_queue)
-        self.state_storage._load_state(message.request_id)
+        self.state_storage.load_state(message.request_id)
         self._process_top_3_by_request(message.request_id, data_output_queue)
         self._send_eof(message, data_output_queue)
         self.state_storage.delete_state(message.request_id)
