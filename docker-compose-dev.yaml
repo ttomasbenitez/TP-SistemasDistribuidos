@@ -341,11 +341,14 @@ services:
       INPUT_QUEUE_1: aggregated-month-queue-1
       OUTPUT_QUEUE_1: products-results-queue
       EOF_SERVICE_QUEUE: eof-service-aggregator-quantity-profit
+      STORAGE_DIR: ./data/aggregator-quantity-profit-1
       LOG_LEVEL: INFO
     networks:
     - testing_net
     depends_on:
     - gateway
+    volumes:
+      - ./data/aggregator-quantity-profit-1:/data/aggregator-quantity-profit-1
 
   aggregator-quantity-profit-2:
     container_name: aggregator-quantity-profit-2
@@ -358,11 +361,14 @@ services:
       INPUT_QUEUE_1: aggregated-month-queue-2
       OUTPUT_QUEUE_1: products-results-queue
       EOF_SERVICE_QUEUE: eof-service-aggregator-quantity-profit
+      STORAGE_DIR: ./data/aggregator-quantity-profit-2
       LOG_LEVEL: INFO
     networks:
     - testing_net
     depends_on:
     - gateway
+    volumes:
+      - ./data/aggregator-quantity-profit-2:/data/aggregator-quantity-profit-2
 
   aggregator-quantity-profit-3:
     container_name: aggregator-quantity-profit-3
@@ -375,11 +381,14 @@ services:
       INPUT_QUEUE_1: aggregated-month-queue-3
       OUTPUT_QUEUE_1: products-results-queue
       EOF_SERVICE_QUEUE: eof-service-aggregator-quantity-profit
+      STORAGE_DIR: ./data/aggregator-quantity-profit-3
       LOG_LEVEL: INFO
     networks:
     - testing_net
     depends_on:
     - gateway
+    volumes:
+      - ./data/aggregator-quantity-profit-3:/data/aggregator-quantity-profit-3
 
   aggregator-quantity-profit-eof-service:
     container_name: aggregator-quantity-profit-eof-service

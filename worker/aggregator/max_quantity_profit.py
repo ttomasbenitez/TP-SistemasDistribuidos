@@ -40,7 +40,7 @@ class QuantityAndProfit(Worker):
         """
         Acumula cantidad y subtotal por año, mes y producto
         """
-        updated = False
+        
         for it in items:
             ym = str(it.year_month_created_at)
             item_id = it.item_id               
@@ -60,10 +60,8 @@ class QuantityAndProfit(Worker):
             else:
                 agg_item.quantity += it.quantity
                 agg_item.subtotal += it.subtotal
-            updated = True
             
-        if updated:
-            self.state_storage.save_state(request_id)
+        self.state_storage.save_state(request_id)
     
     def _send_results_by_date(self, request_id_of_eof):
         chunk = ''

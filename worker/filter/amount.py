@@ -68,7 +68,7 @@ class FilterAmountNode(Worker):
         self.pending_messages = {}
 
         # Cargar estado previo si existe
-        self.state_storage._load_state()
+        self.state_storage.load_state_all()
         for request_id, state in self.state_storage.data_by_request.items():
             self.last_contiguous_msg_num[request_id] = state.get('last_contiguous_msg_num', 0)
             self.pending_messages[request_id] = state.get('pending_messages', set())

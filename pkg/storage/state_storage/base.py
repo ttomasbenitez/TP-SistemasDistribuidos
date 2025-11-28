@@ -18,6 +18,10 @@ class StateStorage(ABC):
         logging.info(f"Cargando estado desde {self.storage_dir}")
         
         filepath = os.path.join(self.storage_dir, f"{request_id}.txt")
+        
+        if not os.path.exists(filepath):
+            logging.info(f"No hay estado persistido para request_id {request_id} en {filepath}")
+            return
                 
         try:
             with self._lock:
@@ -27,6 +31,25 @@ class StateStorage(ABC):
             logging.info(f"Estado cargado para request_id: {request_id}")
         except Exception as e:
             logging.error(f"Error al cargar estado de {filepath}: {e}")
+            
+    def load_state_all(self):
+        """Carga el estado de todos los archivos en el directorio de almacenamiento."""
+        logging.info(f"Cargando todos los estados desde {self.storage_dir}")
+        
+        try:
+            for filename in os.listdir(self.storage_dir):
+                if filename.endswith(".txt"):
+                    request_id = filename[:-4]  # Remover la extensión .txt
+                    filepath = os.path.join(self.storage_dir, filename)
+                    
+                    with self._lock:
+                        with open(filepath, "r") as f:
+                            self._load_state_from_file(f, request_id)
+                    
+                    logging.info(f"Estado cargado para request_id: {request_id}")
+                    
+        except Exception as e:
+            logging.error(f"Error al cargar estados desde {self.storage_dir}: {e}")
 
     @abstractmethod
     def _load_state_from_file(self, file_handle, request_id):
@@ -38,6 +61,7 @@ class StateStorage(ABC):
         al archivo existente, y luego limpia el buffer en RAM.
         """
         if request_id not in self.data_by_request:
+            logging.error(f"No hay estado en memoria para request_id {request_id}, nada que guardar.")
             return
 
         final_filepath = os.path.join(self.storage_dir, f"{request_id}.txt")
