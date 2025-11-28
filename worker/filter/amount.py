@@ -1,4 +1,5 @@
 from worker.base import Worker 
+from pkg.storage.state_storage.filter_amount import FilterAmountStateStorage
 from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
 import logging
 from pkg.message.message import Message
@@ -24,7 +25,8 @@ class FilterAmountNode(Worker):
                  eof_final_queue: str, 
                  host: str, 
                  amount_to_filter: int,
-                 total_shards: int):
+                 total_shards: int,
+                 storage_dir: str):
         
         self.__init_manager__()
         self.__init_middlewares_handler__()
@@ -39,6 +41,7 @@ class FilterAmountNode(Worker):
         self.clients = []
         self.amount_to_filter = amount_to_filter
         self.total_shards = total_shards
+        self.state_storage = FilterAmountStateStorage(storage_dir)
         
     def start(self):
        
@@ -63,6 +66,13 @@ class FilterAmountNode(Worker):
         self.last_contiguous_msg_num = {}
         # Diccionario para guardar request_id -> set(pending_messages)
         self.pending_messages = {}
+
+        # Cargar estado previo si existe
+        self.state_storage._load_state()
+        for request_id, state in self.state_storage.data_by_request.items():
+            self.last_contiguous_msg_num[request_id] = state.get('last_contiguous_msg_num', 0)
+            self.pending_messages[request_id] = state.get('pending_messages', set())
+            logging.info(f"Estado recuperado para request_id {request_id}: last_contiguous={self.last_contiguous_msg_num[request_id]}, pending_count={len(self.pending_messages[request_id])}")
 
         def __on_message__(message_body):
             try:
@@ -91,6 +101,9 @@ class FilterAmountNode(Worker):
         if message.request_id in self.pending_messages:
             del self.pending_messages[message.request_id]
         
+        # Borrar estado persistido
+        self.state_storage.delete_state(message.request_id)
+        
         logging.info(f"action: ACK EOF")
 
     def _handle_message(self, message, data_output_exchange):
@@ -112,6 +125,13 @@ class FilterAmountNode(Worker):
         self._dec_inflight(message.request_id)
 
         self._update_contiguous_sequence(message)
+
+        # Guardar estado
+        self.state_storage.data_by_request[message.request_id] = {
+            'msg_num': message.msg_num,
+            'last_contiguous_msg_num': self.last_contiguous_msg_num[message.request_id]
+        }
+        self.state_storage.save_state(message.request_id)
 
     def _initialize_request_state(self, request_id):
         if request_id not in self.last_contiguous_msg_num:
@@ -202,6 +222,7 @@ def initialize_config():
         "eof_service_queue": os.getenv('EOF_SERVICE_QUEUE'),
         "eof_final_queue": os.getenv('EOF_FINAL_QUEUE'),
         "total_shards": int(os.getenv('TOTAL_SHARDS', 3)),
+        "storage_dir": os.getenv('STORAGE_DIR', './data'),
     }
     
     required_keys = [
@@ -233,7 +254,8 @@ def main():
                             config_params["eof_final_queue"],
                             config_params["rabbitmq_host"],  
                             AMOUNT_THRESHOLD,
-                            config_params["total_shards"])
+                            config_params["total_shards"],
+                            config_params["storage_dir"])
     filter.start()
 
 if __name__ == "__main__":
