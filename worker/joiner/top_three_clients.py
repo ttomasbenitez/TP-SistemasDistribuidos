@@ -47,48 +47,50 @@ class TopThreeClientsJoiner(Joiner):
         data_input_queue.start_consuming(__on_message__)
         
     def _accumulate_items(self, items, request_id):
-        state = self.state_storage.data_by_request.setdefault(request_id, {
-            "users_by_store": {},
-            "users_birthdates": {}
-        })
-        users_by_store = state["users_by_store"]
-        store_id = None
+        with self.state_storage._lock:
+            state = self.state_storage.data_by_request.setdefault(request_id, {
+                "users_by_store": {},
+                "users_birthdates": {}
+            })
+            users_by_store = state["users_by_store"]
+            store_id = None
 
-        for item in items:
-            user_id = item.get_user()
-            if not user_id:
-                continue
+            for item in items:
+                user_id = item.get_user()
+                if not user_id:
+                    continue
 
-            store_id = store_id or item.get_store()
-            store_users = users_by_store.setdefault(store_id, {})
-            store_users[user_id] = store_users.get(user_id, 0) + 1
+                store_id = store_id or item.get_store()
+                store_users = users_by_store.setdefault(store_id, {})
+                store_users[user_id] = store_users.get(user_id, 0) + 1
 
-        if store_id is None:
-            return
-        
+            if store_id is None:
+                return
+            
         if self.messages_received >= SNAPSHOT_COUNT:
             self.state_storage.save_state(request_id)
             self.messages_received = 0
         
     def _process_items_to_join(self, message):
-        items = message.process_message()
-        state = self.state_storage.data_by_request.setdefault(message.request_id, {
-            "users_by_store": {},
-            "users_birthdates": {}
-        })
-        users_birthdates = state["users_birthdates"]
+        with self.state_storage._lock:
+            items = message.process_message()
+            state = self.state_storage.data_by_request.setdefault(message.request_id, {
+                "users_by_store": {},
+                "users_birthdates": {}
+            })
+            users_birthdates = state["users_birthdates"]
 
-        for item in items:
-            user_id = item.get_user_id()
-            birthdate = item.get_birthdate()
-            users_birthdates[user_id] = birthdate
+            for item in items:
+                user_id = item.get_user_id()
+                birthdate = item.get_birthdate()
+                users_birthdates[user_id] = birthdate
 
-        self.state_storage.save_state(message.request_id)
+            self.state_storage.save_state(message.request_id)
         
     def _send_results(self, message):
         data_output_queue = MessageMiddlewareQueue(self.host, self.data_output_queue)
         self.message_middlewares.append(data_output_queue)
-        self.state_storage.save_state(message.request_id)
+        self.state_storage._load_state(message.request_id)
         self._process_top_3_by_request(message.request_id, data_output_queue)
         self._send_eof(message, data_output_queue)
         self.state_storage.delete_state(message.request_id)
