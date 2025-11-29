@@ -24,8 +24,6 @@ class TopThreeClientsJoiner(Joiner):
         self.data_input_queue = data_input_queue
         self.data_output_queue = data_output_queue
         self.state_storage = TopThreeClientsStateStorage(storage_dir)
-        self.users_by_store = {}
-        self.messages_received = 0
 
     def _consume_data_queue(self):
         data_input_queue = MessageMiddlewareQueue(self.host, self.data_input_queue)
@@ -41,7 +39,6 @@ class TopThreeClientsJoiner(Joiner):
             items = message.process_message()
 
             if message.type == MESSAGE_TYPE_TRANSACTIONS:
-                self.messages_received += 1
                 self._accumulate_items(items, message.request_id)
                 
         data_input_queue.start_consuming(__on_message__)
