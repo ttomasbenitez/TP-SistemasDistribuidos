@@ -51,7 +51,7 @@ class Joiner(Worker, ABC):
                 logging.info(f"action: EOF message received {self.eofs_by_client[message.request_id]}/{self.expected_eofs} | request_id: {message.request_id} | type: {message.type}")
                 return
         try:
-            logging.info(f"action: EOF message received {self.eofs_by_client[message.request_id]}/{self.expected_eofs} | request_id: {message.request_id} | type: {message.type}")
+            logging.info(f"action: EOF message received {self.eofs_by_client[message.request_id]}/{self.expected_eofs} send results | request_id: {message.request_id} | type: {message.type}")
             self._send_results(message)
         except Exception as e:
             logging.error(f"Error al procesar mensajes pendientes: {e}")

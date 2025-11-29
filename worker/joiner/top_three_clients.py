@@ -47,51 +47,49 @@ class TopThreeClientsJoiner(Joiner):
         data_input_queue.start_consuming(__on_message__)
         
     def _accumulate_items(self, items, request_id):
-        # with self.state_storage._lock:
-        state = self.state_storage.data_by_request.setdefault(request_id, {
-            "users_by_store": {},
-            "users_birthdates": {}
-        })
-        users_by_store = state["users_by_store"]
-        store_id = None
+        with self.state_storage._lock:
+            state = self.state_storage.data_by_request.setdefault(request_id, {
+                "users_by_store": {},
+                "users_birthdates": {}
+            })
+            users_by_store = state["users_by_store"]
+            store_id = None
 
-        for item in items:
-            user_id = item.get_user()
-            if not user_id:
-                continue
+            for item in items:
+                user_id = item.get_user()
+                if not user_id:
+                    continue
 
-            store_id = store_id or item.get_store()
-            store_users = users_by_store.setdefault(store_id, {})
-            store_users[user_id] = store_users.get(user_id, 0) + 1
+                store_id = store_id or item.get_store()
+                store_users = users_by_store.setdefault(store_id, {})
+                store_users[user_id] = store_users.get(user_id, 0) + 1
 
-        if store_id is None:
-            return
+            if store_id is None:
+                return
         
-        # if self.messages_received >= SNAPSHOT_COUNT:
         self.state_storage.save_state(request_id)
         logging.info(f"Snapshot guardado | request_id: {request_id}")
-            # self.messages_received = 0
         
     def _process_items_to_join(self, message):
-        # with self.state_storage._lock:
-        items = message.process_message()
-        state = self.state_storage.data_by_request.setdefault(message.request_id, {
-            "users_by_store": {},
-            "users_birthdates": {}
-        })
-        users_birthdates = state["users_birthdates"]
+        with self.state_storage._lock:
+            items = message.process_message()
+            state = self.state_storage.data_by_request.setdefault(message.request_id, {
+                "users_by_store": {},
+                "users_birthdates": {}
+            })
+            users_birthdates = state["users_birthdates"]
 
-        for item in items:
-            user_id = item.get_user_id()
-            birthdate = item.get_birthdate()
-            users_birthdates[user_id] = birthdate
+            for item in items:
+                user_id = item.get_user_id()
+                birthdate = item.get_birthdate()
+                users_birthdates[user_id] = birthdate
 
         self.state_storage.save_state(message.request_id)
         
     def _send_results(self, message):
+        self.state_storage.load_state(message.request_id)
         data_output_queue = MessageMiddlewareQueue(self.host, self.data_output_queue)
         self.message_middlewares.append(data_output_queue)
-        self.state_storage.load_state(message.request_id)
         self._process_top_3_by_request(message.request_id, data_output_queue)
         self._send_eof(message, data_output_queue)
         self.state_storage.delete_state(message.request_id)
@@ -100,6 +98,8 @@ class TopThreeClientsJoiner(Joiner):
         saved_state = self.state_storage.data_by_request.get(request_id, {})
         users_by_store_state = saved_state.get("users_by_store", {})
         users_birthdates_state = saved_state.get("users_birthdates", {})
+        
+        chunk = ''
 
         for store, users in users_by_store_state.items():
             if store is None:
@@ -117,15 +117,14 @@ class TopThreeClientsJoiner(Joiner):
 
             top_3_users = [user for user in sorted_users if user[1] in unique_values]
 
-            chunk = ''
             for user_id, transaction_count in top_3_users:
                 birthdate = users_birthdates_state.get(user_id)
                 if birthdate:
                     chunk += Q4IntermediateResult(store, birthdate, transaction_count).serialize()
-
-            if chunk:
-                msg = Message(request_id, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT, 1, chunk)
-                data_output_queue.send(msg.serialize())
+        # TODO: numero de mensaje
+        if chunk:
+            msg = Message(request_id, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT, 1, chunk)
+            data_output_queue.send(msg.serialize())
         
 
     def _send_eof(self, message, data_output_queue):

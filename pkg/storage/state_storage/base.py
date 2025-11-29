@@ -87,8 +87,9 @@ class StateStorage(ABC):
     
     def delete_state(self, request_id):
         """Borra el estado de un request_id de memoria y disco."""
-        if request_id in self.data_by_request:
-            del self.data_by_request[request_id]
+        with self._lock:
+            if request_id in self.data_by_request:
+                del self.data_by_request[request_id]
             
         filepath = os.path.join(self.storage_dir, f"{request_id}.txt")
         if os.path.exists(filepath):

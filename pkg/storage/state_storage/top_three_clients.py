@@ -25,8 +25,8 @@ class TopThreeClientsStateStorage(StateStorage):
         users_by_store = state["users_by_store"]
         users_birthdates = state["users_birthdates"]
 
-        for line_num, raw_line in enumerate(file_handle, start=1):
-            line = raw_line.strip()
+        for line in file_handle:
+            line = line.strip()
             if not line:
                 continue
 
@@ -47,7 +47,7 @@ class TopThreeClientsStateStorage(StateStorage):
                 store_users[user_id] = store_users.get(user_id, 0) + count
                 continue
 
-            if kind == "U":
+            if kind == "B":
                 _k, user_id_str, birthdate = parts
 
                 try:
