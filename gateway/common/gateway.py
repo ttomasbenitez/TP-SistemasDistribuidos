@@ -37,6 +37,7 @@ class Gateway:
 
                 results_queue_name = f"{self._in_queue_prefix}_{self._request_id}"
                 results_in_queue = MessageMiddlewareQueue(self._rabbitmq_host, results_queue_name)
+                results_in_queue.channel.exchange_declare(exchange=self._output_exchange_name, exchange_type='topic', durable=True)
                 results_in_queue.bind_queue(
                     self._output_exchange_name,
                      str(self._request_id),

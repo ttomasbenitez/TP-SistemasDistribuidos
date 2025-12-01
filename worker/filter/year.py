@@ -14,6 +14,7 @@ class FilterYearNode(Worker):
                  data_input_queue: str,
                  data_output_exchange: str,
                  output_exchange_queues: dict,
+                 sharding_q4_amount: str,
                  eof_output_exchange: str,
                  eof_output_queues: dict,
                  eof_self_queue: str,
@@ -28,6 +29,7 @@ class FilterYearNode(Worker):
         self.data_input_queue = data_input_queue
         self.data_output_exchange = data_output_exchange
         self.output_exchange_queues = output_exchange_queues
+        self.sharding_q4_amount = sharding_q4_amount
         self.eof_output_exchange = eof_output_exchange
         self.eof_output_queues = eof_output_queues
         self.eof_service_queue = eof_service_queue
@@ -98,8 +100,9 @@ class FilterYearNode(Worker):
 
                 new_chunk = ''.join(it.serialize() for it in items if it.get_year() in self.years)
                 if new_chunk:
+                    sharding_key_q4 = message.msg_num % self.sharding_q4_amount
                     message.update_content(new_chunk)
-                    data_output_exchange.send(message.serialize(), str(message.type))
+                    data_output_exchange.send(message.serialize(), f"{str(message.type)}.q4.{sharding_key_q4}")
 
             except Exception as e:
                 logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
@@ -114,7 +117,6 @@ def initialize_config():
         "rabbitmq_host": os.getenv('RABBITMQ_HOST'),
         "input_queue": os.getenv('INPUT_QUEUE_1'),
         "output_queue_1": os.getenv('OUTPUT_QUEUE_1'),
-        "output_queue_2": os.getenv('OUTPUT_QUEUE_2'),
         "output_queue_3": os.getenv('OUTPUT_QUEUE_3'),
         "output_exchange_filter_year": os.getenv('EXCHANGE_NAME'),
         "eof_exchange_name": os.getenv('EOF_EXCHANGE_NAME'),
@@ -125,18 +127,30 @@ def initialize_config():
         "eof_final_queue": os.getenv('EOF_FINAL_QUEUE'),
         "logging_level": os.getenv('LOG_LEVEL', 'INFO'),
     }
+    
+    q4_queues = []
+    while True:
+        q_name = os.getenv(f'OUTPUT_QUEUE_Q4_{len(q4_queues)+1}')
+        if q_name is None:
+            break
+        q4_queues.append(q_name)
+        
+    config_params["output_queues_q4"] = q4_queues
 
     required_keys = [
         "rabbitmq_host",
         "input_queue",
         "output_queue_1",
-        "output_queue_2",
         "output_queue_3",
         "output_exchange_filter_year",
     ]
+    
     missing = [k for k in required_keys if config_params[k] is None]
     if missing:
         raise ValueError(f"Expected value(s) not found for: {', '.join(missing)}. Aborting filter.")
+    
+    if not config_params["output_queues_q4"]:
+         raise ValueError("Expected at least one Q1 output queue. Aborting filter.")
     return config_params
 
 
@@ -144,16 +158,23 @@ def main():
     config = initialize_config()
     initialize_log(config["logging_level"])
 
-   # TODO: hacer esto dinamico en base a config
-    output_exchange_queues =  {config["output_queue_1"]: [str(MESSAGE_TYPE_TRANSACTIONS), str(MESSAGE_TYPE_EOF)], 
-                                config["output_queue_2"]: [str(MESSAGE_TYPE_TRANSACTIONS), str(MESSAGE_TYPE_EOF)], 
-                                config["output_queue_3"]: [str(MESSAGE_TYPE_TRANSACTION_ITEMS), str(MESSAGE_TYPE_EOF)]}
+    output_exchange_queues =  {config["output_queue_1"]: [f"{str(MESSAGE_TYPE_TRANSACTIONS)}.#", str(MESSAGE_TYPE_EOF)], 
+                                config["output_queue_3"]: [f"{str(MESSAGE_TYPE_TRANSACTION_ITEMS)}.#", str(MESSAGE_TYPE_EOF)]}
+    
+    index = 0
+    for queue in config["output_queues_q4"]:
+        output_exchange_queues[queue] = [f"{str(MESSAGE_TYPE_TRANSACTIONS)}.q4.{index}", str(MESSAGE_TYPE_EOF)]
+        index += 1
+    
+    sharding_q4_amount = len(config["output_queues_q4"])
+   
     eof_output_queues = {config["eof_queue_1"]: [str(MESSAGE_TYPE_EOF)],
                             config["eof_queue_2"]: [str(MESSAGE_TYPE_EOF)]}
     node = FilterYearNode(
         config["input_queue"],
         config["output_exchange_filter_year"],
         output_exchange_queues,
+        sharding_q4_amount,
         config["eof_exchange_name"],
         eof_output_queues,
         config["eof_self_queue"],

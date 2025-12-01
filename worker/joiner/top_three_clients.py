@@ -123,7 +123,7 @@ class TopThreeClientsJoiner(Joiner):
             msg = Message(request_id, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT, 1, chunk)
             data_output_queue.send(msg.serialize())
         
-
+        
     def _send_eof(self, message, data_output_queue):
         data_output_queue.send(message.serialize())
         logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")

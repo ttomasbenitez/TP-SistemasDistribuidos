@@ -48,7 +48,8 @@ services:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: batches-queue
       OUTPUT_QUEUE_1: year-filtered-queue-q1-q3
-      OUTPUT_QUEUE_2: year-filtered-queue-q4
+      OUTPUT_QUEUE_Q4_1: year-filtered-queue-q4-1
+      OUTPUT_QUEUE_Q4_2: year-filtered-queue-q4-2
       OUTPUT_QUEUE_3: year-filtered-queue-q2
       EXCHANGE_NAME: year-filtered-exchange
       EOF_EXCHANGE_NAME: eof-exchange-filter-year
@@ -73,7 +74,8 @@ services:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: batches-queue
       OUTPUT_QUEUE_1: year-filtered-queue-q1-q3
-      OUTPUT_QUEUE_2: year-filtered-queue-q4
+      OUTPUT_QUEUE_Q4_1: year-filtered-queue-q4-1
+      OUTPUT_QUEUE_Q4_2: year-filtered-queue-q4-2
       OUTPUT_QUEUE_3: year-filtered-queue-q2
       EXCHANGE_NAME: year-filtered-exchange
       EOF_EXCHANGE_NAME: eof-exchange-filter-year
@@ -118,7 +120,8 @@ services:
       OUTPUT_QUEUE_Q1_1: time-filtered-queue-q1-1
       OUTPUT_QUEUE_Q1_2: time-filtered-queue-q1-2
       OUTPUT_QUEUE_Q1_3: time-filtered-queue-q1-3
-      OUTPUT_QUEUE_Q3: time-filtered-queue-q3
+      OUTPUT_QUEUE_Q3_1: time-filtered-queue-q3-1
+      OUTPUT_QUEUE_Q3_2: time-filtered-queue-q3-2
       EOF_QUEUE_NODO_1: EOF-filter-time-1
       EOF_QUEUE_NODO_2: EOF-filter-time-2
       EXCHANGE_NAME: time-filtered-exchange
@@ -143,7 +146,8 @@ services:
       OUTPUT_QUEUE_Q1_1: time-filtered-queue-q1-1
       OUTPUT_QUEUE_Q1_2: time-filtered-queue-q1-2
       OUTPUT_QUEUE_Q1_3: time-filtered-queue-q1-3
-      OUTPUT_QUEUE_Q3: time-filtered-queue-q3
+      OUTPUT_QUEUE_Q3_1: time-filtered-queue-q3-1
+      OUTPUT_QUEUE_Q3_2: time-filtered-queue-q3-2
       EOF_QUEUE_NODO_1: EOF-filter-time-1
       EOF_QUEUE_NODO_2: EOF-filter-time-2
       EXCHANGE_NAME: time-filtered-exchange
@@ -167,8 +171,9 @@ services:
       OUTPUT_QUEUE_1: time-filtered-queue-q1-1
       OUTPUT_QUEUE_2: time-filtered-queue-q1-2
       OUTPUT_QUEUE_3: time-filtered-queue-q1-3
-      OUTPUT_QUEUE_4: time-filtered-queue-q3
-      EXCHANGE_NAME: time-filtered-exchange
+      OUTPUT_QUEUE_4: time-filtered-queue-q3-1
+      OUTPUT_QUEUE_5: time-filtered-queue-q3-2
+      EXCHANGE_NAME: time-filtered-exchange-eof
       LOG_LEVEL: INFO
       EXPECTED_ACKS: 2
     networks:
@@ -494,12 +499,8 @@ services:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
       CONTAINER_NAME: aggregator-store-q3-1
       RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE_1: time-filtered-queue-q3
+      INPUT_QUEUE_1: time-filtered-queue-q3-1
       OUTPUT_QUEUE_1: aggregated-store-q3-queue
-      EOF_EXCHANGE_NAME: eof-exchange-aggregator-store-q3
-      EOF_SELF_QUEUE: eof-aggregator-store-q3-1
-      EOF_QUEUE_1: eof-aggregator-store-q3-1
-      EOF_QUEUE_2: eof-aggregator-store-q3-2
       EOF_SERVICE_QUEUE: eof-service-aggregator-store-q3
       LOG_LEVEL: INFO
     networks:
@@ -515,12 +516,8 @@ services:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
       CONTAINER_NAME: aggregator-store-q3-2
       RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE_1: time-filtered-queue-q3
+      INPUT_QUEUE_1: time-filtered-queue-q3-2
       OUTPUT_QUEUE_1: aggregated-store-q3-queue
-      EOF_EXCHANGE_NAME: eof-exchange-aggregator-store-q3
-      EOF_SELF_QUEUE: eof-aggregator-store-q3-2
-      EOF_QUEUE_1: eof-aggregator-store-q3-1
-      EOF_QUEUE_2: eof-aggregator-store-q3-2
       EOF_SERVICE_QUEUE: eof-service-aggregator-store-q3
       LOG_LEVEL: INFO
     networks:
@@ -572,13 +569,8 @@ services:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
       CONTAINER_NAME: aggregator-store-q4-1
       RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE_1: year-filtered-queue-q4
+      INPUT_QUEUE_1: year-filtered-queue-q4-1
       OUTPUT_QUEUE_1: aggregated-store-q4-queue
-      EXCHANGE_NAME: aggregated-stores-q4-exchange
-      EOF_EXCHANGE_NAME: eof-exchange-aggregator-store-q4
-      EOF_SELF_QUEUE: eof-aggregator-store-q4-1
-      EOF_QUEUE_1: eof-aggregator-store-q4-1
-      EOF_QUEUE_2: eof-aggregator-store-q4-2
       EOF_SERVICE_QUEUE: eof-service-aggregator-store-q4
       LOG_LEVEL: INFO
     networks:
@@ -594,13 +586,8 @@ services:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
       CONTAINER_NAME: aggregator-store-q4-2
       RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE_1: year-filtered-queue-q4
+      INPUT_QUEUE_1: year-filtered-queue-q4-2
       OUTPUT_QUEUE_1: aggregated-store-q4-queue
-      EXCHANGE_NAME: aggregated-stores-q4-exchange
-      EOF_EXCHANGE_NAME: eof-exchange-aggregator-store-q4
-      EOF_SELF_QUEUE: eof-aggregator-store-q4-2
-      EOF_QUEUE_1: eof-aggregator-store-q4-1
-      EOF_QUEUE_2: eof-aggregator-store-q4-2
       EOF_SERVICE_QUEUE: eof-service-aggregator-store-q4
       LOG_LEVEL: INFO
     networks:

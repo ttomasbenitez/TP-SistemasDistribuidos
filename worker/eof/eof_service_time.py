@@ -26,24 +26,31 @@ def initialize_config():
     config_params = {
         "rabbitmq_host": os.getenv('RABBITMQ_HOST'),
         "input_queue": os.getenv('INPUT_QUEUE'),
-        "output_queue_1": os.getenv('OUTPUT_QUEUE_1'),
-        "output_queue_2": os.getenv('OUTPUT_QUEUE_2'),
         "output_exchange_filter": os.getenv('EXCHANGE_NAME'),
         "logging_level": os.getenv('LOG_LEVEL', 'INFO'),
         "expected_acks": int(os.getenv('EXPECTED_ACKS')),
     }
+    
+    output_queues = [
+        value
+        for key, value in os.environ.items()
+        if key.startswith("OUTPUT_QUEUE")
+    ]
+    
+    config_params["output_queues"] = output_queues
 
     required_keys = [
         "rabbitmq_host",
         "input_queue",
-        "output_queue_1",
-        "output_queue_2",
         "output_exchange_filter",
     ]
 
     missing_keys = [key for key in required_keys if config_params[key] is None]
     if missing_keys:
         raise ValueError(f"Expected value(s) not found for: {', '.join(missing_keys)}. Aborting filter.")
+    
+    if len(output_queues) == 0:
+         raise ValueError("Expected at least one output queues. Aborting filter.")
     
     return config_params
 
@@ -53,10 +60,12 @@ def main():
     initialize_log(config_params["logging_level"])
 
     eof_input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue"])
+    
+    eof_queues = {}
+    for queue in config_params["output_queues"]:
+        eof_queues[queue] = [str(MESSAGE_TYPE_EOF)]
 
-    eof_output_exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["output_exchange_filter"], 
-                                        {config_params["output_queue_1"]: [str(MESSAGE_TYPE_EOF)], 
-                                        config_params["output_queue_2"]: [str(MESSAGE_TYPE_EOF)]})
+    eof_output_exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["output_exchange_filter"], eof_queues)
    
     eof_service = EofServiceTime(
         expected_acks=config_params["expected_acks"],

@@ -15,8 +15,9 @@ class FilterTimeNode(Worker):
     def __init__(self, 
                  data_input_queue: str, 
                  data_output_exchange: str, 
-                 q1_output_queues: list,
-                 q3_output_queue: str,
+                 output_exchange_queues: list,
+                 sharding_q1_amount: int,
+                 sharding_q3_amount: int,
                  eof_output_exchange: str,
                  eof_output_queues: dict,
                  eof_self_queue: str,
@@ -28,8 +29,9 @@ class FilterTimeNode(Worker):
         self.__init_middlewares_handler__()
         self.data_input_queue = data_input_queue
         self.data_output_exchange = data_output_exchange
-        self.q1_output_queues = q1_output_queues
-        self.q3_output_queue = q3_output_queue
+        self.output_exchange_queues = output_exchange_queues
+        self.sharding_q1_amount = sharding_q1_amount
+        self.sharding_q3_amount = sharding_q3_amount
         self.eof_output_exchange = eof_output_exchange
         self.eof_output_queues = eof_output_queues
         self.host = host
@@ -52,12 +54,9 @@ class FilterTimeNode(Worker):
         
     def _consume_data_queue(self):
         data_in_queue = MessageMiddlewareQueue(self.host, self.data_input_queue)
-        
-        q1_queues = [MessageMiddlewareQueue(self.host, q) for q in self.q1_output_queues]
-        q3_queue = MessageMiddlewareQueue(self.host, self.q3_output_queue)
-        
+        data_output_exchange = MessageMiddlewareExchange(self.host, self.data_output_exchange, self.output_exchange_queues)
         eof_output_exchange = MessageMiddlewareExchange(self.host, self.eof_output_exchange, self.eof_output_queues)
-        self.message_middlewares.extend([data_in_queue, q3_queue, eof_output_exchange] + q1_queues)
+        self.message_middlewares.extend([data_in_queue, eof_output_exchange, data_output_exchange])
         
         def __on_message__(message):
             try:
@@ -66,13 +65,6 @@ class FilterTimeNode(Worker):
                 if message.type == MESSAGE_TYPE_EOF:
                     logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
                     eof_output_exchange.send(message.serialize(), str(message.type))
-                    
-                    # Broadcast EOF to all Q1 queues
-                    for q in q1_queues:
-                        q.send(message.serialize())
-                    
-                    # Send EOF to Q3 queue
-                    q3_queue.send(message.serialize())
                     return
 
                 logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
@@ -97,13 +89,11 @@ class FilterTimeNode(Worker):
                     message.update_content(new_chunk)
                     serialized = message.serialize()
                     
-                    # Send to Q3 (broadcast/single)
-                    q3_queue.send(serialized)
+                    sharding_key_q1 = message.msg_num % self.sharding_q1_amount
+                    sharding_key_q3 = message.msg_num % self.sharding_q3_amount
                     
-                    # Send to Q1 (sharded)
-                    # Modulo msg_num to select queue
-                    queue_index = message.msg_num % len(q1_queues)
-                    q1_queues[queue_index].send(serialized)
+                    data_output_exchange.send(serialized, f"{str(MESSAGE_TYPE_TRANSACTIONS)}.q1.{sharding_key_q1}")
+                    data_output_exchange.send(serialized, f"{str(MESSAGE_TYPE_TRANSACTIONS)}.q3.{sharding_key_q3}")
                     
             except Exception as e:
                 logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
@@ -119,7 +109,6 @@ def initialize_config():
         "rabbitmq_host": os.getenv('RABBITMQ_HOST'),
         "input_queue": os.getenv('INPUT_QUEUE_1'),
         "eof_self_queue": os.getenv('EOF_SELF_QUEUE'),
-        "q3_output_queue": os.getenv('OUTPUT_QUEUE_Q3'),
         "eof_queue_1": os.getenv('EOF_QUEUE_NODO_1'),
         "eof_queue_2": os.getenv('EOF_QUEUE_NODO_2'),
         "output_exchange_filter_time": os.getenv('EXCHANGE_NAME'),
@@ -130,19 +119,25 @@ def initialize_config():
     
     # Read Q1 output queues
     q1_queues = []
+    q3_queues = []
     i = 1
     while True:
-        queue = os.getenv(f'OUTPUT_QUEUE_Q1_{i}')
-        if not queue:
+        queue_q1 = os.getenv(f'OUTPUT_QUEUE_Q1_{i}')
+        queue_q2 = os.getenv(f'OUTPUT_QUEUE_Q3_{i}')
+        if not queue_q1 and not queue_q2:
             break
-        q1_queues.append(queue)
+        if queue_q1:
+            q1_queues.append(queue_q1)
+        if queue_q2:
+            q3_queues.append(queue_q2)
         i += 1
-    config_params["q1_output_queues"] = q1_queues
+        
+    config_params["output_queues_q1"] = q1_queues
+    config_params["output_queues_q3"] = q3_queues
 
     required_keys = [
         "rabbitmq_host",
         "input_queue",
-        "q3_output_queue",
         "output_exchange_filter_time",
     ]
 
@@ -150,8 +145,8 @@ def initialize_config():
     if missing_keys:
         raise ValueError(f"Expected value(s) not found for: {', '.join(missing_keys)}. Aborting filter.")
     
-    if not config_params["q1_output_queues"]:
-         raise ValueError("Expected at least one Q1 output queue. Aborting filter.")
+    if not config_params["output_queues_q1"] or not config_params["output_queues_q3"]:
+         raise ValueError("Expected at least one Q1 and Q3 output queue. Aborting filter.")
     
     return config_params
 
@@ -165,11 +160,26 @@ def main():
     
     eof_output_queues = {config_params["eof_queue_1"]: [str(MESSAGE_TYPE_EOF)],
                         config_params["eof_queue_2"]: [str(MESSAGE_TYPE_EOF)]}
+    
+    output_exchange_queues =  {}
+    index = 0
+    for queue in config_params["output_queues_q1"]:
+        output_exchange_queues[queue] = [f"{str(MESSAGE_TYPE_TRANSACTIONS)}.q1.{index}", str(MESSAGE_TYPE_EOF)]
+        index += 1
+    
+    index = 0
+    for queue in config_params["output_queues_q3"]:
+        output_exchange_queues[queue] = [f"{str(MESSAGE_TYPE_TRANSACTIONS)}.q3.{index}", str(MESSAGE_TYPE_EOF)]
+        index += 1
+    
+    sharding_q1_amount = len(config_params["output_queues_q1"])
+    sharding_q3_amount = len(config_params["output_queues_q3"])
 
     filter = FilterTimeNode(config_params["input_queue"], 
                             config_params["output_exchange_filter_time"],
-                            config_params["q1_output_queues"],
-                            config_params["q3_output_queue"],
+                            output_exchange_queues,
+                            sharding_q1_amount,
+                            sharding_q3_amount,
                             config_params["eof_exchange_name"],
                             eof_output_queues,
                             config_params["eof_self_queue"],

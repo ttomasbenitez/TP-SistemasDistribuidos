@@ -34,7 +34,7 @@ class ClientHandler(threading.Thread):
 
     def _receive_and_publish(self):
         """Recibe los mensajes del cliente y los envía al exchange."""
-        while self._running:
+        while True:
             message = self._protocol.read_message()
             if message.type == MESSAGE_TYPE_EOF:
                 logging.info("action: client_handler receive_data | result: eof")
@@ -53,26 +53,20 @@ class ClientHandler(threading.Thread):
 
         logging.info(f"action: start_results_consumer | result: in_progress from queue {self._in_queue.queue_name}")
 
-        def _consume():
-            try:
-                self._in_queue.start_consuming(self._on_result_message)
-            except Exception as e:
-                logging.error(f"action: consume_results | result: fail | error: {e}")
-
-        self._consumer_thread = threading.Thread(target=_consume)
-        self._consumer_thread.start()
-        self._consumer_thread.join()
+        try:
+            self._in_queue.start_consuming(self._on_result_message)
+        except Exception as e:
+            logging.error(f"action: consume_results | result: fail | error: {e}")
 
     def _on_result_message(self, raw_msg):
         """Callback que envía los mensajes del backend al cliente."""
         msg = Message.deserialize(raw_msg)
         if msg.type == MESSAGE_TYPE_EOF:
-            logging.info(f"action: send_eof_to_client | result: success | finished_queries: {self._finished_queries + 1}/{EXPECTED_QUERIES}")
             self._finished_queries += 1
+            logging.info(f"action: send_eof_to_client | result: success | finished_queries: {self._finished_queries}/{EXPECTED_QUERIES}")
             if self._finished_queries == EXPECTED_QUERIES:
                 logging.info("action: all_results_sent | result: success")
                 self._protocol.send_message(raw_msg)
-                self._running = False
             return
         self._protocol.send_message(raw_msg)
 
@@ -80,11 +74,6 @@ class ClientHandler(threading.Thread):
         """Cierra ordenadamente protocolo, cola y socket."""
         logging.info("action: client_handler_close | result: in_progress")
         self._running = False
-        try:
-            if self._consumer_thread and self._consumer_thread.is_alive():
-                self._consumer_thread.join(timeout=2)
-        except Exception:
-            pass
         try:
             if self._in_queue:
                 self._in_queue.stop_consuming()
