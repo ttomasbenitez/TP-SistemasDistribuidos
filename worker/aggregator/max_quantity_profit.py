@@ -8,6 +8,7 @@ from utils.custom_logging import initialize_log
 import os
 from pkg.message.q2_result import Q2Result
 from Middleware.connection import PikaConnection
+from utils.heartbeat import start_heartbeat_sender
 
 class QuantityAndProfit(Worker):
     
@@ -17,16 +18,15 @@ class QuantityAndProfit(Worker):
                  eof_service_queue: str, 
                  storage_dir: str,
                  host: str):
-        # super().__init__(in_queue)
-        # self.out_queue = out_queue
         self.data_input_queue = data_input_queue
         self.data_output_queue = data_output_queue
         self.eof_service_queue = eof_service_queue
         self.connection = PikaConnection(host)
-        # self.eof_service_queue_middleware = eof_service_queue
         self.state_storage = QuantityAndProfitStateStorage(storage_dir)
         
     def start(self):
+        
+        self.heartbeat_sender = start_heartbeat_sender()
         
         self.connection.start()
         self._consume_data_queue()

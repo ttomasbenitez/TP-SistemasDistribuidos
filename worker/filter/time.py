@@ -41,13 +41,7 @@ class FilterTimeNode(Worker):
         self.time = time_set
 
     def start(self):
-       
-        # logging.info(f"Starting process")
-        # p_data = Process(target=self._consume_data_queue)
-        
-        # logging.info(f"Starting EOF node process")
-        # p_eof = Process(target=self._consume_eof)
-        
+    
         self.heartbeat_sender = start_heartbeat_sender()
 
         self.connection.start()

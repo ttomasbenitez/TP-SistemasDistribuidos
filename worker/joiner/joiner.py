@@ -25,13 +25,6 @@ class Joiner(Worker, ABC):
         
     def start(self):
         self.heartbeat_sender = start_heartbeat_sender()
-        # logging.info(f"Starting Joiner worker")
-        # t_data = threading.Thread(target=self._consume_data_queue)
-        # t_items_to_join = threading.Thread(target=self._consume_items_to_join_queue)
-        # t_data.start()
-        # t_items_to_join.start()
-        # t_data.join()
-        # t_items_to_join.join()
     
         self.connection.start()
         self._consume_data_queue()

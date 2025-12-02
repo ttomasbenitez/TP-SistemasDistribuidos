@@ -7,7 +7,6 @@ from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_QUERY_2_INTERME
 from utils.custom_logging import initialize_log
 from pkg.message.q2_result import Q2IntermediateResult
 import os
-from multiprocessing import Process, Value
 from utils.heartbeat import start_heartbeat_sender
 import hashlib
 from pkg.message.utils import calculate_sub_message_id
@@ -37,16 +36,9 @@ class AggregatorMonth(Worker):
         self.eof_service_queue = eof_service_queue
     
     def start(self):
-        # logging.info(f"Starting process")
-        # p_data = Process(target=self._consume_data_queue)
         
-        # logging.info(f"Starting EOF node process")
-        # p_eof = Process(target=self._consume_eof)
+        self.heartbeat_sender = start_heartbeat_sender()
         
-        # self.heartbeat_sender = start_heartbeat_sender()
-
-        # for p in (p_data, p_eof): p.start()
-        # for p in (p_data, p_eof): p.join()
         self.connection.start()
         self._consume_data_queue()
         self._consume_eof()
@@ -58,7 +50,7 @@ class AggregatorMonth(Worker):
         data_output_queues = [MessageMiddlewareQueue(queue, self.connection) for queue in self.data_output_queues]
         data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
         self.message_middlewares.extend([eof_output_exchange, data_input_queue] + data_output_queues)
-        logging.info(f"COLASSS {data_output_queues}")
+        
         self.buffers = {}
         self.last_message = {}
 
@@ -219,8 +211,6 @@ def main():
     
     eof_output_queues = {config_params["eof_queue_1"]: [str(MESSAGE_TYPE_EOF)],
                             config_params["eof_queue_2"]: [str(MESSAGE_TYPE_EOF)]}
-    
-    logging.info(f"Initialized output queuques: {config_params['output_queues']}")
 
     aggregator = AggregatorMonth(config_params["input_queue"], 
                                 config_params["output_queues"], 

@@ -5,7 +5,6 @@ from pkg.message.message import Message
 from utils.custom_logging import initialize_log
 import os
 from pkg.message.constants import MESSAGE_TYPE_EOF
-from multiprocessing import Process
 from Middleware.connection import PikaConnection
 from utils.heartbeat import start_heartbeat_sender
 from pkg.dedup.sliding_window_dedup_strategy import SlidingWindowDedupStrategy
@@ -27,14 +26,8 @@ class StoreAggregator(Worker):
         self.eof_service_queue = eof_service_queue
         self.dedup_strategy = SlidingWindowDedupStrategy(total_shards, storage_dir)
 
-    def start(self):
-       
-        logging.info(f"Starting process")
-        # p_data = Process(target=self._consume_data_queue)
-        
+    def start(self):    
         self.heartbeat_sender = start_heartbeat_sender()
-        # p_data.start()
-        # p_data.join()
         self.connection.start()
         self._consume_data_queue()
         self.connection.start_consuming()

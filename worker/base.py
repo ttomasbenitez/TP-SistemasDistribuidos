@@ -5,24 +5,14 @@ from pkg.message.message import Message
 import signal
 import logging
 from multiprocessing import Manager
-from utils.heartbeat import start_heartbeat_sender
 from pkg.message.utils import calculate_sub_message_id
 from pkg.message.constants import SUB_MESSAGE_START_ID
-from Middleware.connection import PikaConnection
 
 class Worker(ABC):
     
     @abstractmethod
     def __init__(self):
         pass
-        # self.connection = PikaConnection(host)
-        # self.in_middleware = in_middleware
-        # # self.host = host
-        # self.connection = connection
-        # self.eof_self_queue = eof_self_queue
-        # self.eof_service_queue = eof_service_queue
-        # self.__init_manager__()
-        # self.__init_middlewares_handler__()
         
     def __init_middlewares_handler__(self):
         self.message_middlewares = []

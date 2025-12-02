@@ -45,16 +45,7 @@ class FilterAmountNode(Worker):
         
     def start(self):
        
-        # logging.info(f"Starting process")
-        # p_data = Process(target=self._consume_data_queue)
-        
-        # logging.info(f"Starting EOF FINAL process")
-        # p_eof_final = Process(target=self._consume_eof_final)
-        
         self.heartbeat_sender = start_heartbeat_sender()
-
-        # for p in (p_data, p_eof_final): p.start()
-        # for p in (p_data, p_eof_final): p.join()
         
         self.connection.start()
         self._consume_data_queue()

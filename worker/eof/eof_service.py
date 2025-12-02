@@ -5,6 +5,7 @@ import signal
 from pkg.message.message import Message
 from pkg.message.constants import MESSAGE_TYPE_EOF
 from abc import ABC, abstractmethod
+from utils.heartbeat import start_heartbeat_sender
 from Middleware.connection import PikaConnection
 class EofService(Worker, ABC):
   
@@ -19,12 +20,13 @@ class EofService(Worker, ABC):
         signal.signal(signal.SIGINT, self.__handle_shutdown)
         
     def start(self):
+        
+        self.heartbeat_sender = start_heartbeat_sender()
+        
         self.connection.start()
         self._consume_eof_queue()
         logging.info("Eof Service iniciado y consumiendo mensajes.")
         self.connection.start_consuming()
-        # self.in_middleware = MessageMiddlewareQueue(self.eof_in_queque, self.connection)
-        # self.in_middleware.start_consuming(self.__on_message__)
       
     def _consume_eof_queue(self):
         data_input_queue = MessageMiddlewareQueue(self.eof_input_queque, self.connection)
