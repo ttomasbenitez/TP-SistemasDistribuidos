@@ -98,7 +98,8 @@ class FilterTimeNode(Worker):
             except Exception as e:
                 logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
             finally:
-                self._dec_inflight(message.request_id)
+                if message.type != MESSAGE_TYPE_EOF:
+                    self._dec_inflight(message.request_id)
 
         data_in_queue.start_consuming(__on_message__)
 

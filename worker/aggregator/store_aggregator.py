@@ -32,6 +32,7 @@ class StoreAggregator(Worker):
         self.heartbeat_sender = start_heartbeat_sender()
         p_data.start()
         p_data.join()
+        self.heartbeat_sender.stop()
         
     def _consume_data_queue(self):
         data_input_queue = MessageMiddlewareQueue(self.host, self.data_input_queue)
@@ -45,22 +46,16 @@ class StoreAggregator(Worker):
 
                 if message.type == MESSAGE_TYPE_EOF:
                     logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
-                    self._ensure_request(message.request_id)
-                    self.drained[message.request_id].wait()
                     eof_service_queue.send(message.serialize())
                     return
                 
                 logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
-                self._ensure_request(message.request_id)
-                self._inc_inflight(message.request_id) 
                 
                 items = message.process_message()
                 groups = self._group_items_by_store(items)
                 self._send_groups(message, groups, data_output_queue)
             except Exception as e:
                 logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
-            finally:
-                self._dec_inflight(message.request_id)
         
         data_input_queue.start_consuming(__on_message__)
 

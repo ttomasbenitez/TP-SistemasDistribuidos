@@ -63,7 +63,7 @@ class ClientHandler(threading.Thread):
         msg = Message.deserialize(raw_msg)
         if msg.type == MESSAGE_TYPE_EOF:
             self._finished_queries += 1
-            logging.info(f"action: send_eof_to_client | result: success | finished_queries: {self._finished_queries}/{EXPECTED_QUERIES}")
+            logging.info(f"action: send_eof_to_client | result: success | request_id: {msg.request_id} | finished_queries: {self._finished_queries}/{EXPECTED_QUERIES}")
             if self._finished_queries == EXPECTED_QUERIES:
                 logging.info("action: all_results_sent | result: success")
                 self._protocol.send_message(raw_msg)

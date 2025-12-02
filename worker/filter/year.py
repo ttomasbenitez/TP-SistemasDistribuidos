@@ -63,9 +63,9 @@ class FilterYearNode(Worker):
             try:
                 message = Message.deserialize(message)
                 if message.type == MESSAGE_TYPE_EOF:
-                    logging.info(f"action: final EOF message received | request_id: {message.request_id}")            
+                    logging.info(f"action: final EOF message received | request_id: {message.request_id}")  
                     self._ensure_request(message.request_id)
-                    self.drained[message.request_id].wait()
+                    self.drained[message.request_id].wait()          
                     data_output_exchange.send(message.serialize(), str(message.type))
             except Exception as e:
                 logging.error(f"action: ERROR processing final EOF message | error: {type(e).__name__}: {e}")
@@ -107,7 +107,7 @@ class FilterYearNode(Worker):
             except Exception as e:
                 logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
             finally:
-                if message is not None:
+                if message.type != MESSAGE_TYPE_EOF:
                     self._dec_inflight(message.request_id)
 
         data_input_queue.start_consuming(__on_message__)
