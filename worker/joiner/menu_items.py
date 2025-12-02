@@ -72,23 +72,27 @@ class JoinerMenuItems(Joiner):
             if message.type == MESSAGE_TYPE_EOF:
                 return self._process_on_eof_message__(message)
 
-            items = message.process_message()
+            self._ensure_request(message.request_id)
+            self._inc_inflight(message.request_id)
+            try:
+                items = message.process_message()
+                if message.type == MESSAGE_TYPE_QUERY_2_RESULT:
+                    ready_to_send = ''
+                    for item in items:
+                        with self.items_to_join_lock:
+                            name = self.items_to_join.get(message.request_id, {}).get(parse_int(item.item_data))
+                        if name:
+                            item.join_item_name(name)
+                            ready_to_send += item.serialize()
+                        else:
+                            self.pending_items.append((item, message.request_id))
 
-            if message.type == MESSAGE_TYPE_QUERY_2_RESULT:
-                ready_to_send = ''
-                for item in items:
-                    with self.items_to_join_lock:
-                        name = self.items_to_join.get(message.request_id, {}).get(parse_int(item.item_data))
-                    if name:
-                        item.join_item_name(name)
-                        ready_to_send += item.serialize()
-                    else:
-                        self.pending_items.append((item, message.request_id))
-
-                if ready_to_send:
-                    message.update_content(ready_to_send)
-                    serialized = message.serialize()
-                    data_output_exchange.send(serialized, str(message.request_id))
+                    if ready_to_send:
+                        message.update_content(ready_to_send)
+                        serialized = message.serialize()
+                        data_output_exchange.send(serialized, str(message.request_id))
+            finally:
+                self._dec_inflight(message.request_id)
                     
         data_input_queue.start_consuming(__on_message__)
         

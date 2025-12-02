@@ -11,6 +11,8 @@ from pkg.message.constants import (
 from utils.custom_logging import initialize_log
 import os
 from pkg.message.q3_result import Q3Result
+import hashlib
+import threading
 
 EXPECTED_EOFS = 2
 
@@ -27,6 +29,8 @@ class StoresJoiner(Joiner):
         self.data_output_exchange = data_output_exchange
         self.pending_transactions = []
         self.processed_transactions = {}
+        self._seen_lock = threading.Lock()
+        self._seen_messages = set()
 
     def _consume_data_queue(self):
         data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
@@ -38,18 +42,32 @@ class StoresJoiner(Joiner):
 
             if message.type == MESSAGE_TYPE_EOF:
                 return self._process_on_eof_message__(message)
-            
-            items = message.process_message()
-
-            if message.type == MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT:
-                for item in items:
-                    with self.items_to_join_lock:
-                        store_name = self.items_to_join.get(message.request_id, {}).get(item.get_store())
-                    if store_name:
-                        key = (message.request_id, store_name, item.get_period())
-                        self.processed_transactions[key] = self.processed_transactions.get(key, 0.0) + item.get_tpv()
-                    else:
-                        self.pending_transactions.append((item, message.request_id))
+            self._ensure_request(message.request_id)
+            self._inc_inflight(message.request_id)
+            try:
+                # Idempotencia robusta: deduplicar usando hash del cuerpo
+                try:
+                    raw_bytes = msg if isinstance(msg, (bytes, bytearray)) else str(msg).encode("utf-8")
+                except Exception:
+                    raw_bytes = message.serialize().encode("utf-8")
+                body_hash = hashlib.sha256(raw_bytes).hexdigest()
+                dedup_key = (message.request_id, message.type, body_hash)
+                with self._seen_lock:
+                    if dedup_key in self._seen_messages:
+                        return
+                    self._seen_messages.add(dedup_key)
+                items = message.process_message()
+                if message.type == MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT:
+                    for item in items:
+                        with self.items_to_join_lock:
+                            store_name = self.items_to_join.get(message.request_id, {}).get(item.get_store())
+                        if store_name:
+                            key = (message.request_id, store_name, item.get_period())
+                            self.processed_transactions[key] = self.processed_transactions.get(key, 0.0) + item.get_tpv()
+                        else:
+                            self.pending_transactions.append((item, message.request_id))
+            finally:
+                self._dec_inflight(message.request_id)
                         
         data_input_queue.start_consuming(__on_message__)
 

@@ -15,6 +15,11 @@ class PikaConnection():
         if self.connection is None or self.connection.is_closed:
             self.connect()
         self.channel = self.connection.channel()
+        try:
+            # Enable publisher confirms for reliability
+            self.channel.confirm_delivery()
+        except Exception:
+            pass
         
     def start(self):
         self.connect()
@@ -76,4 +81,3 @@ class PikaConnection():
         self.stop_consuming()
         self.connect()
         self.open_channel()
-        

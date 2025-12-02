@@ -13,6 +13,7 @@ class Joiner(Worker, ABC):
   
     def __init_client_handler__(self, items_input_queue: str, host: str, expected_eofs: int):
         
+        self.__init_manager__()
         self.__init_middlewares_handler__()
         self.items_input_queue = items_input_queue
         self.connection = PikaConnection(host)
@@ -50,6 +51,8 @@ class Joiner(Worker, ABC):
             logging.info(f"action: EOF message received {self.eofs_by_client[message.request_id]}/{self.expected_eofs} | request_id: {message.request_id} | type: {message.type}")
             return
         try:
+            self._ensure_request(message.request_id)
+            self.drained[message.request_id].wait()
             logging.info(f"action: EOF message received {self.eofs_by_client[message.request_id]}/{self.expected_eofs} send results | request_id: {message.request_id} | type: {message.type}")
             self._send_results(message)
         except Exception as e:
@@ -66,6 +69,11 @@ class Joiner(Worker, ABC):
             if message.type == MESSAGE_TYPE_EOF:
                 return self._process_on_eof_message__(message)
             
-            self._process_items_to_join(message)
+            self._ensure_request(message.request_id)
+            self._inc_inflight(message.request_id)
+            try:
+                self._process_items_to_join(message)
+            finally:
+                self._dec_inflight(message.request_id)
             
         items_input_queue.start_consuming(__on_items_message__)

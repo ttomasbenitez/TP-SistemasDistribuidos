@@ -44,7 +44,8 @@ class SemesterAggregator(Worker):
         data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
         data_output_queue = MessageMiddlewareQueue(self.data_output_queue, self.connection)
         eof_output_exchange = MessageMiddlewareExchange(self.eof_output_exchange, self.eof_output_queues, self.connection)
-        self.message_middlewares.extend([data_input_queue, data_output_queue, eof_output_exchange])
+        eof_self_queue = MessageMiddlewareQueue(self.eof_self_queue, self.connection)
+        self.message_middlewares.extend([data_input_queue, data_output_queue, eof_output_exchange, eof_self_queue])
         
         def __on_message__(message):
             try:
@@ -52,7 +53,8 @@ class SemesterAggregator(Worker):
 
                 if message.type == MESSAGE_TYPE_EOF:
                     logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
-                    eof_output_exchange.send(message.serialize(), str(message.type))
+                    # Route EOF to self queue; Worker._consume_eof will wait for drained and forward to service
+                    eof_self_queue.send(message.serialize())
                     return
                 
                 logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")

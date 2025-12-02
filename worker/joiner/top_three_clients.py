@@ -36,10 +36,14 @@ class TopThreeClientsJoiner(Joiner):
             if message.type == MESSAGE_TYPE_EOF:
                 return self._process_on_eof_message__(message)
 
-            items = message.process_message()
-
-            if message.type == MESSAGE_TYPE_TRANSACTIONS:
-                self._accumulate_items(items, message.request_id)
+            self._ensure_request(message.request_id)
+            self._inc_inflight(message.request_id)
+            try:
+                items = message.process_message()
+                if message.type == MESSAGE_TYPE_TRANSACTIONS:
+                    self._accumulate_items(items, message.request_id)
+            finally:
+                self._dec_inflight(message.request_id)
                 
         data_input_queue.start_consuming(__on_message__)
         
