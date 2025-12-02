@@ -40,10 +40,10 @@ class StateStorage(ABC):
             for filename in os.listdir(self.storage_dir):
                 if filename.endswith(".txt"):
                     request_id = filename[:-4]  # Remover la extensión .txt
-                    filepath = os.path.join(self.storage_dir, filename)
+                filepath = os.path.join(self.storage_dir, filename)
                     
-                    with self._lock:
-                        with open(filepath, "r") as f:
+                with self._lock:
+                    with open(filepath, "r") as f:
                             self._load_state_from_file(f, request_id)
                     
                     logging.info(f"Estado cargado para request_id: {request_id}")

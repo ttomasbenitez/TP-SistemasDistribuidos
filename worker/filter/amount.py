@@ -1,5 +1,5 @@
 from worker.base import Worker 
-from pkg.storage.state_storage.filter_amount import FilterAmountStateStorage
+from pkg.dedup.sliding_window_dedup_strategy import SlidingWindowDedupStrategy
 from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
 import logging
 from pkg.message.message import Message
@@ -40,8 +40,7 @@ class FilterAmountNode(Worker):
         self.eof_final_queue = eof_final_queue
         self.clients = []
         self.amount_to_filter = amount_to_filter
-        self.total_shards = total_shards
-        self.state_storage = FilterAmountStateStorage(storage_dir)
+        self.dedup_strategy = SlidingWindowDedupStrategy(total_shards, storage_dir)
         
     def start(self):
        
@@ -62,18 +61,8 @@ class FilterAmountNode(Worker):
         eof_output_exchange = MessageMiddlewareExchange(self.host, self.eof_output_exchange, self.eof_output_queues)
         self.message_middlewares.extend([data_input_queue, data_output_exchange, eof_output_exchange])
         
-        # Diccionario para guardar request_id -> last_contiguous_msg_num
-        self.last_contiguous_msg_num = {}
-        # Diccionario para guardar request_id -> set(pending_messages)
-        self.pending_messages = {}
-
-        # Cargar estado previo si existe
-        self.state_storage.load_state_all()
-        for request_id, state in self.state_storage.data_by_request.items():
-            self.last_contiguous_msg_num[request_id] = state.get('last_contiguous_msg_num', 0)
-            self.pending_messages[request_id] = state.get('pending_messages', set())
-            logging.info(f"Estado recuperado para request_id {request_id}: last_contiguous={self.last_contiguous_msg_num[request_id]}, pending_count={len(self.pending_messages[request_id])}")
-
+        self.dedup_strategy.load_dedup_state()
+        
         def __on_message__(message_body):
             try:
                 message = Message.deserialize(message_body)
@@ -95,25 +84,13 @@ class FilterAmountNode(Worker):
         # Send EOF to service queue
         eof_output_exchange.send(message.serialize(), str(message.type))
         
-        # Limpiar estado de duplicados para este request_id
-        if message.request_id in self.last_contiguous_msg_num:
-            del self.last_contiguous_msg_num[message.request_id]
-        if message.request_id in self.pending_messages:
-            del self.pending_messages[message.request_id]
-        
-        # Borrar estado persistido
-        self.state_storage.delete_state(message.request_id)
+        self.dedup_strategy.update_state_on_eof(message)
         
         logging.info(f"action: ACK EOF")
 
     def _handle_message(self, message, data_output_exchange):
-        self._initialize_request_state(message.request_id)
-        
-        if self._is_duplicate(message):
+        if self.dedup_strategy.check_state_before_processing(message) is False:
             return
-
-        self.pending_messages[message.request_id].add(message.msg_num)
-        self._clean_window_if_needed(message.request_id)
         
         # Procesar mensaje
         logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type} | msg_num: {message.msg_num}")
@@ -122,53 +99,9 @@ class FilterAmountNode(Worker):
 
         self._process_and_send_items(message, data_output_exchange)
         
+        self.dedup_strategy.update_contiguous_sequence(message)
+
         self._dec_inflight(message.request_id)
-
-        self._update_contiguous_sequence(message)
-
-        # Guardar estado
-        self.state_storage.data_by_request[message.request_id] = {
-            'msg_num': message.msg_num,
-            'last_contiguous_msg_num': self.last_contiguous_msg_num[message.request_id]
-        }
-        self.state_storage.save_state(message.request_id)
-
-    def _initialize_request_state(self, request_id):
-        if request_id not in self.last_contiguous_msg_num:
-            self.last_contiguous_msg_num[request_id] = 0
-            self.pending_messages[request_id] = set()
-
-    def _is_duplicate(self, message):
-        last_cont = self.last_contiguous_msg_num[message.request_id]
-        
-        if message.msg_num <= last_cont:
-            logging.info(f"action: Duplicate message received | request_id: {message.request_id} | msg_num: {message.msg_num} | last_contiguous: {last_cont}")
-            return True
-        
-        if message.msg_num in self.pending_messages[message.request_id]:
-             logging.info(f"action: Duplicate pending message received | request_id: {message.request_id} | msg_num: {message.msg_num}")
-             return True
-             
-        return False
-
-    def _clean_window_if_needed(self, request_id):
-        if len(self.pending_messages[request_id]) > MAX_PENDING_SIZE:
-            logging.info(f"action: Clearing pending messages window | request_id: {request_id} | size: {len(self.pending_messages[request_id])}")
-            self.pending_messages[request_id].clear()
-
-    def _update_contiguous_sequence(self, message):
-        last_cont = self.last_contiguous_msg_num[message.request_id]
-        prev_expected = message.msg_num - self.total_shards
-        
-        if prev_expected <= last_cont:
-            self.last_contiguous_msg_num[message.request_id] = message.msg_num
-            self.pending_messages[message.request_id].remove(message.msg_num)
-            
-            current_check = message.msg_num + self.total_shards
-            while current_check in self.pending_messages[message.request_id]:
-                self.last_contiguous_msg_num[message.request_id] = current_check
-                self.pending_messages[message.request_id].remove(current_check)
-                current_check += self.total_shards
 
     def _process_and_send_items(self, message, data_output_exchange):
         items = message.process_message()

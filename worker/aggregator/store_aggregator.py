@@ -5,7 +5,7 @@ from pkg.message.message import Message
 from utils.custom_logging import initialize_log
 import os
 from pkg.message.constants import MESSAGE_TYPE_EOF
-from multiprocessing import Process, Value
+from multiprocessing import Process
 from utils.heartbeat import start_heartbeat_sender
 
 

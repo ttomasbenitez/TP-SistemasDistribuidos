@@ -16,7 +16,7 @@ class FilterAmountStateStorage(StateStorage):
                 continue
             
             try:
-                parts = line.split(",")
+                parts = line.split(";")
                 if len(parts) != 2:
                     continue
                     
@@ -57,5 +57,5 @@ class FilterAmountStateStorage(StateStorage):
         last_contiguous = state.get('last_contiguous_msg_num')
         
         if msg_num is not None and last_contiguous is not None:
-            line = f"{msg_num},{last_contiguous}\n"
+            line = f"{msg_num};{last_contiguous}\n"
             file_handle.write(line)
