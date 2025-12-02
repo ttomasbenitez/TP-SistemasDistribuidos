@@ -56,7 +56,7 @@ class SlidingWindowDedupStrategy(DedupStrategy):
         last_cont = self.last_contiguous_msg_num[message.request_id]
         prev_expected = message.msg_num - self.total_shards
         
-        if last_cont is -1:
+        if last_cont == -1:
             last_cont = message.msg_num
         
         if prev_expected <= last_cont:

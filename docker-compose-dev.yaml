@@ -502,6 +502,7 @@ services:
       INPUT_QUEUE_1: time-filtered-queue-q3-1
       OUTPUT_QUEUE_1: aggregated-store-q3-queue
       EOF_SERVICE_QUEUE: eof-service-aggregator-store-q3
+      TOTAL_SHARDS: 2
       LOG_LEVEL: INFO
     networks:
     - testing_net
@@ -519,6 +520,7 @@ services:
       INPUT_QUEUE_1: time-filtered-queue-q3-2
       OUTPUT_QUEUE_1: aggregated-store-q3-queue
       EOF_SERVICE_QUEUE: eof-service-aggregator-store-q3
+      TOTAL_SHARDS: 2
       LOG_LEVEL: INFO
     networks:
     - testing_net
@@ -572,6 +574,7 @@ services:
       INPUT_QUEUE_1: year-filtered-queue-q4-1
       OUTPUT_QUEUE_1: aggregated-store-q4-queue
       EOF_SERVICE_QUEUE: eof-service-aggregator-store-q4
+      TOTAL_SHARDS: 2
       LOG_LEVEL: INFO
     networks:
     - testing_net
@@ -589,6 +592,7 @@ services:
       INPUT_QUEUE_1: year-filtered-queue-q4-2
       OUTPUT_QUEUE_1: aggregated-store-q4-queue
       EOF_SERVICE_QUEUE: eof-service-aggregator-store-q4
+      TOTAL_SHARDS: 2
       LOG_LEVEL: INFO
     networks:
     - testing_net

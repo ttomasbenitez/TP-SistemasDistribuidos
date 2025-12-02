@@ -1,5 +1,5 @@
 from worker.base import Worker 
-from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
+from Middleware.middleware import MessageMiddlewareQueue
 import logging
 from pkg.message.message import Message
 from utils.custom_logging import initialize_log
@@ -7,7 +7,7 @@ import os
 from pkg.message.constants import MESSAGE_TYPE_EOF
 from multiprocessing import Process
 from utils.heartbeat import start_heartbeat_sender
-
+from pkg.dedup.sliding_window_dedup_strategy import SlidingWindowDedupStrategy
 
 class StoreAggregator(Worker):
 
@@ -15,7 +15,8 @@ class StoreAggregator(Worker):
                  data_input_queue: str, 
                  data_output_queue: str,
                  eof_service_queue: str,
-                 host: str):
+                 host: str,total_shards: int,
+                 storage_dir: str):
         
         self.__init_manager__()
         self.__init_middlewares_handler__()
@@ -23,6 +24,7 @@ class StoreAggregator(Worker):
         self.data_output_queue = data_output_queue
         self.host = host
         self.eof_service_queue = eof_service_queue
+        self.dedup_strategy = SlidingWindowDedupStrategy(total_shards, storage_dir)
 
     def start(self):
        
@@ -40,6 +42,8 @@ class StoreAggregator(Worker):
         eof_service_queue = MessageMiddlewareQueue(self.host, self.eof_service_queue)
         self.message_middlewares.extend([data_input_queue, data_output_queue, eof_service_queue])
         
+        self.dedup_strategy.load_dedup_state()
+        
         def __on_message__(message):
             try:
                 message = Message.deserialize(message)
@@ -47,13 +51,17 @@ class StoreAggregator(Worker):
                 if message.type == MESSAGE_TYPE_EOF:
                     logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
                     eof_service_queue.send(message.serialize())
+                    self.dedup_strategy.update_state_on_eof(message)
                     return
                 
                 logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
                 
+                if self.dedup_strategy.check_state_before_processing(message) is False:
+                    return
                 items = message.process_message()
                 groups = self._group_items_by_store(items)
                 self._send_groups(message, groups, data_output_queue)
+                self.dedup_strategy.update_contiguous_sequence(message)
             except Exception as e:
                 logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
         
@@ -81,6 +89,8 @@ def initialize_config():
         "output_queue": os.getenv('OUTPUT_QUEUE_1'),
         "eof_service_queue": os.getenv('EOF_SERVICE_QUEUE'),
         "logging_level": os.getenv('LOG_LEVEL', 'INFO'),
+        "total_shards": int(os.getenv('TOTAL_SHARDS', 3)),
+        "storage_dir": os.getenv('STORAGE_DIR', './data'),
     }
 
     required_keys = [
@@ -103,7 +113,9 @@ def main():
     aggregator = StoreAggregator(config_params["input_queue"],
                                  config_params["output_queue"],
                                  config_params["eof_service_queue"],
-                                 config_params["rabbitmq_host"])
+                                 config_params["rabbitmq_host"],
+                                 config_params["total_shards"],
+                                 config_params["storage_dir"])
     aggregator.start()
 
 if __name__ == "__main__":
