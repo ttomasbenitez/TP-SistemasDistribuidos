@@ -7,34 +7,54 @@ from pkg.message.constants import MESSAGE_TYPE_QUERY_2_RESULT, MESSAGE_TYPE_EOF,
 from utils.custom_logging import initialize_log
 import os
 from pkg.message.q2_result import Q2Result
+from Middleware.connection import PikaConnection
 
 class QuantityAndProfit(Worker):
     
-    def __init__(self, in_queue: MessageMiddlewareQueue, out_queue: MessageMiddlewareQueue, eof_service_queue: MessageMiddlewareQueue, storage_dir: str):
-        super().__init__(in_queue)
-        self.out_queue = out_queue
-        self.eof_service_queue_middleware = eof_service_queue
+    def __init__(self, 
+                 data_input_queue: str, 
+                 data_output_queue: str, 
+                 eof_service_queue: str, 
+                 storage_dir: str,
+                 host: str):
+        # super().__init__(in_queue)
+        # self.out_queue = out_queue
+        self.data_input_queue = data_input_queue
+        self.data_output_queue = data_output_queue
+        self.eof_service_queue = eof_service_queue
+        self.connection = PikaConnection(host)
+        # self.eof_service_queue_middleware = eof_service_queue
         self.state_storage = QuantityAndProfitStateStorage(storage_dir)
+        
+    def start(self):
+        
+        self.connection.start()
+        self._consume_data_queue()
+        self.connection.start_consuming()
+        
+    def _consume_data_queue(self):
+        data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
+        data_output_queue = MessageMiddlewareQueue(self.data_output_queue, self.connection)
+        eof_service_queue = MessageMiddlewareQueue(self.eof_service_queue, self.connection)
+        
+        def __on_message__(message):
+            try:
+                message = Message.deserialize(message)
+                if message.type == MESSAGE_TYPE_EOF:
+                    logging.info(f"EOF recibido en data queue | request_id: {message.request_id}")
+                    self._send_results_by_date(message.request_id, data_output_queue)
+                    eof_service_queue.send(message.serialize())
+                    logging.info(f"EOF enviado a service queue | request_id: {message.request_id} | type: {message.type}")
+                    return
 
-    def __on_message__(self, message):
-        try:
-            message = Message.deserialize(message)
-            if message.type == MESSAGE_TYPE_EOF:
-                logging.info(f"EOF recibido en data queue | request_id: {message.request_id}")
-                self._send_results_by_date(message.request_id)
-                self._send_eof(message)
-                return
-
-            logging.info(f"Mensaje recibido | request_id: {message.request_id} | type: {message.type}")
-            items = message.process_message()
-            if items:
-                self._accumulate_items(items, message.request_id)
-        except Exception as e:
-            logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
-
-    def _send_eof(self, message):
-        self.eof_service_queue_middleware.send(message.serialize())
-        logging.info(f"EOF enviado a service queue | request_id: {message.request_id} | type: {message.type}")
+                logging.info(f"Mensaje recibido | request_id: {message.request_id} | type: {message.type}")
+                items = message.process_message()
+                if items:
+                    self._accumulate_items(items, message.request_id)
+            except Exception as e:
+                logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
+        
+        data_input_queue.start_consuming(__on_message__)       
             
     def _accumulate_items(self, items, request_id):
         """
@@ -63,8 +83,9 @@ class QuantityAndProfit(Worker):
             
         self.state_storage.save_state(request_id)
     
-    def _send_results_by_date(self, request_id_of_eof):
+    def _send_results_by_date(self, request_id_of_eof, data_output_queue):
         chunk = ''
+        
         self.state_storage.load_state(request_id_of_eof)
         # Check if we have data for this request
         if request_id_of_eof not in  self.state_storage.data_by_request:
@@ -92,11 +113,12 @@ class QuantityAndProfit(Worker):
         if chunk:
             logging.info(f"Enviando resultados acumulados | request_id: {request_id_of_eof}")
             serialized_message = Message(request_id_of_eof, MESSAGE_TYPE_QUERY_2_RESULT, 0, chunk).serialize()
-            self.out_queue.send(serialized_message)
+            data_output_queue.send(serialized_message)
         
         # Clean up state
         self.state_storage.delete_state(request_id_of_eof)
 
+    #TODO
     def close(self):
         try:
             self.in_middleware.close()
@@ -133,12 +155,8 @@ def main():
     config_params = initialize_config()
 
     initialize_log(config_params["logging_level"])
-
-    input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue"])
-    output_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["output_queue"])
-    eof_service_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["eof_service_queue"])
     
-    aggregator = QuantityAndProfit(input_queue, output_queue, eof_service_queue, config_params["storage_dir"])
+    aggregator = QuantityAndProfit(config_params["input_queue"], config_params["output_queue"], config_params["eof_service_queue"], config_params["storage_dir"], config_params["rabbitmq_host"])
     aggregator.start()
 
 if __name__ == "__main__":

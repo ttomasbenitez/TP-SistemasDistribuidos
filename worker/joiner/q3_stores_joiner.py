@@ -29,7 +29,7 @@ class StoresJoiner(Joiner):
         self.processed_transactions = {}
 
     def _consume_data_queue(self):
-        data_input_queue = MessageMiddlewareQueue(self.host, self.data_input_queue)
+        data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
         self.message_middlewares.append(data_input_queue)
         
         def __on_message__(msg):
@@ -64,7 +64,7 @@ class StoresJoiner(Joiner):
         logging.info(f"action: Stores updated | request_id: {message.request_id}")
                     
     def _send_results(self, message):
-        data_output_exchange = MessageMiddlewareExchange(self.host, self.data_output_exchange, {})
+        data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, {}, self.connection)
         self.message_middlewares.append(data_output_exchange)
         self._process_pending()
         self._send_joined_transactions_by_request(message, message.request_id, data_output_exchange)

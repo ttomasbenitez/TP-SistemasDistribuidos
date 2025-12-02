@@ -6,6 +6,7 @@ from utils.custom_logging import initialize_log
 import os
 from pkg.message.constants import MESSAGE_TYPE_TRANSACTIONS, MESSAGE_TYPE_TRANSACTION_ITEMS, MESSAGE_TYPE_EOF
 from multiprocessing import Process
+from Middleware.connection import PikaConnection
 from utils.heartbeat import start_heartbeat_sender
 
 class FilterYearNode(Worker):
@@ -25,7 +26,7 @@ class FilterYearNode(Worker):
         self.__init_manager__()
         self.__init_middlewares_handler__()
      
-        self.host = host
+        self.connection = PikaConnection(host)
         self.data_input_queue = data_input_queue
         self.data_output_exchange = data_output_exchange
         self.output_exchange_queues = output_exchange_queues
@@ -38,25 +39,32 @@ class FilterYearNode(Worker):
         self.years = years_set
 
     def start(self):
-        logging.info("Starting data consumer process")
-        p_data = Process(target=self._consume_data_queue)
+        # logging.info("Starting data consumer process")
+        # p_data = Process(target=self._consume_data_queue)
 
-        logging.info("Starting EOF consumer process")
-        p_eof = Process(target=self._consume_eof)
+        # logging.info("Starting EOF consumer process")
+        # p_eof = Process(target=self._consume_eof)
         
-        logging.info(f"Starting EOF FINAL process")
-        p_eof_final = Process(target=self._consume_eof_final)
+        # logging.info(f"Starting EOF FINAL process")
+        # p_eof_final = Process(target=self._consume_eof_final)
 
         self.heartbeat_sender = start_heartbeat_sender()
 
-        for p in (p_data, p_eof, p_eof_final):
-            p.start()
-        for p in (p_data, p_eof, p_eof_final):
-            p.join()
+        # for p in (p_data, p_eof, p_eof_final):
+        #     p.start()
+        # for p in (p_data, p_eof, p_eof_final):
+        #     p.join()
+        
+        self.connection.start()
+        self._consume_data_queue()
+        self._consume_eof()
+        self._consume_eof_final()
+        self.connection.start_consuming()
+        
 
     def _consume_eof_final(self):
-        eof_final_queue = MessageMiddlewareQueue(self.host, self.eof_final_queue)
-        data_output_exchange = MessageMiddlewareExchange(self.host, self.data_output_exchange, self.output_exchange_queues)
+        eof_final_queue = MessageMiddlewareQueue(self.eof_final_queue, self.connection)
+        data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, self.output_exchange_queues, self.connection)
         self.message_middlewares.extend([eof_final_queue, data_output_exchange])
         
         def __on_eof_final_message__(message):
@@ -73,9 +81,9 @@ class FilterYearNode(Worker):
         eof_final_queue.start_consuming(__on_eof_final_message__)
 
     def _consume_data_queue(self):
-        data_input_queue = MessageMiddlewareQueue(self.host, self.data_input_queue)
-        data_output_exchange = MessageMiddlewareExchange(self.host, self.data_output_exchange, self.output_exchange_queues)
-        eof_exchange = MessageMiddlewareExchange(self.host, self.eof_output_exchange, self.eof_output_queues)
+        data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
+        data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, self.output_exchange_queues, self.connection)
+        eof_exchange = MessageMiddlewareExchange(self.eof_output_exchange, self.eof_output_queues, self.connection)
         self.message_middlewares.extend([data_input_queue, data_output_exchange, eof_exchange])
 
         def __on_message__(message_bytes):

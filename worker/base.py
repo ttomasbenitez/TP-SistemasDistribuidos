@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 from Middleware.middleware import MessageMiddleware, MessageMiddlewareQueue
 from pkg.message.constants import MESSAGE_TYPE_EOF
 from pkg.message.message import Message
@@ -8,16 +8,21 @@ from multiprocessing import Manager
 from utils.heartbeat import start_heartbeat_sender
 from pkg.message.utils import calculate_sub_message_id
 from pkg.message.constants import SUB_MESSAGE_START_ID
+from Middleware.connection import PikaConnection
 
 class Worker(ABC):
     
-    def __init__(self, in_middleware: MessageMiddleware, host: str = '', eof_self_queue: str = '', eof_service_queue: str = ''):
-        self.in_middleware = in_middleware
-        self.host = host
-        self.eof_self_queue = eof_self_queue
-        self.eof_service_queue = eof_service_queue
-        self.__init_manager__()
-        self.__init_middlewares_handler__()
+    @abstractmethod
+    def __init__(self):
+        pass
+        # self.connection = PikaConnection(host)
+        # self.in_middleware = in_middleware
+        # # self.host = host
+        # self.connection = connection
+        # self.eof_self_queue = eof_self_queue
+        # self.eof_service_queue = eof_service_queue
+        # self.__init_manager__()
+        # self.__init_middlewares_handler__()
         
     def __init_middlewares_handler__(self):
         self.message_middlewares = []
@@ -30,19 +35,9 @@ class Worker(ABC):
         self.inflight = self.manager.dict()
         self.drained = self.manager.dict()
         
+    @abstractmethod
     def start(self):
-        
-        self.heartbeat_sender = start_heartbeat_sender()
-       
-        try:
-            self.in_middleware.start_consuming(self.__on_message__)
-        except Exception as e:
-            print(f"Error al consumir: {type(e).__name__}: {e}")
-
-        self.stop()
-        if hasattr(self, 'heartbeat_sender') and self.heartbeat_sender:
-            self.heartbeat_sender.stop()
-        self.close()
+        pass
     
     def __on_message__(self, raw):
         pass
@@ -70,8 +65,8 @@ class Worker(ABC):
                 self.drained[request_id].set()
                 
     def _consume_eof(self):
-        eof_service_queue = MessageMiddlewareQueue(self.host, self.eof_service_queue)
-        eof_self_queue = MessageMiddlewareQueue(self.host, self.eof_self_queue)
+        eof_service_queue = MessageMiddlewareQueue(self.eof_service_queue, self.connection)
+        eof_self_queue = MessageMiddlewareQueue(self.eof_self_queue, self.connection)
         self.message_middlewares.extend([eof_service_queue, eof_self_queue])
         
         def on_eof_message(message):
@@ -85,7 +80,7 @@ class Worker(ABC):
             except Exception as e:
                 logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
         
-        eof_self_queue.start_consuming(on_eof_message)
+        eof_self_queue.start_consuming(on_eof_message, False)
     
     def stop(self):
         try:

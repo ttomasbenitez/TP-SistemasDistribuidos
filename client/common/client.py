@@ -62,14 +62,16 @@ class Client:
 
     def __send_folder_data(self, folder_path, message_type):
         folder = Path(folder_path)
+        
         for file_path in folder.glob("*.csv"):
             file_reader = FileReader(file_path, int(os.getenv('MAX_BATCH_SIZE')))
             while file_reader.has_more_data():
                 data = file_reader.get_chunk()
                 self._msg_num += 1
-                self._protocol.send_message(Message(self._request_id, message_type, self._msg_num, data).serialize())
+                mensaje = Message(self._request_id, message_type, self._msg_num, data)
+                self._protocol.send_message(mensaje.serialize())
             file_reader.close()
-
+        
         logging.info(f'action: send_data_folder | folder: {folder_path} | result: success')
 
     def __send_end_of_data(self):

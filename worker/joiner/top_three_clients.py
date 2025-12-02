@@ -26,7 +26,7 @@ class TopThreeClientsJoiner(Joiner):
         self.state_storage = TopThreeClientsStateStorage(storage_dir)
 
     def _consume_data_queue(self):
-        data_input_queue = MessageMiddlewareQueue(self.host, self.data_input_queue)
+        data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
         self.message_middlewares.append(data_input_queue)
         
         def __on_message__(msg):
@@ -85,7 +85,7 @@ class TopThreeClientsJoiner(Joiner):
         
     def _send_results(self, message):
         self.state_storage.load_state(message.request_id)
-        data_output_queue = MessageMiddlewareQueue(self.host, self.data_output_queue)
+        data_output_queue = MessageMiddlewareQueue(self.data_output_queue, self.connection)
         self.message_middlewares.append(data_output_queue)
         self._process_top_3_by_request(message.request_id, data_output_queue)
         self._send_eof(message, data_output_queue)

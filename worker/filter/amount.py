@@ -9,6 +9,7 @@ import os
 from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_QUERY_1_RESULT
 from multiprocessing import Process
 from utils.heartbeat import start_heartbeat_sender
+from Middleware.connection import PikaConnection
 
 MAX_PENDING_SIZE = 1000
 AMOUNT_THRESHOLD = 75
@@ -30,7 +31,7 @@ class FilterAmountNode(Worker):
         
         self.__init_manager__()
         self.__init_middlewares_handler__()
-        self.host = host
+        self.connection = PikaConnection(host)
         self.data_input_queue = data_input_queue
         self.data_output_exchange = data_output_exchange
         self.eof_output_exchange = eof_output_exchange
@@ -44,21 +45,26 @@ class FilterAmountNode(Worker):
         
     def start(self):
        
-        logging.info(f"Starting process")
-        p_data = Process(target=self._consume_data_queue)
+        # logging.info(f"Starting process")
+        # p_data = Process(target=self._consume_data_queue)
         
-        logging.info(f"Starting EOF FINAL process")
-        p_eof_final = Process(target=self._consume_eof_final)
+        # logging.info(f"Starting EOF FINAL process")
+        # p_eof_final = Process(target=self._consume_eof_final)
         
         self.heartbeat_sender = start_heartbeat_sender()
 
-        for p in (p_data, p_eof_final): p.start()
-        for p in (p_data, p_eof_final): p.join()
+        # for p in (p_data, p_eof_final): p.start()
+        # for p in (p_data, p_eof_final): p.join()
+        
+        self.connection.start()
+        self._consume_data_queue()
+        self._consume_eof_final()
+        self.connection.start_consuming()
 
     def _consume_data_queue(self):
-        data_input_queue = MessageMiddlewareQueue(self.host, self.data_input_queue)
-        data_output_exchange = MessageMiddlewareExchange(self.host, self.data_output_exchange, {})
-        eof_output_exchange = MessageMiddlewareExchange(self.host, self.eof_output_exchange, self.eof_output_queues)
+        data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
+        data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, {}, self.connection)
+        eof_output_exchange = MessageMiddlewareExchange(self.eof_output_exchange, self.eof_output_queues, self.connection)
         self.message_middlewares.extend([data_input_queue, data_output_exchange, eof_output_exchange])
         
         self.dedup_strategy.load_dedup_state()
@@ -75,7 +81,6 @@ class FilterAmountNode(Worker):
 
             except Exception as e:
                 logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
-                raise e
 
         data_input_queue.start_consuming(__on_message__, manual_ack=False)
 
@@ -117,8 +122,8 @@ class FilterAmountNode(Worker):
                 data_output_exchange.send(serialized, str(message.request_id))
         
     def _consume_eof_final(self):
-        eof_final_queue = MessageMiddlewareQueue(self.host, self.eof_final_queue)
-        data_output_exchange = MessageMiddlewareExchange(self.host, self.data_output_exchange, {})
+        eof_final_queue = MessageMiddlewareQueue(self.eof_final_queue, self.connection)
+        data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, {}, self.connection)
         self.message_middlewares.extend([eof_final_queue, data_output_exchange])
         
         def __on_eof_final_message__(message):

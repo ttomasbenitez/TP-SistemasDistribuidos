@@ -33,10 +33,15 @@ class JoinerMenuItems(Joiner):
                     self.items_to_join[message.request_id][item.get_id()] = item.get_name()
         
         logging.info(f"action: Menu Items updated | request_id: {message.request_id}")
-    
+        
     def _send_results(self, message):
-        data_output_exchange = MessageMiddlewareExchange(self.host, self.data_output_exchange, {})
+        data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, {}, self.connection)
         self.message_middlewares.append(data_output_exchange)
+        self._send_processed_clients(message, data_output_exchange)
+        self._send_eof(message, data_output_exchange)
+        
+    
+    def _send_processed_clients(self, message, data_output_exchange):
         
         request_id = message.request_id
         ready_to_send = ''
@@ -53,10 +58,11 @@ class JoinerMenuItems(Joiner):
         if ready_to_send:
             serialized = Message(request_id, MESSAGE_TYPE_QUERY_2_RESULT, 0, ready_to_send).serialize()
             data_output_exchange.send(serialized, str(request_id))
+        
 
     def _consume_data_queue(self):
-        data_input_queue = MessageMiddlewareQueue(self.host, self.data_input_queue)
-        data_output_exchange = MessageMiddlewareExchange(self.host, self.data_output_exchange, {})
+        data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
+        data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, {}, self.connection)
         self.message_middlewares.extend([data_input_queue, data_output_exchange])
         
         def __on_message__(message):
@@ -85,6 +91,12 @@ class JoinerMenuItems(Joiner):
                     data_output_exchange.send(serialized, str(message.request_id))
                     
         data_input_queue.start_consuming(__on_message__)
+        
+    def _send_eof(self, message, data_output_exchange):
+        data_output_exchange.send(message.serialize(), str(message.request_id))
+        logging.info(f"action: EOF sent | request_id: {message.request_id} | type: {message.type}")
+
+
                        
 def initialize_config():
     """ Parse env variables to find program config params

@@ -7,6 +7,7 @@ import os
 from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_TRANSACTIONS
 from multiprocessing import Process
 from utils.heartbeat import start_heartbeat_sender
+from Middleware.connection import PikaConnection
 
 import hashlib
 
@@ -34,28 +35,30 @@ class FilterTimeNode(Worker):
         self.sharding_q3_amount = sharding_q3_amount
         self.eof_output_exchange = eof_output_exchange
         self.eof_output_queues = eof_output_queues
-        self.host = host
+        self.connection = PikaConnection(host)
         self.eof_service_queue = eof_service_queue
         self.eof_self_queue = eof_self_queue
         self.time = time_set
 
     def start(self):
        
-        logging.info(f"Starting process")
-        p_data = Process(target=self._consume_data_queue)
+        # logging.info(f"Starting process")
+        # p_data = Process(target=self._consume_data_queue)
         
-        logging.info(f"Starting EOF node process")
-        p_eof = Process(target=self._consume_eof)
+        # logging.info(f"Starting EOF node process")
+        # p_eof = Process(target=self._consume_eof)
         
         self.heartbeat_sender = start_heartbeat_sender()
 
-        for p in (p_data, p_eof): p.start()
-        for p in (p_data, p_eof): p.join()
+        self.connection.start()
+        self._consume_data_queue()
+        self._consume_eof()
+        self.connection.start_consuming()
         
     def _consume_data_queue(self):
-        data_in_queue = MessageMiddlewareQueue(self.host, self.data_input_queue)
-        data_output_exchange = MessageMiddlewareExchange(self.host, self.data_output_exchange, self.output_exchange_queues)
-        eof_output_exchange = MessageMiddlewareExchange(self.host, self.eof_output_exchange, self.eof_output_queues)
+        data_in_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
+        data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, self.output_exchange_queues, self.connection)
+        eof_output_exchange = MessageMiddlewareExchange(self.eof_output_exchange, self.eof_output_queues, self.connection)
         self.message_middlewares.extend([data_in_queue, eof_output_exchange, data_output_exchange])
         
         def __on_message__(message):

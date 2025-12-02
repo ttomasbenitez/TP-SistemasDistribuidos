@@ -2,6 +2,7 @@ import socket
 import logging
 import signal
 import uuid
+from Middleware.connection import PikaConnection
 from .client_handler import ClientHandler
 from Middleware.middleware import MessageMiddlewareQueue
 from Middleware.middleware import MessageMiddlewareExchange
@@ -36,18 +37,19 @@ class Gateway:
                 logging.info(f"action: new_connection | ip: {addr[0]} | result: success")
 
                 results_queue_name = f"{self._in_queue_prefix}_{self._request_id}"
-                results_in_queue = MessageMiddlewareQueue(self._rabbitmq_host, results_queue_name)
-                results_in_queue.channel.exchange_declare(exchange=self._output_exchange_name, exchange_type='topic', durable=True)
-                results_in_queue.bind_queue(
-                    self._output_exchange_name,
-                     str(self._request_id),
-                )
-                logging.info(f"action: bind_results_queue | queue name: {results_queue_name} | exchange: {self._output_exchange_name} | result: success")
+                connection = PikaConnection(self._rabbitmq_host)
+                results_in_queue = MessageMiddlewareQueue(results_queue_name, connection)
+                # results_in_queue.channel.exchange_declare(exchange=self._output_exchange_name, exchange_type='topic', durable=True)
+                # results_in_queue.bind_queue(
+                #     self._output_exchange_name,
+                #      str(self._request_id),
+                # )
+               # logging.info(f"action: bind_results_queue | queue name: {results_queue_name} | exchange: {self._output_exchange_name} | result: success")
 
                 queues_dict = self.create_queues_dict()
-                exchange = MessageMiddlewareExchange(self._rabbitmq_host, self._exchange_name, queues_dict)
+                exchange = MessageMiddlewareExchange(self._exchange_name, queues_dict, connection)
 
-                handler = ClientHandler(self._request_id, client_sock, exchange, results_in_queue)
+                handler = ClientHandler(self._request_id, client_sock, exchange, results_in_queue, self._output_exchange_name, connection)
                 self._request_id += 1
 
                 self._clients.append(handler)

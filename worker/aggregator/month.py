@@ -1,5 +1,6 @@
 from worker.base import Worker 
 from Middleware.middleware import MessageMiddlewareExchange, MessageMiddlewareQueue
+from Middleware.connection import PikaConnection
 import logging
 from pkg.message.message import Message
 from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_QUERY_2_INTERMEDIATE_RESULT
@@ -31,28 +32,33 @@ class AggregatorMonth(Worker):
         self.data_output_queues = data_output_queues
         self.eof_output_exchange = eof_output_exchange
         self.eof_output_queues = eof_output_queues
-        self.host = host
+        self.connection = PikaConnection(host)
         self.eof_self_queue= eof_self_queue
         self.eof_service_queue = eof_service_queue
     
     def start(self):
-        logging.info(f"Starting process")
-        p_data = Process(target=self._consume_data_queue)
+        # logging.info(f"Starting process")
+        # p_data = Process(target=self._consume_data_queue)
         
-        logging.info(f"Starting EOF node process")
-        p_eof = Process(target=self._consume_eof)
+        # logging.info(f"Starting EOF node process")
+        # p_eof = Process(target=self._consume_eof)
         
-        self.heartbeat_sender = start_heartbeat_sender()
+        # self.heartbeat_sender = start_heartbeat_sender()
 
-        for p in (p_data, p_eof): p.start()
-        for p in (p_data, p_eof): p.join()
-
+        # for p in (p_data, p_eof): p.start()
+        # for p in (p_data, p_eof): p.join()
+        self.connection.start()
+        self._consume_data_queue()
+        self._consume_eof()
+        self.connection.start_consuming()
+       
+    
     def _consume_data_queue(self):
-        eof_output_exchange = MessageMiddlewareExchange(self.host, self.eof_output_exchange, self.eof_output_queues)
-        data_output_queues = [MessageMiddlewareQueue(self.host, queue) for queue in self.data_output_queues]
-        data_input_queue = MessageMiddlewareQueue(self.host, self.data_input_queue)
+        eof_output_exchange = MessageMiddlewareExchange(self.eof_output_exchange, self.eof_output_queues, self.connection)
+        data_output_queues = [MessageMiddlewareQueue(queue, self.connection) for queue in self.data_output_queues]
+        data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
         self.message_middlewares.extend([eof_output_exchange, data_input_queue] + data_output_queues)
-        
+        logging.info(f"COLASSS {data_output_queues}")
         self.buffers = {}
         self.last_message = {}
 
@@ -143,10 +149,10 @@ class AggregatorMonth(Worker):
             hash_val = int(hashlib.sha256(key.encode()).hexdigest(), 16)
             queue_index = hash_val % len(output_queues)
             target_queue = output_queues[queue_index]
-            
             new_chunk = ''.join(item.serialize() for item in items)
             new_msg_num = calculate_sub_message_id(original_message.msg_num, sub_msg_id)
             new_message = original_message.new_from_original(new_chunk, msg_num=new_msg_num)
+            logging.info(f"action: sending group | key: {key} | to_queue_index: {queue_index} | request_id: {new_message.request_id} | type: {new_message.type}")
             serialized = new_message.serialize()
             target_queue.send(serialized)
             sub_msg_id += 1
@@ -194,7 +200,6 @@ def initialize_config():
         pass
 
     config_params["output_queues"] = output_queues
-    
     config_params["eof_exchange_name"] = os.getenv('EOF_EXCHANGE_NAME')
     config_params["eof_queue_1"] = os.getenv('EOF_QUEUE_1')
     config_params["eof_queue_2"] = os.getenv('EOF_QUEUE_2')
@@ -214,6 +219,8 @@ def main():
     
     eof_output_queues = {config_params["eof_queue_1"]: [str(MESSAGE_TYPE_EOF)],
                             config_params["eof_queue_2"]: [str(MESSAGE_TYPE_EOF)]}
+    
+    logging.info(f"Initialized output queuques: {config_params['output_queues']}")
 
     aggregator = AggregatorMonth(config_params["input_queue"], 
                                 config_params["output_queues"], 

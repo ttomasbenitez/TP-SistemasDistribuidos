@@ -7,10 +7,19 @@ from pkg.message.constants import MESSAGE_TYPE_EOF
 
 class EofServiceTime(EofService):
     
-    def send_message_to_output(self, message):
+    def __init__(self, eof_input_queque, eof_output_middleware, eof_queues, expected_acks, host):
+        super().__init__(eof_input_queque, eof_output_middleware, expected_acks, host)
+        self.eof_queues = eof_queues
+    
+    def send_message(self, message):
+        eof_output_exchange = MessageMiddlewareExchange(
+            self.eof_output_middleware,
+            self.eof_queues,
+            self.connection
+        )
         try:
             routing_key = str(message.type)
-            self.eof_out_middleware.send(message.serialize(), routing_key)
+            eof_output_exchange.send(message.serialize(), routing_key)
         except Exception as e:
             logging.error(f"Error al enviar el mensaje: {type(e).__name__}: {e}")
             
@@ -58,19 +67,17 @@ def main():
     config_params = initialize_config()
 
     initialize_log(config_params["logging_level"])
-
-    eof_input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue"])
-    
+ 
     eof_queues = {}
     for queue in config_params["output_queues"]:
         eof_queues[queue] = [str(MESSAGE_TYPE_EOF)]
 
-    eof_output_exchange = MessageMiddlewareExchange(config_params["rabbitmq_host"], config_params["output_exchange_filter"], eof_queues)
-   
     eof_service = EofServiceTime(
-        expected_acks=config_params["expected_acks"],
-        eof_in_queque=eof_input_queue,
-        eof_out_middleware=eof_output_exchange
+        config_params["input_queue"],
+        config_params["output_exchange_filter"],
+        eof_queues,
+        config_params["expected_acks"],
+        config_params["rabbitmq_host"]
     )
     eof_service.start()
     

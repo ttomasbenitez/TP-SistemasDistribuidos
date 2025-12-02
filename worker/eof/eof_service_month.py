@@ -4,16 +4,45 @@ import os
 from utils.custom_logging import initialize_log
 from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
 from pkg.message.constants import MESSAGE_TYPE_EOF
+from Middleware.connection import PikaConnection
+import signal
 
 class EofServiceMonth(EofService):
     
-    def send_message_to_output(self, message):
+    def __init__(self, 
+                 eof_input_queque: str, 
+                 output_queues: list,
+                 expected_acks: int,
+                 host: str):
+        
+        self.connection = PikaConnection(host)
+        self.eof_input_queque = eof_input_queque
+        self.eof_output_queues = output_queues
+        self.expected_acks = expected_acks
+        self.acks_by_client = dict()
+        
+        signal.signal(signal.SIGTERM, self.__handle_shutdown)
+        signal.signal(signal.SIGINT, self.__handle_shutdown)
+    
+    def send_message(self, message):
         try:
             # eof_out_middleware is now a list of middlewares
-            for middleware in self.eof_out_middleware:
-                middleware.send(message.serialize())
+            for middleware in self.eof_output_queues:
+                queue = MessageMiddlewareQueue(middleware, self.connection)
+                queue.send(message.serialize())
         except Exception as e:
             logging.error(f"Error al enviar el mensaje: {type(e).__name__}: {e}")
+    
+    def __handle_shutdown(self, signum, frame):
+        """
+        Closes all worker connections and shuts down the worker.
+        """ 
+        try:
+            self.close()
+        except Exception:
+            pass
+        logging.info(f'action: gateway shutdown | result: success')
+        
             
 def initialize_config():
     """ Parse env variables to find program config params
@@ -66,15 +95,12 @@ def main():
     config_params = initialize_config()
 
     initialize_log(config_params["logging_level"])
-
-    eof_input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue"])
-
-    eof_output_queues = [MessageMiddlewareQueue(config_params["rabbitmq_host"], queue) for queue in config_params["output_queues"]]
-
+    
     eof_service = EofServiceMonth(
-        expected_acks=config_params["expected_acks"],
-        eof_in_queque=eof_input_queue,
-        eof_out_middleware=eof_output_queues
+        config_params["input_queue"],
+        config_params["output_queues"],
+        config_params["expected_acks"],
+        config_params["rabbitmq_host"]
     )
     eof_service.start()
     

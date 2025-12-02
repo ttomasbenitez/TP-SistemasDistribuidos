@@ -7,6 +7,7 @@ import logging
 from pkg.message.message import Message
 from Middleware.middleware import MessageMiddlewareQueue
 from pkg.message.constants import MESSAGE_TYPE_EOF
+from Middleware.connection import PikaConnection
 
 class Joiner(Worker, ABC):
   
@@ -14,7 +15,7 @@ class Joiner(Worker, ABC):
         
         self.__init_middlewares_handler__()
         self.items_input_queue = items_input_queue
-        self.host = host
+        self.connection = PikaConnection(host)
         self.expected_eofs = expected_eofs
         self.eofs_by_client = {}
         self.items_to_join = {}
@@ -24,13 +25,18 @@ class Joiner(Worker, ABC):
         
     def start(self):
         self.heartbeat_sender = start_heartbeat_sender()
-        logging.info(f"Starting Joiner worker")
-        t_data = threading.Thread(target=self._consume_data_queue)
-        t_items_to_join = threading.Thread(target=self._consume_items_to_join_queue)
-        t_data.start()
-        t_items_to_join.start()
-        t_data.join()
-        t_items_to_join.join()
+        # logging.info(f"Starting Joiner worker")
+        # t_data = threading.Thread(target=self._consume_data_queue)
+        # t_items_to_join = threading.Thread(target=self._consume_items_to_join_queue)
+        # t_data.start()
+        # t_items_to_join.start()
+        # t_data.join()
+        # t_items_to_join.join()
+    
+        self.connection.start()
+        self._consume_data_queue()
+        self._consume_items_to_join_queue()
+        self.connection.start_consuming()
 
     @abstractmethod
     def _consume_data_queue(self):
@@ -45,11 +51,11 @@ class Joiner(Worker, ABC):
         pass
     
     def _process_on_eof_message__(self, message):
-        with self.eofs_lock:
-            self.eofs_by_client[message.request_id] = self.eofs_by_client.get(message.request_id, 0) + 1
-            if self.eofs_by_client[message.request_id] < self.expected_eofs:
-                logging.info(f"action: EOF message received {self.eofs_by_client[message.request_id]}/{self.expected_eofs} | request_id: {message.request_id} | type: {message.type}")
-                return
+        # with self.eofs_lock:
+        self.eofs_by_client[message.request_id] = self.eofs_by_client.get(message.request_id, 0) + 1
+        if self.eofs_by_client[message.request_id] < self.expected_eofs:
+            logging.info(f"action: EOF message received {self.eofs_by_client[message.request_id]}/{self.expected_eofs} | request_id: {message.request_id} | type: {message.type}")
+            return
         try:
             logging.info(f"action: EOF message received {self.eofs_by_client[message.request_id]}/{self.expected_eofs} send results | request_id: {message.request_id} | type: {message.type}")
             self._send_results(message)
@@ -58,7 +64,7 @@ class Joiner(Worker, ABC):
         return
     
     def _consume_items_to_join_queue(self):
-        items_input_queue = MessageMiddlewareQueue(self.host, self.items_input_queue)
+        items_input_queue = MessageMiddlewareQueue(self.items_input_queue, self.connection)
         self.message_middlewares.append(items_input_queue)
         def __on_items_message__(message):
             message = Message.deserialize(message)

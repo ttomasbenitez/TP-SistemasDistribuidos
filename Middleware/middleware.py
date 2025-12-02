@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import logging
 import pika
+from Middleware.connection import PikaConnection
 
 class MessageMiddlewareMessageError(Exception):
     pass
@@ -51,17 +52,18 @@ class MessageMiddleware(ABC):
 		pass
 
 class MessageMiddlewareQueue(MessageMiddleware):
-    def __init__(self, host, queue_name):
+    def __init__(self, queue_name: str, connection: PikaConnection):
         self.queue_name = queue_name
-        self.host = host
-        self._connect(host, queue_name)
+        self.connection = connection
+        self._connect_to_channel()
         
-    def _connect(self, host, queue_name):
-        self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=host, heartbeat=6000))
-        self.channel = self.connection.channel()
-        self.channel.queue_declare(queue=queue_name, durable=True)
+    def _connect_to_channel(self):
+        # self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=host, heartbeat=6000))
+        # self.channel = self.connection.channel()
+        self.connection.declare_queue(self.queue_name)
+        # self.channel.queue_declare(queue=queue_name, durable=True)
 
-    def start_consuming(self, on_message_callback, manual_ack=False, prefetch_count=2):
+    def start_consuming(self, on_message_callback, init_consuming=True, manual_ack=False, prefetch_count=2):
         def callback(ch, method, properties, body):
             if manual_ack:
                 on_message_callback(body, ch, method)
@@ -72,42 +74,51 @@ class MessageMiddlewareQueue(MessageMiddleware):
                 except Exception as e:
                     logging.error(f"[Middleware] Error processing message: {e}")
                     ch.basic_nack(delivery_tag=method.delivery_tag)
+                    
+        self.connection.add_basic_consume(
+            queue_name=self.queue_name,
+            on_message_callback=callback,
+            prefetch_count=prefetch_count,
+            auto_ack=False
+        )
             
-        self.channel.basic_qos(prefetch_count=prefetch_count)
-        self.channel.basic_consume(queue=self.queue_name, on_message_callback=callback, auto_ack=False)
-            
-        self.channel.start_consuming()
+        # self.channel.basic_qos(prefetch_count=prefetch_count)
+        # self.channel.basic_consume(queue=self.queue_name, on_message_callback=callback, auto_ack=False)
+        # if init_consuming:
+        #     self.connection.start_consuming()
 
     def stop_consuming(self):
-        self.connection.close()
+        self.connection.stop_consuming()
         
     def send(self, message):
         try:
-            self.channel.basic_publish(exchange='', routing_key=self.queue_name, body=message)
+            self.connection.send(exchange='', routing_key=self.queue_name, body=message)
+            # self.channel.basic_publish(exchange='', routing_key=self.queue_name, body=message)
         except (pika.exceptions.AMQPConnectionError,
                 pika.exceptions.StreamLostError,
                 pika.exceptions.ChannelClosedByBroker) as e:
             logging.warning(f"[AMQP] Conexión perdida ({type(e).__name__}). Reintentando...")
             try:
                 self.reconnect()
-                self.channel.basic_publish(
-                    exchange='',
-                    routing_key=self.queue_name,
-                    body=message,
-                    mandatory=True
-                )
+                self.connection.send(exchange='', routing_key=self.queue_name, body=message)
+                # self.channel.basic_publish(
+                #     exchange='',
+                #     routing_key=self.queue_name,
+                #     body=message,
+                #     mandatory=True
+                # )
                 logging.info("[AMQP] Reenvío exitoso tras reconexión.")
             except Exception as e2:
                 logging.error(f"[AMQP] Falló reintento tras reconexión: {type(e2).__name__}: {e2}")
 
     def close(self):
-        self.connection.close()
+        self.connection.stop_consuming()
 
     def delete(self):
-        self.channel.queue_delete(queue=self.queue_name)
+        self.connection.delete_queue(queue=self.queue_name)
     
-    def bind_queue(self, exchange_name, routing_key):
-        self.channel.queue_bind(exchange=exchange_name, queue=self.queue_name, routing_key=routing_key)
+    # def bind_queue(self, exchange_name, routing_key):
+    #     self.channel.queue_bind(exchange=exchange_name, queue=self.queue_name, routing_key=routing_key)
         
     def reconnect(self):
         try:
@@ -115,71 +126,91 @@ class MessageMiddlewareQueue(MessageMiddleware):
         except Exception as e:
             logging.warning(f"Error cerrando conexión vieja: {e}")
         logging.info("Reconectando con RabbitMQ...")
-        self._connect(self.host, self.queue_name)
+        self.connection.reconnect()
+        self._connect_to_channel()
 
 class MessageMiddlewareExchange(MessageMiddleware):
-    def __init__(self, host, exchange_name, queues_dict):
-        self.host = host
+    def __init__(self, exchange_name: str, queues_dict: object, connection: PikaConnection):
+        # self.host = host
         self.exchange_name = exchange_name
         self.exchange_queues = queues_dict
-        self._connect(host, exchange_name, queues_dict)
+        self.connection = connection
+        self._connect_to_channel()
         
-    def _connect(self, host, exchange_name, queues_dict):
-        self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=host, heartbeat=6000))
-        self.channel = self.connection.channel()
-        self.channel.exchange_declare(exchange=exchange_name, exchange_type='topic', durable=True)
-        self.route_keys = list(queues_dict.values())
-
+    def _connect_to_channel(self):
+        # self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=host, heartbeat=6000))
+        # self.channel = self.connection.channel()
+        self.connection.declare_exchange(self.exchange_name, exchange_type='topic')
+        # self.channel.exchange_declare(exchange=exchange_name, exchange_type='topic', durable=True)
+        self.route_keys = list(self.exchange_queues.values())
         # Diccionario que guarda cola -> {"queue": objeto Queue, "routing_key": routing_key}
         self.queues = {}
 
-        for queue_name, routing_keys in queues_dict.items():
+        for queue_name, routing_keys in self.exchange_queues.items():
             # Crear la cola
-            queue = MessageMiddlewareQueue(host, queue_name)
+            queue = MessageMiddlewareQueue(queue_name, connection=self.connection)
             # Bindearla al exchange con la routing key correspondiente
             # Bindear la cola al exchange por cada routing key si es lista
             if isinstance(routing_keys, list):
                 for key in routing_keys:
-                    self.channel.queue_bind(exchange=self.exchange_name, queue=queue_name, routing_key=key)
+                    self.connection.bind_queue(queue_name=queue_name, exchange=self.exchange_name, routing_key=key)
+                    # self.channel.queue_bind(exchange=self.exchange_name, queue=queue_name, routing_key=key)
             else:
-                self.channel.queue_bind(exchange=self.exchange_name, queue=queue_name, routing_key=routing_keys)
+                self.connection.bind_queue(queue_name=queue_name, exchange=self.exchange_name, routing_key=key)
+                # self.channel.queue_bind(exchange=self.exchange_name, queue=queue_name, routing_key=routing_keys)
 
             self.queues[queue_name] = {"queue": queue, "routing_key": routing_keys}
 
         
-    def start_consuming(self, on_message_callback):
+    def start_consuming(self, on_message_callback, init_consuming=True):
         def callback(ch, method, properties, body):
             on_message_callback(body)
             ch.basic_ack(delivery_tag=method.delivery_tag)
 
         for queue_name in self.queues.keys():
-            self.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=False)
+            self.connection.add_basic_consume(
+                queue_name=queue_name,
+                on_message_callback=callback
+            )
+            # self.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=False)
 
-        self.channel.start_consuming()
+        # if init_consuming:
+        #     self.connection.start_consuming()
+        # self.channel.start_consuming()
 
     def stop_consuming(self):
-        self.connection.close()
+        self.connection.stop_consuming()
 
     def send(self, message, routing_key):
         try:
-            self.channel.basic_publish(
+            self.connection.send(
                 exchange=self.exchange_name,
                 routing_key=routing_key,
-                body=message,
-                mandatory=True
+                body=message
             )
+            # self.channel.basic_publish(
+            #     exchange=self.exchange_name,
+            #     routing_key=routing_key,
+            #     body=message,
+            #     mandatory=True
+            # )
         except (pika.exceptions.AMQPConnectionError,
                 pika.exceptions.StreamLostError,
                 pika.exceptions.ChannelClosedByBroker) as e:
             logging.warning(f"[AMQP] Conexión perdida ({type(e).__name__}). Reintentando...")
             try:
-                self.reconnect()
-                self.channel.basic_publish(
-                    exchange=self.exchange_name,
-                    routing_key=routing_key,
-                    body=message,
-                    mandatory=True
+                self.connection.reconnect()
+                self.connection.send(
+                exchange=self.exchange_name,
+                routing_key=routing_key,
+                body=message
                 )
+                # self.channel.basic_publish(
+                #     exchange=self.exchange_name,
+                #     routing_key=routing_key,
+                #     body=message,
+                #     mandatory=True
+                # )
                 logging.info("[AMQP] Reenvío exitoso tras reconexión.")
             except Exception as e2:
                 logging.error(f"[AMQP] Falló reintento tras reconexión: {type(e2).__name__}: {e2}")
@@ -188,7 +219,8 @@ class MessageMiddlewareExchange(MessageMiddleware):
         self.connection.close()
 
     def delete(self):
-        self.channel.exchange_delete(exchange=self.exchange_name)
+        self.connection.delete_exchange(exchange=self.exchange_name)
+        # self.channel.exchange_delete(exchange=self.exchange_name)
     
     def reconnect(self):
         try:
@@ -196,5 +228,6 @@ class MessageMiddlewareExchange(MessageMiddleware):
         except Exception as e:
             logging.warning(f"Error cerrando conexión vieja: {e}")
         logging.info("Reconectando con RabbitMQ...")
-        self._connect(self.host, self.exchange_name, self.exchange_queues)
+        self.connection.reconnect()
+        self._connect_to_channel()
         

@@ -7,9 +7,13 @@ from pkg.message.constants import MESSAGE_TYPE_EOF
 
 class EofServiceAggregatorStore(EofService):
     
-    def send_message_to_output(self, message):
+    def send_message(self, message):
+        eof_output_queue = MessageMiddlewareQueue(
+            self.eof_output_middleware,
+            self.connection
+        )
         try:
-            self.eof_out_middleware.send(message.serialize())
+            eof_output_queue.send(message.serialize())
         except Exception as e:
             logging.error(f"Error al enviar el mensaje: {type(e).__name__}: {e}")
             
@@ -47,14 +51,11 @@ def main():
 
     initialize_log(config_params["logging_level"])
 
-    eof_input_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["input_queue"])
-
-    output_queue = MessageMiddlewareQueue(config_params["rabbitmq_host"], config_params["output_queue"])
-   
     eof_service = EofServiceAggregatorStore(
-        expected_acks=config_params["expected_acks"],
-        eof_in_queque=eof_input_queue,
-        eof_out_middleware=output_queue
+        config_params["input_queue"],
+        config_params["output_queue"],
+        config_params["expected_acks"],
+        config_params["rabbitmq_host"]
     )
     eof_service.start()
     
