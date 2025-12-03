@@ -151,9 +151,9 @@ class Message:
             msg_num = self.msg_num
         return Message(self.request_id, self.type, msg_num, new_content)
     
-    def get_node_id(self):
+    def get_node_id_and_request_id(self):
         """
         Obtiene el ID del nodo del mensaje.
         :return: ID del nodo.
         """
-        return self.node_id
+        return f"{self.node_id}.{self.request_id}"

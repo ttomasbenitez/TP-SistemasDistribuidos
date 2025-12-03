@@ -53,7 +53,7 @@ class SemesterAggregator(Worker):
         - If greater than last -> accept and update
         - If less than last -> out-of-order (skip)
         """
-        sender_id = message.get_node_id()
+        sender_id = message.get_node_id_and_request_id()
         with self._sender_lock:
             last = self._last_msg_by_sender.get(sender_id, -1)
             if message.msg_num == last:
@@ -143,7 +143,7 @@ class SemesterAggregator(Worker):
                     deltas.append((period, store_id, amount))
 
                 # Persist incremental changes and last seen msg for sender
-                sender_id = message.get_node_id()
+                sender_id = message.get_node_id_and_request_id()
                 lines = []
                 for period, s_id, delta in deltas:
                     lines.append(f"agg;{period};{s_id};{delta}")
@@ -169,7 +169,7 @@ class SemesterAggregator(Worker):
                     res = Q3IntermediateResult(period, store_id, total)
                     self._send_grouped_item(message, res, data_output_queue)
         finally:
-            # Send EOF to downstream queue for q3
+            # Send EOF to downstream exchange for q3
             data_output_queue.send(message.serialize())
             # Cleanup state both memory and disk
             try:

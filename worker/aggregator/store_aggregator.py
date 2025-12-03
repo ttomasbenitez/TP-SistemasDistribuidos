@@ -80,8 +80,8 @@ class StoreAggregator(Worker):
     
     def _send_groups(self, original_message: Message, groups: dict, data_output_exchange: MessageMiddlewareExchange):
         current_msg_num = self.dedup_strategy.current_msg_num.get(original_message.request_id, 0)
-        logging.info(f"action: sending grouped items | request_id: {original_message.request_id} | groups_count: {len(groups)} | starting_msg_num: {current_msg_num}")
         for key, items in groups.items():
+            logging.info(f"action: sending grouped items | request_id: {original_message.request_id} | node: {self.node_id} | starting_msg_num: {current_msg_num}")
             new_chunk = ''.join(item.serialize() for item in items)
             new_message = Message(original_message.request_id, original_message.type, current_msg_num, new_chunk)
             new_message.add_node_id(self.node_id)
@@ -91,6 +91,8 @@ class StoreAggregator(Worker):
             sharding_key = sharding_key_value % self.total_shards
             data_output_exchange.send(serialized, f"{str(new_message.type)}.{sharding_key}")
             current_msg_num += 1
+        
+        self.dedup_strategy.current_msg_num[original_message.request_id] = current_msg_num
                
 def initialize_config():
     """ Parse env variables to find program config params
