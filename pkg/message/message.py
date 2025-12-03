@@ -22,6 +22,7 @@ from pkg.message.q3_result import Q3Result
 from pkg.message.q3_result import Q3IntermediateResult
 from pkg.message.q2_result import Q2Result, Q2IntermediateResult
 from pkg.message.q4_result import Q4Result, Q4IntermediateResult
+from pkg.message.utils import parse_int
 
 
 class Message:
@@ -40,14 +41,23 @@ class Message:
         self.request_id = request_id
         self.type = type
         self.msg_num = msg_num
+        self.node_id = None
         self.content = content
+        
+    def add_node_id(self, node_id):
+        """
+        Agrega el ID del nodo al mensaje.
+        :param node_id: ID del nodo.
+        """
+        self.node_id = node_id
 
     def serialize(self):
         """
         Serializa el mensaje en bytes.
         :return: Mensaje serializado en bytes.
         """
-        msg = f"{self.type};{self.request_id};{self.msg_num};{self.content}".encode('utf-8')
+        node = self.node_id if self.node_id is not None else ''
+        msg = f"{self.type};{self.request_id};{self.msg_num};{node};{self.content}".encode('utf-8')
         return msg
     
     def deserialize(raw_msg):
@@ -56,12 +66,16 @@ class Message:
         :param raw_msg: Mensaje en bytes.
         """
         raw_msg = raw_msg.decode('utf-8')
-        parts = raw_msg.split(';', 3)
+        parts = raw_msg.split(';', 4)
         type = int(parts[0])
         request_id = int(parts[1])
         msg_num = int(parts[2])
-        content = parts[3]
-        return Message(request_id, type, msg_num, content)
+        node_id = parse_int(parts[3])
+        content = parts[4]
+        
+        message = Message(request_id, type, msg_num, content)
+        message.add_node_id(node_id)
+        return message
 
     def process_message_from_csv(self):
         """ 
@@ -136,3 +150,10 @@ class Message:
         if msg_num is None:
             msg_num = self.msg_num
         return Message(self.request_id, self.type, msg_num, new_content)
+    
+    def get_node_id(self):
+        """
+        Obtiene el ID del nodo del mensaje.
+        :return: ID del nodo.
+        """
+        return self.node_id

@@ -8,7 +8,7 @@ import os
 from pkg.storage.state_storage.top_three_clients import TopThreeClientsStateStorage
 from pkg.message.q4_result import Q4IntermediateResult
 
-EXPECTED_EOFS = 2
+EXPECTED_EOFS = 3 # 1 users, 2 store agg
 SNAPSHOT_COUNT = 1000
 
 class TopThreeClientsJoiner(Joiner):
@@ -43,7 +43,8 @@ class TopThreeClientsJoiner(Joiner):
                 if message.type == MESSAGE_TYPE_TRANSACTIONS:
                     self._accumulate_items(items, message.request_id)
             finally:
-                self._dec_inflight(message.request_id)
+                if message.type == MESSAGE_TYPE_TRANSACTIONS:
+                    self._dec_inflight(message.request_id)
                 
         data_input_queue.start_consuming(__on_message__)
         

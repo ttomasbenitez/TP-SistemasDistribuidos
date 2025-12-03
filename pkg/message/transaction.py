@@ -113,3 +113,14 @@ class Transaction:
         """
         return self.user_id
     
+    def get_sharding_key(self, sharding_param: str):
+        """
+        Obtiene la clave de sharding 
+        """
+        if sharding_param == 'store':
+            return self.get_store()
+        if sharding_param == 'semester':
+            year = self.get_year()
+            sem  = self.get_semester()
+            return year + sem
+    

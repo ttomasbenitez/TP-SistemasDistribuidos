@@ -63,7 +63,8 @@ class Q4StoresJoiner(Joiner):
                         else:
                             self.pending_clients[(item.get_store(), message.request_id)] = item
             finally:
-                self._dec_inflight(message.request_id)
+                if message.type != MESSAGE_TYPE_EOF:
+                    self._dec_inflight(message.request_id)
                         
         data_input_queue.start_consuming(__on_message__)
 

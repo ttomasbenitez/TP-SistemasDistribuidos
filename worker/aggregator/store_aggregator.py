@@ -1,29 +1,37 @@
 from worker.base import Worker 
-from Middleware.middleware import MessageMiddlewareQueue
+from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
 import logging
-from pkg.message.message import Message
+from pkg.message.message import Message, Transaction
 from utils.custom_logging import initialize_log
 import os
-from pkg.message.constants import MESSAGE_TYPE_EOF
+from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_TRANSACTIONS
 from Middleware.connection import PikaConnection
 from utils.heartbeat import start_heartbeat_sender
 from pkg.dedup.sliding_window_dedup_strategy import SlidingWindowDedupStrategy
+from pkg.message.utils import calculate_sub_message_id
+from pkg.message.constants import SUB_MESSAGE_START_ID
 
 class StoreAggregator(Worker):
 
     def __init__(self, 
                  data_input_queue: str, 
-                 data_output_queue: str,
-                 eof_service_queue: str,
-                 host: str,total_shards: int,
-                 storage_dir: str):
+                 output_exchange_queues: list,
+                 data_output_exchange: str,
+                 host: str,
+                 total_shards: int,
+                 storage_dir: str,
+                 sharding_key: str,
+                 node_number: int):
         
         self.__init_manager__()
         self.__init_middlewares_handler__()
         self.data_input_queue = data_input_queue
-        self.data_output_queue = data_output_queue
+        self.output_exchange_queues = output_exchange_queues
+        self.data_output_exchange = data_output_exchange
         self.connection = PikaConnection(host)
-        self.eof_service_queue = eof_service_queue
+        self.total_shards = total_shards
+        self.sharding_key = sharding_key
+        self.node_id = node_number
         self.dedup_strategy = SlidingWindowDedupStrategy(total_shards, storage_dir)
 
     def start(self):    
@@ -35,9 +43,8 @@ class StoreAggregator(Worker):
         
     def _consume_data_queue(self):
         data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
-        data_output_queue = MessageMiddlewareQueue(self.data_output_queue, self.connection)
-        eof_service_queue = MessageMiddlewareQueue(self.eof_service_queue, self.connection)
-        self.message_middlewares.extend([data_input_queue, data_output_queue, eof_service_queue])
+        data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, self.output_exchange_queues, self.connection)
+        self.message_middlewares.extend([data_input_queue, data_output_exchange])
         
         self.dedup_strategy.load_dedup_state()
         
@@ -47,7 +54,7 @@ class StoreAggregator(Worker):
 
                 if message.type == MESSAGE_TYPE_EOF:
                     logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
-                    eof_service_queue.send(message.serialize())
+                    data_output_exchange.send(message.serialize(), str(message.type))
                     self.dedup_strategy.update_state_on_eof(message)
                     return
                 
@@ -57,7 +64,7 @@ class StoreAggregator(Worker):
                     return
                 items = message.process_message()
                 groups = self._group_items_by_store(items)
-                self._send_groups(message, groups, data_output_queue)
+                self._send_groups(message, groups, data_output_exchange)
                 self.dedup_strategy.update_contiguous_sequence(message)
             except Exception as e:
                 logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
@@ -70,6 +77,20 @@ class StoreAggregator(Worker):
             store = item.get_store()
             groups.setdefault(store, []).append(item)
         return groups
+    
+    def _send_groups(self, original_message: Message, groups: dict, data_output_exchange: MessageMiddlewareExchange):
+        current_msg_num = self.dedup_strategy.current_msg_num.get(original_message.request_id, 0)
+        logging.info(f"action: sending grouped items | request_id: {original_message.request_id} | groups_count: {len(groups)} | starting_msg_num: {current_msg_num}")
+        for key, items in groups.items():
+            new_chunk = ''.join(item.serialize() for item in items)
+            new_message = Message(original_message.request_id, original_message.type, current_msg_num, new_chunk)
+            new_message.add_node_id(self.node_id)
+            serialized = new_message.serialize()
+            first_item = items[0]
+            sharding_key_value = first_item.get_sharding_key(self.sharding_key)
+            sharding_key = sharding_key_value % self.total_shards
+            data_output_exchange.send(serialized, f"{str(new_message.type)}.{sharding_key}")
+            current_msg_num += 1
                
 def initialize_config():
     """ Parse env variables to find program config params
@@ -83,19 +104,28 @@ def initialize_config():
     config_params = {
         "rabbitmq_host": os.getenv('RABBITMQ_HOST'),
         "input_queue": os.getenv('INPUT_QUEUE_1'),
-        "output_queue": os.getenv('OUTPUT_QUEUE_1'),
-        "eof_service_queue": os.getenv('EOF_SERVICE_QUEUE'),
+        "output_exchange": os.getenv('OUTPUT_EXCHANGE'),
         "logging_level": os.getenv('LOG_LEVEL', 'INFO'),
         "total_shards": int(os.getenv('TOTAL_SHARDS', 3)),
         "storage_dir": os.getenv('STORAGE_DIR', './data'),
+        "sharding_key": os.getenv('SHARDING_KEY', 'request_id'),
+        "node_number": int(os.getenv('NODE_NUMBER', 1)),
     }
 
     required_keys = [
         "rabbitmq_host",
         "input_queue",
-        "output_queue",
+        "output_exchange",
     ]
-
+    
+    queues = []
+    while True:
+        q_name = os.getenv(f'OUTPUT_QUEUE_{len(queues)+1}')
+        if q_name is None:
+            break
+        queues.append(q_name)
+        
+    config_params["output_queues"] = queues
     missing_keys = [key for key in required_keys if config_params[key] is None]
     if missing_keys:
         raise ValueError(f"Expected value(s) not found for: {', '.join(missing_keys)}. Aborting filter.")
@@ -107,12 +137,21 @@ def main():
 
     initialize_log(config_params["logging_level"])
     
+    output_exchange_queues =  {}
+    
+    index = 0
+    for queue in config_params["output_queues"]:
+        output_exchange_queues[queue] = [f"{str(MESSAGE_TYPE_TRANSACTIONS)}.{index}", str(MESSAGE_TYPE_EOF)]
+        index += 1
+    
     aggregator = StoreAggregator(config_params["input_queue"],
-                                 config_params["output_queue"],
-                                 config_params["eof_service_queue"],
+                                 output_exchange_queues,
+                                 config_params["output_exchange"],
                                  config_params["rabbitmq_host"],
                                  config_params["total_shards"],
-                                 config_params["storage_dir"])
+                                 config_params["storage_dir"],
+                                 config_params["sharding_key"],
+                                 config_params["node_number"])
     aggregator.start()
 
 if __name__ == "__main__":

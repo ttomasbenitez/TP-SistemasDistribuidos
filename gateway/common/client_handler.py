@@ -28,11 +28,7 @@ class ClientHandler(threading.Thread):
             self.connection.start()
             self.connection.declare_exchange(self._output_exchange_name, 'topic')
             self.connection.bind_queue(self._in_queue.queue_name, self._output_exchange_name, str(self._request_id))
-            #  results_in_queue.channel.exchange_declare(exchange=self._output_exchange_name, exchange_type='topic', durable=True)
-            #     results_in_queue.bind_queue(
-            #         self._output_exchange_name,
-            #          str(self._request_id),
-            #     )
+          
             logging.info(f"action: bind_results_queue | queue name: {self._in_queue.queue_name} | exchange: {self._output_exchange_name} | result: success")
 
             self._receive_and_publish()

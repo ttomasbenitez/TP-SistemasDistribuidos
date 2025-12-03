@@ -11,6 +11,7 @@ class SlidingWindowDedupStrategy(DedupStrategy):
         self.total_shards = total_shards
         self.last_contiguous_msg_num = {}
         self.pending_messages = {}
+        self.current_msg_num = {}
         self.state_storage = FilterAmountStateStorage(storage_dir)
     
     def is_duplicate(self, message: Message):
@@ -31,7 +32,8 @@ class SlidingWindowDedupStrategy(DedupStrategy):
         for request_id, state in self.state_storage.data_by_request.items():
             self.last_contiguous_msg_num[request_id] = state.get('last_contiguous_msg_num', -1)
             self.pending_messages[request_id] = state.get('pending_messages', set())
-            logging.info(f"Estado recuperado para request_id {request_id}: last_contiguous={self.last_contiguous_msg_num[request_id]}, pending_count={len(self.pending_messages[request_id])}")
+            self.current_msg_num[request_id] = state.get('current_msg_num', 0)
+            logging.info(f"Estado recuperado para request_id {request_id}: last_contiguous={self.last_contiguous_msg_num[request_id]}, pending_count={len(self.pending_messages[request_id])}, current_msg_num={self.current_msg_num[request_id]}")
     
     def check_state_before_processing(self, message):
         request_id = message.request_id
@@ -71,10 +73,11 @@ class SlidingWindowDedupStrategy(DedupStrategy):
                 
         self.state_storage.data_by_request[message.request_id] = {
             'msg_num': message.msg_num,
-            'last_contiguous_msg_num': self.last_contiguous_msg_num[message.request_id]
+            'last_contiguous_msg_num': self.last_contiguous_msg_num[message.request_id], 
+            'current_msg_num': self.current_msg_num.get(message.request_id, 0)
         }
         
-        self.state_storage.save_state(message.request_id)
+        self.state_storage.save_state(message.request_id, False)
         
     def update_state_on_eof(self, message: Message):
         if message.request_id in self.last_contiguous_msg_num:

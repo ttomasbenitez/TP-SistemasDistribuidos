@@ -440,7 +440,7 @@ services:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
       CONTAINER_NAME: aggregator-semester-1
       RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE_1: aggregated-store-q3-queue
+      INPUT_QUEUE_1: aggregated-store-q3-queue-1
       OUTPUT_QUEUE_1: aggregated-semester-queue
       EOF_EXCHANGE_NAME: eof-exchange-semester
       EOF_SELF_QUEUE: eof-aggregator-semester-1
@@ -461,7 +461,7 @@ services:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
       CONTAINER_NAME: aggregator-semester-2
       RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE_1: aggregated-store-q3-queue
+      INPUT_QUEUE_1: aggregated-store-q3-queue-2
       OUTPUT_QUEUE_1: aggregated-semester-queue
       EOF_EXCHANGE_NAME: eof-exchange-semester
       EOF_SELF_QUEUE: eof-aggregator-semester-2
@@ -500,10 +500,15 @@ services:
       CONTAINER_NAME: aggregator-store-q3-1
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: time-filtered-queue-q3-1
-      OUTPUT_QUEUE_1: aggregated-store-q3-queue
-      EOF_SERVICE_QUEUE: eof-service-aggregator-store-q3
+      OUTPUT_EXCHANGE: aggregated-store-q3-exchange
+      OUTPUT_QUEUE_1: aggregated-store-q3-queue-1
+      OUTPUT_QUEUE_2: aggregated-store-q3-queue-2
+      # OUTPUT_QUEUE_1: aggregated-store-q3-queue
+      # EOF_SERVICE_QUEUE: eof-service-aggregator-store-q3
+      NODE_NUMBER: 1
       TOTAL_SHARDS: 2
       LOG_LEVEL: INFO
+      SHARDING_KEY: store
     networks:
     - testing_net
     depends_on:
@@ -518,31 +523,35 @@ services:
       CONTAINER_NAME: aggregator-store-q3-2
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: time-filtered-queue-q3-2
-      OUTPUT_QUEUE_1: aggregated-store-q3-queue
-      EOF_SERVICE_QUEUE: eof-service-aggregator-store-q3
+      OUTPUT_EXCHANGE: aggregated-store-q3-exchange
+      OUTPUT_QUEUE_1: aggregated-store-q3-queue-1
+      OUTPUT_QUEUE_2: aggregated-store-q3-queue-2
+      # EOF_SERVICE_QUEUE: eof-service-aggregator-store-q3
+      NODE_NUMBER: 2
       TOTAL_SHARDS: 2
       LOG_LEVEL: INFO
+      SHARDING_KEY: store
     networks:
     - testing_net
     depends_on:
     - gateway
 
-  aggregator-store-q3-eof-service:
-    container_name: aggregator-store-q3-eof-service
-    image: worker:latest
-    command: "/worker/eof/eof_service_aggregator_store.py"
-    environment:
-      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-      CONTAINER_NAME: aggregator-store-q3-eof-service
-      RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE: eof-service-aggregator-store-q3
-      OUTPUT_QUEUE: aggregated-store-q3-queue
-      LOG_LEVEL: INFO
-      EXPECTED_ACKS: 2
-    networks:
-    - testing_net
-    depends_on:
-    - gateway
+  # aggregator-store-q3-eof-service:
+  #   container_name: aggregator-store-q3-eof-service
+  #   image: worker:latest
+  #   command: "/worker/eof/eof_service_aggregator_store.py"
+  #   environment:
+  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+  #     CONTAINER_NAME: aggregator-store-q3-eof-service
+  #     RABBITMQ_HOST: rabbitmq
+  #     INPUT_QUEUE: eof-service-aggregator-store-q3
+  #     OUTPUT_QUEUE: aggregated-store-q3-queue
+  #     LOG_LEVEL: INFO
+  #     EXPECTED_ACKS: 2
+  #   networks:
+  #   - testing_net
+  #   depends_on:
+  #   - gateway
 
   join-stores-q3:
     container_name: joiner-stores-q3
@@ -562,7 +571,6 @@ services:
     depends_on:
     - gateway
 
-
   aggregator-store-q4-1:
     container_name: aggregator-store-q4-1
     image: worker:latest
@@ -572,10 +580,14 @@ services:
       CONTAINER_NAME: aggregator-store-q4-1
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: year-filtered-queue-q4-1
-      OUTPUT_QUEUE_1: aggregated-store-q4-queue
-      EOF_SERVICE_QUEUE: eof-service-aggregator-store-q4
+      OUTPUT_EXCHANGE: aggregated-store-q4-exchange
+      OUTPUT_QUEUE_1: aggregated-store-q4-queue-1
+      OUTPUT_QUEUE_2: aggregated-store-q4-queue-2
+      # EOF_SERVICE_QUEUE: eof-service-aggregator-store-q4
+      NODE_NUMBER: 1
       TOTAL_SHARDS: 2
       LOG_LEVEL: INFO
+      SHARDING_KEY: semester
     networks:
     - testing_net
     depends_on:
@@ -590,41 +602,65 @@ services:
       CONTAINER_NAME: aggregator-store-q4-2
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: year-filtered-queue-q4-2
-      OUTPUT_QUEUE_1: aggregated-store-q4-queue
-      EOF_SERVICE_QUEUE: eof-service-aggregator-store-q4
+      OUTPUT_EXCHANGE: aggregated-store-q4-exchange
+      OUTPUT_QUEUE_1: aggregated-store-q4-queue-1
+      OUTPUT_QUEUE_2: aggregated-store-q4-queue-2
+      # EOF_SERVICE_QUEUE: eof-service-aggregator-store-q4
+      NODE_NUMBER: 2
       TOTAL_SHARDS: 2
       LOG_LEVEL: INFO
+      SHARDING_KEY: semester
     networks:
     - testing_net
     depends_on:
     - gateway   
 
-  aggregator-store-q4-eof-service:
-    container_name: aggregator-store-q4-eof-service
-    image: worker:latest
-    command: "/worker/eof/eof_service_aggregator_store.py"
-    environment:
-      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-      CONTAINER_NAME: aggregator-store-q4-eof-service
-      RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE: eof-service-aggregator-store-q4
-      OUTPUT_QUEUE: aggregated-store-q4-queue
-      LOG_LEVEL: INFO
-      EXPECTED_ACKS: 2
-    networks:
-    - testing_net
-    depends_on:
-    - gateway
+  # aggregator-store-q4-eof-service:
+  #   container_name: aggregator-store-q4-eof-service
+  #   image: worker:latest
+  #   command: "/worker/eof/eof_service_aggregator_store.py"
+  #   environment:
+  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+  #     CONTAINER_NAME: aggregator-store-q4-eof-service
+  #     RABBITMQ_HOST: rabbitmq
+  #     INPUT_QUEUE: eof-service-aggregator-store-q4
+  #     OUTPUT_QUEUE: aggregated-store-q4-queue
+  #     LOG_LEVEL: INFO
+  #     EXPECTED_ACKS: 2
+  #   networks:
+  #   - testing_net
+  #   depends_on:
+  #   - gateway
 
-  top-three-clients:
-    container_name: top-three-clients
+  top-three-clients-1:
+    container_name: top-three-clients-1
     image: worker:latest
     command: "/worker/joiner/top_three_clients.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-      CONTAINER_NAME: top-three-clients
+      CONTAINER_NAME: top-three-clients-1
       RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE_1: aggregated-store-q4-queue
+      INPUT_QUEUE_1: aggregated-store-q4-queue-1
+      INPUT_QUEUE_2: users-queue
+      OUTPUT_QUEUE_1: top-clients-queue
+      STORAGE_DIR: ./data/top-three-clients
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
+    volumes:
+      - ./data/top-three-clients:/data/top-three-clients
+
+  top-three-clients-2:
+    container_name: top-three-clients-2
+    image: worker:latest
+    command: "/worker/joiner/top_three_clients.py"
+    environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: top-three-clients-2
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: aggregated-store-q4-queue-2
       INPUT_QUEUE_2: users-queue
       OUTPUT_QUEUE_1: top-clients-queue
       STORAGE_DIR: ./data/top-three-clients

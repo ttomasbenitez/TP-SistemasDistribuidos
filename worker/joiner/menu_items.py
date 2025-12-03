@@ -92,7 +92,8 @@ class JoinerMenuItems(Joiner):
                         serialized = message.serialize()
                         data_output_exchange.send(serialized, str(message.request_id))
             finally:
-                self._dec_inflight(message.request_id)
+                if message.type != MESSAGE_TYPE_EOF:
+                    self._dec_inflight(message.request_id)
                     
         data_input_queue.start_consuming(__on_message__)
         

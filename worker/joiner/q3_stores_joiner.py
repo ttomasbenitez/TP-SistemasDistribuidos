@@ -14,7 +14,7 @@ from pkg.message.q3_result import Q3Result
 import hashlib
 import threading
 
-EXPECTED_EOFS = 2
+EXPECTED_EOFS = 3 # 1 stores, 2 semester
 
 class StoresJoiner(Joiner):
 
@@ -67,7 +67,8 @@ class StoresJoiner(Joiner):
                         else:
                             self.pending_transactions.append((item, message.request_id))
             finally:
-                self._dec_inflight(message.request_id)
+                if message.type != MESSAGE_TYPE_EOF:
+                    self._dec_inflight(message.request_id)
                         
         data_input_queue.start_consuming(__on_message__)
 

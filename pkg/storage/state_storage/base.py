@@ -55,7 +55,7 @@ class StateStorage(ABC):
     def _load_state_from_file(self, file_handle, request_id):
         raise NotImplementedError("Este método debe ser implementado por subclases.")
     
-    def save_state(self, request_id):
+    def save_state(self, request_id, reset_state=True):
         """
         Guarda en disco el estado NUEVO de un request_id agregando
         al archivo existente, y luego limpia el buffer en RAM.
@@ -74,7 +74,8 @@ class StateStorage(ABC):
                     self._save_state_to_file(f, request_id)
                     f.flush()
                     os.fsync(f.fileno())
-                self.cleanup_state(request_id)
+                if reset_state:
+                    self.cleanup_state(request_id)
 
             logging.debug(f"Estado (append) guardado para request_id: {request_id}")
             

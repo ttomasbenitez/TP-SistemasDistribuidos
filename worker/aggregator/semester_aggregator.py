@@ -67,15 +67,15 @@ class SemesterAggregator(Worker):
 
         self.connection.start()
         self._consume_data_queue()
-        self._consume_eof()
+        # self._consume_eof()
         self.connection.start_consuming()
 
     def _consume_data_queue(self):
         data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
         data_output_queue = MessageMiddlewareQueue(self.data_output_queue, self.connection)
         eof_output_exchange = MessageMiddlewareExchange(self.eof_output_exchange, self.eof_output_queues, self.connection)
-        eof_self_queue = MessageMiddlewareQueue(self.eof_self_queue, self.connection)
-        self.message_middlewares.extend([data_input_queue, data_output_queue, eof_output_exchange, eof_self_queue])
+        # eof_self_queue = MessageMiddlewareQueue(self.eof_self_queue, self.connection)
+        self.message_middlewares.extend([data_input_queue, data_output_queue, eof_output_exchange])
         
         def __on_message__(message):
             try:
@@ -84,7 +84,7 @@ class SemesterAggregator(Worker):
                 if message.type == MESSAGE_TYPE_EOF:
                     logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
                     # On EOF: emit all aggregated results for this request_id, then send EOF downstream and cleanup
-                    self._emit_all_and_finalize(message, data_output_queue, eof_output_exchange)
+                    self._emit_all_and_finalize(message, data_output_queue)
                     return
                 
                 logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
@@ -146,7 +146,7 @@ class SemesterAggregator(Worker):
         
         data_input_queue.start_consuming(__on_message__)
 
-    def _emit_all_and_finalize(self, message: Message, data_output_queue: MessageMiddlewareQueue, eof_output_exchange: MessageMiddlewareExchange):
+    def _emit_all_and_finalize(self, message: Message, data_output_queue: MessageMiddlewareQueue):
         """Emit all aggregated Q3 intermediate results and then EOF downstream."""
         request_id = message.request_id
         try:
@@ -157,7 +157,7 @@ class SemesterAggregator(Worker):
                     self._send_grouped_item(message, res, data_output_queue)
         finally:
             # Send EOF to downstream exchange for q3
-            eof_output_exchange.send(message.serialize(), str(message.type))
+            data_output_queue.send(message.serialize(), str(message.type))
             # Cleanup state both memory and disk
             try:
                 del self._agg_by_request[request_id]

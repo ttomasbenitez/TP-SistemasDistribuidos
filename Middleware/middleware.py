@@ -58,10 +58,7 @@ class MessageMiddlewareQueue(MessageMiddleware):
         self._connect_to_channel()
         
     def _connect_to_channel(self):
-        # self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=host, heartbeat=6000))
-        # self.channel = self.connection.channel()
         self.connection.declare_queue(self.queue_name)
-        # self.channel.queue_declare(queue=queue_name, durable=True)
 
     def start_consuming(self, on_message_callback, init_consuming=True, manual_ack=False, prefetch_count=2):
         def callback(ch, method, properties, body):
@@ -81,11 +78,6 @@ class MessageMiddlewareQueue(MessageMiddleware):
             prefetch_count=prefetch_count,
             auto_ack=False
         )
-            
-        # self.channel.basic_qos(prefetch_count=prefetch_count)
-        # self.channel.basic_consume(queue=self.queue_name, on_message_callback=callback, auto_ack=False)
-        # if init_consuming:
-        #     self.connection.start_consuming()
 
     def stop_consuming(self):
         self.connection.stop_consuming()
@@ -93,7 +85,6 @@ class MessageMiddlewareQueue(MessageMiddleware):
     def send(self, message):
         try:
             self.connection.send(exchange='', routing_key=self.queue_name, body=message)
-            # self.channel.basic_publish(exchange='', routing_key=self.queue_name, body=message)
         except (pika.exceptions.AMQPConnectionError,
                 pika.exceptions.StreamLostError,
                 pika.exceptions.ChannelClosedByBroker) as e:
@@ -101,12 +92,6 @@ class MessageMiddlewareQueue(MessageMiddleware):
             try:
                 self.reconnect()
                 self.connection.send(exchange='', routing_key=self.queue_name, body=message)
-                # self.channel.basic_publish(
-                #     exchange='',
-                #     routing_key=self.queue_name,
-                #     body=message,
-                #     mandatory=True
-                # )
                 logging.info("[AMQP] Reenvío exitoso tras reconexión.")
             except Exception as e2:
                 logging.error(f"[AMQP] Falló reintento tras reconexión: {type(e2).__name__}: {e2}")
@@ -116,10 +101,7 @@ class MessageMiddlewareQueue(MessageMiddleware):
 
     def delete(self):
         self.connection.delete_queue(queue=self.queue_name)
-    
-    # def bind_queue(self, exchange_name, routing_key):
-    #     self.channel.queue_bind(exchange=exchange_name, queue=self.queue_name, routing_key=routing_key)
-        
+
     def reconnect(self):
         try:
             self.close()
@@ -131,17 +113,13 @@ class MessageMiddlewareQueue(MessageMiddleware):
 
 class MessageMiddlewareExchange(MessageMiddleware):
     def __init__(self, exchange_name: str, queues_dict: object, connection: PikaConnection):
-        # self.host = host
         self.exchange_name = exchange_name
         self.exchange_queues = queues_dict
         self.connection = connection
         self._connect_to_channel()
         
     def _connect_to_channel(self):
-        # self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=host, heartbeat=6000))
-        # self.channel = self.connection.channel()
         self.connection.declare_exchange(self.exchange_name, exchange_type='topic')
-        # self.channel.exchange_declare(exchange=exchange_name, exchange_type='topic', durable=True)
         self.route_keys = list(self.exchange_queues.values())
         # Diccionario que guarda cola -> {"queue": objeto Queue, "routing_key": routing_key}
         self.queues = {}
@@ -154,10 +132,8 @@ class MessageMiddlewareExchange(MessageMiddleware):
             if isinstance(routing_keys, list):
                 for key in routing_keys:
                     self.connection.bind_queue(queue_name=queue_name, exchange=self.exchange_name, routing_key=key)
-                    # self.channel.queue_bind(exchange=self.exchange_name, queue=queue_name, routing_key=key)
             else:
                 self.connection.bind_queue(queue_name=queue_name, exchange=self.exchange_name, routing_key=key)
-                # self.channel.queue_bind(exchange=self.exchange_name, queue=queue_name, routing_key=routing_keys)
 
             self.queues[queue_name] = {"queue": queue, "routing_key": routing_keys}
 
@@ -172,11 +148,6 @@ class MessageMiddlewareExchange(MessageMiddleware):
                 queue_name=queue_name,
                 on_message_callback=callback
             )
-            # self.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=False)
-
-        # if init_consuming:
-        #     self.connection.start_consuming()
-        # self.channel.start_consuming()
 
     def stop_consuming(self):
         self.connection.stop_consuming()
@@ -188,12 +159,6 @@ class MessageMiddlewareExchange(MessageMiddleware):
                 routing_key=routing_key,
                 body=message
             )
-            # self.channel.basic_publish(
-            #     exchange=self.exchange_name,
-            #     routing_key=routing_key,
-            #     body=message,
-            #     mandatory=True
-            # )
         except (pika.exceptions.AMQPConnectionError,
                 pika.exceptions.StreamLostError,
                 pika.exceptions.ChannelClosedByBroker) as e:
@@ -205,12 +170,6 @@ class MessageMiddlewareExchange(MessageMiddleware):
                 routing_key=routing_key,
                 body=message
                 )
-                # self.channel.basic_publish(
-                #     exchange=self.exchange_name,
-                #     routing_key=routing_key,
-                #     body=message,
-                #     mandatory=True
-                # )
                 logging.info("[AMQP] Reenvío exitoso tras reconexión.")
             except Exception as e2:
                 logging.error(f"[AMQP] Falló reintento tras reconexión: {type(e2).__name__}: {e2}")
@@ -220,7 +179,6 @@ class MessageMiddlewareExchange(MessageMiddleware):
 
     def delete(self):
         self.connection.delete_exchange(exchange=self.exchange_name)
-        # self.channel.exchange_delete(exchange=self.exchange_name)
     
     def reconnect(self):
         try:

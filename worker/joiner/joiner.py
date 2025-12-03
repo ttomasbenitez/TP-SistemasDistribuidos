@@ -74,6 +74,7 @@ class Joiner(Worker, ABC):
             try:
                 self._process_items_to_join(message)
             finally:
-                self._dec_inflight(message.request_id)
+                if message.type != MESSAGE_TYPE_EOF:
+                    self._dec_inflight(message.request_id)
             
         items_input_queue.start_consuming(__on_items_message__)
