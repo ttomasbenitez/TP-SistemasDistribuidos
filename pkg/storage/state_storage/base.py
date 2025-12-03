@@ -39,7 +39,12 @@ class StateStorage(ABC):
         try:
             for filename in os.listdir(self.storage_dir):
                 if filename.endswith(".txt"):
-                    request_id = filename[:-4]  # Remover la extensión .txt
+                    #request_id = filename[:-4]
+                    request_id_str = filename[:-4]  # Remover la extensión .txt
+                    try:
+                        request_id = int(request_id_str)
+                    except ValueError:
+                        request_id = request_id_str
                 filepath = os.path.join(self.storage_dir, filename)
                     
                 with self._lock:

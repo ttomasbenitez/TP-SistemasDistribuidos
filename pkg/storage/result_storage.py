@@ -62,7 +62,7 @@ class ResultStorage:
         rb = self._runs.get(rid)
 
         if not rb:
-            rb = RunBuf(rid, self.base_path, self._lock)
+            rb = RunBuf(rid, self.file_path, self._lock)
             self._runs[rid] = rb
 
         qbuf = rb.query_buf

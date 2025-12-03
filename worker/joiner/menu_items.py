@@ -8,7 +8,7 @@ from Middleware.middleware import MessageMiddlewareExchange, MessageMiddlewareQu
 import os
 from pkg.message.utils import parse_int
 
-EXPECTED_EOFS = 2
+
 
 class JoinerMenuItems(Joiner):
     
@@ -16,8 +16,9 @@ class JoinerMenuItems(Joiner):
                  data_input_queue: str, 
                  data_output_exchange: str,
                  menu_items_input_queue: str,
-                 host: str):
-        super().__init_client_handler__(menu_items_input_queue, host, EXPECTED_EOFS)
+                 host: str,
+                 expected_eofs: int):
+        super().__init_client_handler__(menu_items_input_queue, host, expected_eofs)
         self.data_input_queue = data_input_queue
         self.data_output_exchange = data_output_exchange
         self.pending_items = []
@@ -114,6 +115,7 @@ def initialize_config():
     config_params["input_queue_1"] = os.getenv('INPUT_QUEUE_1')
     config_params["input_queue_2"] = os.getenv('INPUT_QUEUE_2')
     config_params["output_exchange_q2"] = os.getenv('OUTPUT_EXCHANGE')
+    config_params["expected_eofs"] = int(os.getenv('EXPECTED_EOFS', '3'))
     config_params["logging_level"] = os.getenv('LOG_LEVEL', 'INFO')
 
     if None in (config_params["rabbitmq_host"], config_params["input_queue_1"],
@@ -129,7 +131,8 @@ def main():
     joiner = JoinerMenuItems(config_params["input_queue_1"],
                                  config_params["output_exchange_q2"],
                                  config_params["input_queue_2"],
-                                 config_params["rabbitmq_host"])
+                                 config_params["rabbitmq_host"],
+                                 config_params["expected_eofs"])
     joiner.start()
 
 if __name__ == "__main__":
