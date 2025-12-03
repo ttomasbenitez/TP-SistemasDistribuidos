@@ -28,13 +28,13 @@ class StoresJoiner(Joiner):
         self.data_input_queue = data_input_queue
         self.data_output_exchange = data_output_exchange
         self.pending_transactions = []
-        self.processed_transactions = {}
         self._seen_lock = threading.Lock()
         self._seen_messages = set()
 
     def _consume_data_queue(self):
         data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
-        self.message_middlewares.append(data_input_queue)
+        data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, {}, self.connection)
+        self.message_middlewares.extend([data_input_queue, data_output_exchange])
         
         def __on_message__(msg):
             message = Message.deserialize(msg)
@@ -48,7 +48,7 @@ class StoresJoiner(Joiner):
             self._ensure_request(message.request_id)
             self._inc_inflight(message.request_id)
             try:
-                # Idempotencia robusta: deduplicar usando hash del cuerpo
+                # Idempotencia adicional por hash del cuerpo (opc.)
                 try:
                     raw_bytes = msg if isinstance(msg, (bytes, bytearray)) else str(msg).encode("utf-8")
                 except Exception:
@@ -59,15 +59,20 @@ class StoresJoiner(Joiner):
                     if dedup_key in self._seen_messages:
                         return
                     self._seen_messages.add(dedup_key)
+
                 items = message.process_message()
                 if message.type == MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT:
+                    ready_to_send = ''
                     for item in items:
                         store_name = self.items_to_join.get(message.request_id, {}).get(item.get_store())
                         if store_name:
-                            key = (message.request_id, store_name, item.get_period())
-                            self.processed_transactions[key] = self.processed_transactions.get(key, 0.0) + item.get_tpv()
+                            q3 = Q3Result(item.get_period(), store_name, item.get_tpv())
+                            ready_to_send += q3.serialize()
                         else:
                             self.pending_transactions.append((item, message.request_id))
+                    if ready_to_send:
+                        out = Message(message.request_id, MESSAGE_TYPE_QUERY_3_RESULT, message.msg_num, ready_to_send)
+                        data_output_exchange.send(out.serialize(), str(message.request_id))
             finally:
                 if message.type != MESSAGE_TYPE_EOF:
                     self._dec_inflight(message.request_id)
@@ -86,30 +91,30 @@ class StoresJoiner(Joiner):
     def _send_results(self, message):
         data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, {}, self.connection)
         self.message_middlewares.append(data_output_exchange)
-        self._process_pending()
-        self._send_joined_transactions_by_request(message, message.request_id, data_output_exchange)
+        self._process_pending(message.request_id, data_output_exchange)
         self._send_eof(message, data_output_exchange)
  
-    def _process_pending(self):
-        for item, request_id in list(self.pending_transactions):
-            store_name = self.items_to_join.get(request_id, {}).get(item.get_store())
+    def _process_pending(self, request_id, data_output_exchange):
+        ready_to_send = ''
+        remaining = []
+        for item, req_id in self.pending_transactions:
+            if req_id != request_id:
+                remaining.append((item, req_id))
+                continue
+            store_name = self.items_to_join.get(req_id, {}).get(item.get_store())
             if store_name:
-                key = (request_id, store_name, item.get_period())
-                self.processed_transactions[key] = self.processed_transactions.get(key, 0.0) + item.get_tpv()
-        
-        self.pending_transactions = []
+                q3 = Q3Result(item.get_period(), store_name, item.get_tpv())
+                ready_to_send += q3.serialize()
+            else:
+                remaining.append((item, req_id))
+        self.pending_transactions = remaining
+        if ready_to_send:
+            out = Message(request_id, MESSAGE_TYPE_QUERY_3_RESULT, 0, ready_to_send)
+            data_output_exchange.send(out.serialize(), str(request_id))
 
     def _send_joined_transactions_by_request(self, message, request_id, data_output_exchange):
-        total_chunk = ''
-        for (key, total_tpv) in self.processed_transactions.items():
-            req_id, store_name, period = key
-            if req_id != request_id:
-                continue
-            q3Result = Q3Result(period, store_name, total_tpv)
-            total_chunk += q3Result.serialize()
-        msg = Message(message.request_id, MESSAGE_TYPE_QUERY_3_RESULT, message.msg_num, total_chunk)
-        data_output_exchange.send(msg.serialize(), str(message.request_id))
-        logging.info(f"action: results sent | request_id: {message.request_id}")
+        # Function kept for interface compatibility; no-op with immediate forwarding
+        logging.info(f"action: no-op aggregate send | request_id: {request_id}")
 
     def _send_eof(self, message, data_output_exchange):
         data_output_exchange.send(message.serialize(), str(message.request_id))
