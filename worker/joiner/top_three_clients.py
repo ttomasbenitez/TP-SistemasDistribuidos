@@ -7,6 +7,7 @@ from utils.custom_logging import initialize_log
 import os
 from pkg.storage.state_storage.top_three_clients import TopThreeClientsStateStorage
 from pkg.message.q4_result import Q4IntermediateResult
+import threading
 
 EXPECTED_EOFS = 3 # 1 users, 2 store agg
 SNAPSHOT_COUNT = 1000
@@ -24,6 +25,20 @@ class TopThreeClientsJoiner(Joiner):
         self.data_input_queue = data_input_queue
         self.data_output_queue = data_output_queue
         self.state_storage = TopThreeClientsStateStorage(storage_dir)
+        # Sequencing / dedup state
+        self._sender_lock = threading.Lock()
+        self._last_msg_by_sender_data = {}
+        self._last_msg_by_sender_users = {}
+
+    def start(self):
+        # Load persisted state once on startup and hydrate last-msg maps
+        self.state_storage.load_state_all()
+        for _rid, st in self.state_storage.data_by_request.items():
+            for sid, num in st.get("last_msg_by_sender_data", {}).items():
+                self._last_msg_by_sender_data[sid] = max(self._last_msg_by_sender_data.get(sid, -1), num)
+            for sid, num in st.get("last_msg_by_sender_users", {}).items():
+                self._last_msg_by_sender_users[sid] = max(self._last_msg_by_sender_users.get(sid, -1), num)
+        super().start()
 
     def _consume_data_queue(self):
         data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
@@ -39,20 +54,33 @@ class TopThreeClientsJoiner(Joiner):
             self._ensure_request(message.request_id)
             self._inc_inflight(message.request_id)
             try:
+                # Dedup/ordering for data stream (transactions)
+                sender_id = message.get_node_id_and_request_id()
+                with self._sender_lock:
+                    last = self._last_msg_by_sender_data.get(sender_id, -1)
+                    if message.msg_num <= last:
+                        if message.msg_num == last:
+                            logging.info(f"action: duplicate_msg | stream:data | sender:{sender_id} | msg:{message.msg_num}")
+                        else:
+                            logging.warning(f"action: out_of_order_msg | stream:data | sender:{sender_id} | msg:{message.msg_num} < last:{last}")
+                        return
+                    self._last_msg_by_sender_data[sender_id] = message.msg_num
                 items = message.process_message()
                 if message.type == MESSAGE_TYPE_TRANSACTIONS:
-                    self._accumulate_items(items, message.request_id)
+                    self._accumulate_items(items, message.request_id, sender_id, message.msg_num)
             finally:
                 if message.type == MESSAGE_TYPE_TRANSACTIONS:
                     self._dec_inflight(message.request_id)
                 
         data_input_queue.start_consuming(__on_message__)
         
-    def _accumulate_items(self, items, request_id):
+    def _accumulate_items(self, items, request_id, sender_id=None, msg_num=None):
         with self.state_storage._lock:
             state = self.state_storage.data_by_request.setdefault(request_id, {
                 "users_by_store": {},
-                "users_birthdates": {}
+                "users_birthdates": {},
+                "last_msg_by_sender_data": {},
+                "last_msg_by_sender_users": {},
             })
             users_by_store = state["users_by_store"]
             store_id = None
@@ -68,16 +96,33 @@ class TopThreeClientsJoiner(Joiner):
 
             if store_id is None:
                 return
-        
+            # persist last seen marker for data stream if provided
+            if sender_id is not None and msg_num is not None:
+                state["last_msg_by_sender_data"][sender_id] = msg_num
         self.state_storage.save_state(request_id)
         logging.info(f"Snapshot guardado | request_id: {request_id}")
         
     def _process_items_to_join(self, message):
         with self.state_storage._lock:
+            # Dedup/ordering for users stream
+            sender_id = message.get_node_id_and_request_id()
+            with self._sender_lock:
+                last = self._last_msg_by_sender_users.get(sender_id, -1)
+                if message.msg_num <= last:
+                    if message.msg_num == last:
+                        logging.info(f"action: duplicate_msg | stream:users | sender:{sender_id} | msg:{message.msg_num}")
+                        return
+                    else:
+                        logging.warning(f"action: out_of_order_msg | stream:users | sender:{sender_id} | msg:{message.msg_num} < last:{last}")
+                        return
+                self._last_msg_by_sender_users[sender_id] = message.msg_num
+
             items = message.process_message()
             state = self.state_storage.data_by_request.setdefault(message.request_id, {
                 "users_by_store": {},
-                "users_birthdates": {}
+                "users_birthdates": {},
+                "last_msg_by_sender_data": {},
+                "last_msg_by_sender_users": {},
             })
             users_birthdates = state["users_birthdates"]
 
@@ -85,11 +130,11 @@ class TopThreeClientsJoiner(Joiner):
                 user_id = item.get_user_id()
                 birthdate = item.get_birthdate()
                 users_birthdates[user_id] = birthdate
+            state["last_msg_by_sender_users"][sender_id] = message.msg_num
 
         self.state_storage.save_state(message.request_id)
         
     def _send_results(self, message):
-        self.state_storage.load_state(message.request_id)
         data_output_queue = MessageMiddlewareQueue(self.data_output_queue, self.connection)
         self.message_middlewares.append(data_output_queue)
         self._process_top_3_by_request(message.request_id, data_output_queue)
@@ -133,6 +178,7 @@ class TopThreeClientsJoiner(Joiner):
         data_output_queue.send(message.serialize())
         logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")
 
+
 def initialize_config():
     config_params = {}
     config_params["rabbitmq_host"] = os.getenv('RABBITMQ_HOST')
@@ -147,6 +193,7 @@ def initialize_config():
         raise ValueError("Expected value not found. Aborting.")
 
     return config_params
+
 
 
 def main():

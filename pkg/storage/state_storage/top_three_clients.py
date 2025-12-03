@@ -7,23 +7,34 @@ class TopThreeClientsStateStorage(StateStorage):
         Carga el estado desde archivo para un request_id.
 
         Formatos aceptados:
-            T;store_id;user_id;count
-            U;user_id;birthdate
+            T;store_id;user_id;count           # acumulación de transacciones por tienda/usuario
+            B;user_id;birthdate                # catálogo de usuarios (birthdates)
+            SD;sender_id;last_msg_num          # último msg de stream de datos por emisor
+            SU;sender_id;last_msg_num          # último msg de stream de usuarios por emisor
 
         Estructura de destino:
             self.data_by_request[request_id] = {
                 "users_by_store": { store_id: { user_id: total_count } },
-                "users_birthdates": { user_id: birthdate }
+                "users_birthdates": { user_id: birthdate },
+                "last_msg_by_sender_data": { sender_id: last_msg_num },
+                "last_msg_by_sender_users": { sender_id: last_msg_num }
             }
         """
 
-        state = self.data_by_request.setdefault(request_id, {
-            "users_by_store": {},
-            "users_birthdates": {}
-        })
+        state = self.data_by_request.setdefault(
+            request_id,
+            {
+                "users_by_store": {},
+                "users_birthdates": {},
+                "last_msg_by_sender_data": {},
+                "last_msg_by_sender_users": {},
+            },
+        )
 
         users_by_store = state["users_by_store"]
         users_birthdates = state["users_birthdates"]
+        last_data = state["last_msg_by_sender_data"]
+        last_users = state["last_msg_by_sender_users"]
 
         for line in file_handle:
             line = line.strip()
@@ -31,7 +42,6 @@ class TopThreeClientsStateStorage(StateStorage):
                 continue
 
             parts = line.split(";")
-
             kind = parts[0]
 
             if kind == "T":
@@ -40,24 +50,39 @@ class TopThreeClientsStateStorage(StateStorage):
                     store_id = int(store_id_str)
                     user_id = int(user_id_str)
                     count = int(count_str)
-                except ValueError as e:
+                except ValueError:
                     continue
-
                 store_users = users_by_store.setdefault(store_id, {})
                 store_users[user_id] = store_users.get(user_id, 0) + count
                 continue
 
             if kind == "B":
                 _k, user_id_str, birthdate = parts
-
                 try:
                     user_id = int(user_id_str)
-                except ValueError as e:
+                except ValueError:
                     continue
-
                 users_birthdates[user_id] = birthdate
                 continue
-            
+
+            if kind == "SD":
+                _k, sender_id, last_str = parts
+                try:
+                    last = int(last_str)
+                except ValueError:
+                    continue
+                last_data[sender_id] = max(last_data.get(sender_id, -1), last)
+                continue
+
+            if kind == "SU":
+                _k, sender_id, last_str = parts
+                try:
+                    last = int(last_str)
+                except ValueError:
+                    continue
+                last_users[sender_id] = max(last_users.get(sender_id, -1), last)
+                continue
+    
     def _append_transaction(self, users_by_store, file_handle):
         for store_id, users in users_by_store.items():
             for user_id, count in users.items():
@@ -74,9 +99,16 @@ class TopThreeClientsStateStorage(StateStorage):
         if not state:
             return
 
-        users_by_store = state["users_by_store"]
-        users_birthdates = state["users_birthdates"]
+        users_by_store = state.get("users_by_store", {})
+        users_birthdates = state.get("users_birthdates", {})
+        last_data = state.get("last_msg_by_sender_data", {})
+        last_users = state.get("last_msg_by_sender_users", {})
         
         self._append_transaction(users_by_store, file_handle)
         self._append_birthdates(users_birthdates, file_handle)
+        # persist marks of last seen message per sender
+        for sid, num in last_data.items():
+            file_handle.write(f"SD;{sid};{num}\n")
+        for sid, num in last_users.items():
+            file_handle.write(f"SU;{sid};{num}\n")
         
