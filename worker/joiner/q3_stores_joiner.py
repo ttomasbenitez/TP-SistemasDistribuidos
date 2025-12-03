@@ -59,8 +59,7 @@ class StoresJoiner(Joiner):
                 items = message.process_message()
                 if message.type == MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT:
                     for item in items:
-                        with self.items_to_join_lock:
-                            store_name = self.items_to_join.get(message.request_id, {}).get(item.get_store())
+                        store_name = self.items_to_join.get(message.request_id, {}).get(item.get_store())
                         if store_name:
                             key = (message.request_id, store_name, item.get_period())
                             self.processed_transactions[key] = self.processed_transactions.get(key, 0.0) + item.get_tpv()
@@ -76,10 +75,9 @@ class StoresJoiner(Joiner):
         items = message.process_message()
         if message.type == MESSAGE_TYPE_STORES:
             for item in items:
-                with self.items_to_join_lock:
-                    if message.request_id not in self.items_to_join:
-                        self.items_to_join[message.request_id] = {}
-                    self.items_to_join[message.request_id][item.get_id()] = item.get_name()
+                if message.request_id not in self.items_to_join:
+                    self.items_to_join[message.request_id] = {}
+                self.items_to_join[message.request_id][item.get_id()] = item.get_name()
         logging.info(f"action: Stores updated | request_id: {message.request_id}")
                     
     def _send_results(self, message):
@@ -91,8 +89,7 @@ class StoresJoiner(Joiner):
  
     def _process_pending(self):
         for item, request_id in list(self.pending_transactions):
-            with self.items_to_join_lock:
-                store_name = self.items_to_join.get(request_id, {}).get(item.get_store())
+            store_name = self.items_to_join.get(request_id, {}).get(item.get_store())
             if store_name:
                 key = (request_id, store_name, item.get_period())
                 self.processed_transactions[key] = self.processed_transactions.get(key, 0.0) + item.get_tpv()

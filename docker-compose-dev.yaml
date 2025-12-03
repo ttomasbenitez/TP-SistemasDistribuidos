@@ -28,8 +28,9 @@ services:
       OUTPUT_QUEUE_1: stores-queue-1
       OUTPUT_QUEUE_2: stores-queue-2
       OUTPUT_QUEUE_3: menu-items-queue
-      OUTPUT_QUEUE_4: users-queue
+      OUTPUT_QUEUE_4: users-queue-1
       OUTPUT_QUEUE_5: batches-queue
+      OUTPUT_QUEUE_6: users-queue-2
       OUTPUT_EXCHANGE_NAME: results-exchange
       EXCHANGE_NAME: gateway-exchange
     depends_on:
@@ -191,13 +192,6 @@ services:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: time-filtered-queue-q1-1
       EXCHANGE_NAME: results-exchange
-      EOF_SELF_QUEUE: EOF-filter-amount-1
-      EOF_QUEUE_NODO_1: EOF-filter-amount-1
-      EOF_QUEUE_NODO_2: EOF-filter-amount-2
-      EOF_QUEUE_NODO_3: EOF-filter-amount-3
-      EOF_EXCHANGE_NAME: eof-exchange-filter-amount
-      EOF_SERVICE_QUEUE: eof-service-filter-amount
-      EOF_FINAL_QUEUE: eof-final-filter-amount
       TOTAL_SHARDS: 3
       LOG_LEVEL: INFO
     networks:
@@ -215,13 +209,6 @@ services:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: time-filtered-queue-q1-2
       EXCHANGE_NAME: results-exchange
-      EOF_SELF_QUEUE: EOF-filter-amount-2
-      EOF_QUEUE_NODO_1: EOF-filter-amount-1
-      EOF_QUEUE_NODO_2: EOF-filter-amount-2
-      EOF_QUEUE_NODO_3: EOF-filter-amount-3
-      EOF_EXCHANGE_NAME: eof-exchange-filter-amount
-      EOF_SERVICE_QUEUE: eof-service-filter-amount
-      EOF_FINAL_QUEUE: eof-final-filter-amount
       TOTAL_SHARDS: 3
       LOG_LEVEL: INFO
     networks:
@@ -239,32 +226,8 @@ services:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: time-filtered-queue-q1-3
       EXCHANGE_NAME: results-exchange
-      EOF_SELF_QUEUE: EOF-filter-amount-3
-      EOF_QUEUE_NODO_1: EOF-filter-amount-1
-      EOF_QUEUE_NODO_2: EOF-filter-amount-2
-      EOF_QUEUE_NODO_3: EOF-filter-amount-3
-      EOF_EXCHANGE_NAME: eof-exchange-filter-amount
-      EOF_SERVICE_QUEUE: eof-service-filter-amount
-      EOF_FINAL_QUEUE: eof-final-filter-amount
       TOTAL_SHARDS: 3
       LOG_LEVEL: INFO
-    networks:
-    - testing_net
-    depends_on:
-    - gateway
-  
-  filter-amount-eof-service:
-    container_name: filter-amount-eof-service
-    image: worker:latest
-    command: "/worker/eof/eof_service_amount.py"
-    environment:
-      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-      CONTAINER_NAME: filter-amount-eof-service
-      RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE: eof-service-filter-amount
-      OUTPUT_QUEUE: eof-final-filter-amount
-      LOG_LEVEL: INFO
-      EXPECTED_ACKS: 3
     networks:
     - testing_net
     depends_on:
@@ -442,11 +405,6 @@ services:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-store-q3-queue-1
       OUTPUT_QUEUE_1: aggregated-semester-queue
-      EOF_EXCHANGE_NAME: eof-exchange-semester
-      EOF_SELF_QUEUE: eof-aggregator-semester-1
-      EOF_QUEUE_1: eof-aggregator-semester-1
-      EOF_QUEUE_2: eof-aggregator-semester-2
-      EOF_SERVICE_QUEUE: eof-service-aggregator-semester
       LOG_LEVEL: INFO
       EXPECTED_ACKS: 2
     networks:
@@ -464,28 +422,6 @@ services:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-store-q3-queue-2
       OUTPUT_QUEUE_1: aggregated-semester-queue
-      EOF_EXCHANGE_NAME: eof-exchange-semester
-      EOF_SELF_QUEUE: eof-aggregator-semester-2
-      EOF_QUEUE_1: eof-aggregator-semester-1
-      EOF_QUEUE_2: eof-aggregator-semester-2
-      EOF_SERVICE_QUEUE: eof-service-aggregator-semester
-      LOG_LEVEL: INFO
-      EXPECTED_ACKS: 2
-    networks:
-    - testing_net
-    depends_on:
-    - gateway
-
-  aggregator-semester-eof-service:
-    container_name: aggregator-semester-eof-service
-    image: worker:latest
-    command: "/worker/eof/eof_service_aggregator_store.py"
-    environment:
-      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-      CONTAINER_NAME: aggregator-semester-eof-service
-      RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE: eof-service-aggregator-semester
-      OUTPUT_QUEUE: aggregated-semester-queue
       LOG_LEVEL: INFO
       EXPECTED_ACKS: 2
     networks:
@@ -643,7 +579,7 @@ services:
       CONTAINER_NAME: top-three-clients-1
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-store-q4-queue-1
-      INPUT_QUEUE_2: users-queue
+      INPUT_QUEUE_2: users-queue-1
       OUTPUT_QUEUE_1: top-clients-queue
       STORAGE_DIR: ./data/top-three-clients
       LOG_LEVEL: INFO
@@ -663,7 +599,7 @@ services:
       CONTAINER_NAME: top-three-clients-2
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-store-q4-queue-2
-      INPUT_QUEUE_2: users-queue
+      INPUT_QUEUE_2: users-queue-2
       OUTPUT_QUEUE_1: top-clients-queue
       STORAGE_DIR: ./data/top-three-clients
       LOG_LEVEL: INFO

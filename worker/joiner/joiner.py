@@ -21,9 +21,6 @@ class Joiner(Worker, ABC):
         self.eofs_by_client = {}
         self.items_to_join = {}
         
-        self.items_to_join_lock = threading.Lock()
-        self.eofs_lock = threading.Lock()
-        
     def start(self):
         self.heartbeat_sender = start_heartbeat_sender()
     
@@ -45,7 +42,6 @@ class Joiner(Worker, ABC):
         pass
     
     def _process_on_eof_message__(self, message):
-        # with self.eofs_lock:
         self.eofs_by_client[message.request_id] = self.eofs_by_client.get(message.request_id, 0) + 1
         if self.eofs_by_client[message.request_id] < self.expected_eofs:
             logging.info(f"action: EOF message received {self.eofs_by_client[message.request_id]}/{self.expected_eofs} | request_id: {message.request_id} | type: {message.type}")

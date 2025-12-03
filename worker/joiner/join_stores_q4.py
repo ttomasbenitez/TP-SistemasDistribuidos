@@ -7,7 +7,7 @@ from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_QUERY_4_INTERME
 from utils.custom_logging import initialize_log
 import os
 
-EXPECTED_EOFS = 2
+EXPECTED_EOFS = 3
 
 class Q4StoresJoiner(Joiner):
 
@@ -28,8 +28,7 @@ class Q4StoresJoiner(Joiner):
         if message.type == MESSAGE_TYPE_STORES:
             for item in items:
                 key = (item.get_id(), message.request_id)
-                with self.items_to_join_lock:
-                    self.items_to_join[key] = item.get_name()
+                self.items_to_join[key] = item.get_name()
         logging.info(f"action: Stores updated | request_id: {message.request_id}")
                     
     def _send_results(self, message):
@@ -56,8 +55,7 @@ class Q4StoresJoiner(Joiner):
                 items = message.process_message()
                 if message.type == MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT:
                     for item in items:
-                        with self.items_to_join_lock:
-                            store_name = self.items_to_join.get((item.get_store(), message.request_id), 0)
+                        store_name = self.items_to_join.get((item.get_store(), message.request_id), 0)
                         if store_name:
                             self.processed_clients.setdefault(message.request_id, []).append(Q4Result(store_name, item.get_birthdate(), item.get_purchases_qty()))
                         else:

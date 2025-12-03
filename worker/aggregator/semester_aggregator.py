@@ -16,11 +16,6 @@ class SemesterAggregator(Worker):
     def __init__(self, 
                  data_input_queue: str,
                  data_output_queue: str,
-                 eof_output_exchange: str,
-                 eof_output_queues: dict, 
-                 eof_self_queue: str,
-                 eof_service_queue: str,
-                 expected_acks: int,
                  host: str):
         
         self.__init_manager__()
@@ -29,11 +24,6 @@ class SemesterAggregator(Worker):
         self.connection = PikaConnection(host)
         self.data_input_queue = data_input_queue
         self.data_output_queue = data_output_queue
-        self.eof_output_exchange = eof_output_exchange
-        self.eof_output_queues = eof_output_queues
-        self.eof_service_queue = eof_service_queue
-        self.eof_self_queue = eof_self_queue
-        self.expected_acks = expected_acks
         # Track last seen message number per upstream node (store_aggregator)
         self._last_msg_by_sender = {}
         self._sender_lock = threading.Lock()
@@ -72,15 +62,12 @@ class SemesterAggregator(Worker):
 
         self.connection.start()
         self._consume_data_queue()
-        # self._consume_eof()
         self.connection.start_consuming()
 
     def _consume_data_queue(self):
         data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
         data_output_queue = MessageMiddlewareQueue(self.data_output_queue, self.connection)
-        eof_output_exchange = MessageMiddlewareExchange(self.eof_output_exchange, self.eof_output_queues, self.connection)
-        # eof_self_queue = MessageMiddlewareQueue(self.eof_self_queue, self.connection)
-        self.message_middlewares.extend([data_input_queue, data_output_queue, eof_output_exchange])
+        self.message_middlewares.extend([data_input_queue, data_output_queue])
         
         def __on_message__(message):
             try:
@@ -196,11 +183,6 @@ def initialize_config():
         "rabbitmq_host": os.getenv('RABBITMQ_HOST'),
         "input_queue": os.getenv('INPUT_QUEUE_1'),
         "output_queue": os.getenv('OUTPUT_QUEUE_1'),
-        "eof_exchange_name": os.getenv('EOF_EXCHANGE_NAME'),
-        "eof_self_queue": os.getenv('EOF_SELF_QUEUE'),
-        "eof_queue_1": os.getenv('EOF_QUEUE_1'),
-        "eof_queue_2": os.getenv('EOF_QUEUE_2'),
-        "eof_service_queue": os.getenv('EOF_SERVICE_QUEUE'),
         "logging_level": os.getenv('LOG_LEVEL', 'INFO'),
         "expected_acks": int(os.getenv('EXPECTED_ACKS')),
     }
@@ -222,16 +204,8 @@ def main():
 
     initialize_log(config_params["logging_level"])
     
-    eof_exchange_queues =  {config_params["eof_queue_1"]: [str(MESSAGE_TYPE_EOF)],
-                                 config_params["eof_queue_2"]: [str(MESSAGE_TYPE_EOF)]}
-    
     aggregator = SemesterAggregator(config_params["input_queue"], 
-                                    config_params["output_queue"], 
-                                    config_params["eof_exchange_name"], 
-                                    eof_exchange_queues,
-                                    config_params["eof_self_queue"],
-                                    config_params["eof_service_queue"],  
-                                    config_params["expected_acks"],
+                                    config_params["output_queue"],  
                                     config_params["rabbitmq_host"])
     aggregator.start()
 

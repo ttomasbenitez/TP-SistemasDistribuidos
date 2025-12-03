@@ -19,11 +19,6 @@ class FilterAmountNode(Worker):
     def __init__(self, 
                  data_input_queue: str, 
                  data_output_exchange: str,
-                 eof_output_exchange: str, 
-                 eof_output_queues: str,
-                 eof_self_queue: str, 
-                 eof_service_queue: str, 
-                 eof_final_queue: str, 
                  host: str, 
                  amount_to_filter: int,
                  total_shards: int,
@@ -34,11 +29,6 @@ class FilterAmountNode(Worker):
         self.connection = PikaConnection(host)
         self.data_input_queue = data_input_queue
         self.data_output_exchange = data_output_exchange
-        self.eof_output_exchange = eof_output_exchange
-        self.eof_output_queues = eof_output_queues
-        self.eof_self_queue = eof_self_queue
-        self.eof_service_queue = eof_service_queue
-        self.eof_final_queue = eof_final_queue
         self.clients = []
         self.amount_to_filter = amount_to_filter
         self.dedup_strategy = SlidingWindowDedupStrategy(total_shards, storage_dir)
@@ -49,14 +39,13 @@ class FilterAmountNode(Worker):
         
         self.connection.start()
         self._consume_data_queue()
-        self._consume_eof_final()
+        # self._consume_eof_final()
         self.connection.start_consuming()
 
     def _consume_data_queue(self):
         data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
         data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, {}, self.connection)
-        eof_output_exchange = MessageMiddlewareExchange(self.eof_output_exchange, self.eof_output_queues, self.connection)
-        self.message_middlewares.extend([data_input_queue, data_output_exchange, eof_output_exchange])
+        self.message_middlewares.extend([data_input_queue, data_output_exchange])
         
         self.dedup_strategy.load_dedup_state()
         
@@ -65,7 +54,7 @@ class FilterAmountNode(Worker):
                 message = Message.deserialize(message_body)
 
                 if message.type == MESSAGE_TYPE_EOF:
-                    self._handle_eof(message, eof_output_exchange)
+                    self._handle_eof(message, data_output_exchange)
                     return
 
                 self._handle_message(message, data_output_exchange)
@@ -75,11 +64,10 @@ class FilterAmountNode(Worker):
 
         data_input_queue.start_consuming(__on_message__, manual_ack=False)
 
-    def _handle_eof(self, message, eof_output_exchange):
+    def _handle_eof(self, message, data_output_exchange):
         logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
-        # Send EOF to service queue
-        eof_output_exchange.send(message.serialize(), str(message.type))
         
+        data_output_exchange.send(message.serialize(), str(message.type))
         self.dedup_strategy.update_state_on_eof(message)
         
         logging.info(f"action: ACK EOF")
@@ -111,24 +99,6 @@ class FilterAmountNode(Worker):
                 new_message = Message(message.request_id, MESSAGE_TYPE_QUERY_1_RESULT, message.msg_num, new_chunk)
                 serialized = new_message.serialize()
                 data_output_exchange.send(serialized, str(message.request_id))
-        
-    def _consume_eof_final(self):
-        eof_final_queue = MessageMiddlewareQueue(self.eof_final_queue, self.connection)
-        data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, {}, self.connection)
-        self.message_middlewares.extend([eof_final_queue, data_output_exchange])
-        
-        def __on_eof_final_message__(message):
-            try:
-                message = Message.deserialize(message)
-                if message.type == MESSAGE_TYPE_EOF:
-                    logging.info(f"action: final EOF message received | request_id: {message.request_id}")   
-                    self._ensure_request(message.request_id)
-                    self.drained[message.request_id].wait()
-                    data_output_exchange.send(message.serialize(), str(message.request_id))
-            except Exception as e:
-                logging.error(f"action: ERROR processing final EOF message | error: {type(e).__name__}: {e}")
-        
-        eof_final_queue.start_consuming(__on_eof_final_message__)
 
 def initialize_config():
     """ Parse env variables to find program config params
@@ -145,11 +115,6 @@ def initialize_config():
         "input_queue": os.getenv('INPUT_QUEUE_1'),
         "exchange": os.getenv('EXCHANGE_NAME'),
         "logging_level": os.getenv('LOG_LEVEL', 'INFO'),
-        "eof_service_queue": os.getenv('EOF_SERVICE_QUEUE'),
-        "eof_exchange_name": os.getenv('EOF_EXCHANGE_NAME'),
-        "eof_self_queue": os.getenv('EOF_SELF_QUEUE'),
-        "eof_service_queue": os.getenv('EOF_SERVICE_QUEUE'),
-        "eof_final_queue": os.getenv('EOF_FINAL_QUEUE'),
         "total_shards": int(os.getenv('TOTAL_SHARDS', 3)),
         "storage_dir": os.getenv('STORAGE_DIR', './data'),
     }
@@ -171,16 +136,8 @@ def main():
 
     initialize_log(config_params["logging_level"])
 
-    # For sharding, we send EOF directly to the service queue
-    eof_queues = {config_params["eof_service_queue"]: [str(MESSAGE_TYPE_EOF)]}
-
     filter = FilterAmountNode(config_params["input_queue"], 
                             config_params["exchange"], 
-                            config_params["eof_exchange_name"],
-                            eof_queues,
-                            config_params["eof_self_queue"],
-                            config_params["eof_service_queue"],
-                            config_params["eof_final_queue"],
                             config_params["rabbitmq_host"],  
                             AMOUNT_THRESHOLD,
                             config_params["total_shards"],

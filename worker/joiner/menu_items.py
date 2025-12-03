@@ -27,10 +27,9 @@ class JoinerMenuItems(Joiner):
         
         if message.type == MESSAGE_TYPE_MENU_ITEMS:
             for item in items:
-                with self.items_to_join_lock:
-                    if message.request_id not in self.items_to_join:
-                        self.items_to_join[message.request_id] = {}
-                    self.items_to_join[message.request_id][item.get_id()] = item.get_name()
+                if message.request_id not in self.items_to_join:
+                    self.items_to_join[message.request_id] = {}
+                self.items_to_join[message.request_id][item.get_id()] = item.get_name()
         
         logging.info(f"action: Menu Items updated | request_id: {message.request_id}")
         
@@ -79,8 +78,7 @@ class JoinerMenuItems(Joiner):
                 if message.type == MESSAGE_TYPE_QUERY_2_RESULT:
                     ready_to_send = ''
                     for item in items:
-                        with self.items_to_join_lock:
-                            name = self.items_to_join.get(message.request_id, {}).get(parse_int(item.item_data))
+                        name = self.items_to_join.get(message.request_id, {}).get(parse_int(item.item_data))
                         if name:
                             item.join_item_name(name)
                             ready_to_send += item.serialize()
