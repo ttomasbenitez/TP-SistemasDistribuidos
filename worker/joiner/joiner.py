@@ -20,6 +20,8 @@ class Joiner(Worker, ABC):
         self.expected_eofs = expected_eofs
         self.eofs_by_client = {}
         self.items_to_join = {}
+        self._sender_lock = threading.Lock()
+        self._last_msg_by_sender = {}
         
     def start(self):
         self.heartbeat_sender = start_heartbeat_sender()
@@ -40,6 +42,32 @@ class Joiner(Worker, ABC):
     @abstractmethod
     def _send_results(self, message):
         pass
+    
+    def _sender_key(self, message: Message, stream: str) -> str:
+        try:
+            sender_id = message.get_node_id_and_request_id()
+        except Exception:
+            # Fallback to node_id only if combined is not available
+            sender_id = getattr(message, 'node_id', 'unknown')
+            sender_id = f"{sender_id}.{message.request_id}"
+        return f"{stream}:{sender_id}"
+
+    def is_dupped(self, message: Message, stream: str = "data") -> bool:
+        """
+        Returns True if the message is a duplicate or out-of-order for the given stream
+        (based on last seen msg_num for its sender+request). Updates last seen on accept.
+        """
+        key = self._sender_key(message, stream)
+        with self._sender_lock:
+            last = self._last_msg_by_sender.get(key, -1)
+            if message.msg_num <= last:
+                if message.msg_num == last:
+                    logging.info(f"action: duplicate_msg | stream:{stream} | sender:{key} | msg:{message.msg_num}")
+                else:
+                    logging.warning(f"action: out_of_order_msg | stream:{stream} | sender:{key} | msg:{message.msg_num} < last:{last}")
+                return True
+            self._last_msg_by_sender[key] = message.msg_num
+            return False
     
     def _process_on_eof_message__(self, message):
         self.eofs_by_client[message.request_id] = self.eofs_by_client.get(message.request_id, 0) + 1
@@ -64,6 +92,10 @@ class Joiner(Worker, ABC):
              
             if message.type == MESSAGE_TYPE_EOF:
                 return self._process_on_eof_message__(message)
+            
+            # dedup/ordering for items stream
+            if self.is_dupped(message, stream="items"):
+                return
             
             self._ensure_request(message.request_id)
             self._inc_inflight(message.request_id)

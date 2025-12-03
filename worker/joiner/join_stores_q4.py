@@ -49,6 +49,10 @@ class Q4StoresJoiner(Joiner):
             if message.type == MESSAGE_TYPE_EOF:
                 return self._process_on_eof_message__(message)
 
+            # dedup/ordering for data stream
+            if self.is_dupped(message, stream="data"):
+                return
+
             self._ensure_request(message.request_id)
             self._inc_inflight(message.request_id)
             try:
