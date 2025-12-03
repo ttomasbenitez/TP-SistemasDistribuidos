@@ -9,6 +9,7 @@ from pkg.message.q3_result import Q3IntermediateResult
 from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT
 from utils.heartbeat import start_heartbeat_sender
 import threading
+from pkg.storage.state_storage.semester_agg import SemesterAggregatorStateStorage
 
 class SemesterAggregator(Worker):
 
@@ -34,16 +35,11 @@ class SemesterAggregator(Worker):
         # Track last seen message number per upstream node (store_aggregator)
         self._last_msg_by_sender = {}
         self._sender_lock = threading.Lock()
-
-    def _extract_sender_id(self, message: Message) -> str:
-        """
-        Returns the upstream node id that produced this message.
-        Expected to be provided by store_aggregator in future.
-        Current fallback groups all under a single sender 'default'.
-        """
-        # Placeholder: when store_aggregator includes a sender id, parse it here.
-        # For example, it could embed a header-like prefix in content or use properties.
-        return "default"
+        # In-memory aggregation by request_id -> period -> store_id -> total
+        self._agg_by_request = {}
+        # Persistent storage
+        storage_dir = os.getenv('SEMESTER_STORAGE_DIR', './data/semester_agg')
+        self.state_storage = SemesterAggregatorStateStorage(storage_dir)
 
     def _should_process_and_update(self, message: Message) -> bool:
         """
@@ -87,22 +83,41 @@ class SemesterAggregator(Worker):
 
                 if message.type == MESSAGE_TYPE_EOF:
                     logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
-                    # Route EOF to self queue; Worker._consume_eof will wait for drained and forward to service
-                    eof_self_queue.send(message.serialize())
+                    # On EOF: emit all aggregated results for this request_id, then send EOF downstream and cleanup
+                    self._emit_all_and_finalize(message, data_output_queue, eof_output_exchange)
                     return
                 
                 logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
                 self._ensure_request(message.request_id)
                 self._inc_inflight(message.request_id) 
 
+                # Load persisted state on first sight of request_id
+                if message.request_id not in self._agg_by_request:
+                    self._agg_by_request[message.request_id] = {}
+                    # Load persisted state and merge
+                    self.state_storage.load_state(message.request_id)
+                    persisted = self.state_storage.data_by_request.get(message.request_id, {})
+                    persisted_agg = persisted.get("agg", {})
+                    persisted_last = persisted.get("last_msg_by_sender", {})
+                    # Merge aggregation
+                    for period, store_map in persisted_agg.items():
+                        bucket = self._agg_by_request[message.request_id].setdefault(period, {})
+                        for store_id, total in store_map.items():
+                            bucket[store_id] = bucket.get(store_id, 0.0) + total
+                    # Merge last seen
+                    with self._sender_lock:
+                        for sender_id, last_num in persisted_last.items():
+                            self._last_msg_by_sender[sender_id] = max(self._last_msg_by_sender.get(sender_id, -1), last_num)
+
                 # Per-sender sequencing check
                 if not self._should_process_and_update(message):
                     return
 
                 items = message.process_message()
-                agg = dict()
+                # Aggregate in-memory and persist incremental delta
+                per_request = self._agg_by_request[message.request_id]
+                deltas = []  # list of (period, store_id, delta)
                 store_id = None
-
                 for it in items:
                     year = it.get_year()
                     sem  = it.get_semester()
@@ -110,11 +125,18 @@ class SemesterAggregator(Worker):
                     if store_id is None:
                         store_id = it.store_id
                     amount = it.get_final_amount()
-                    agg[period] = agg.get(period, 0.0) + amount
-                    
-                for period, total in agg.items():
-                    res = Q3IntermediateResult(period, store_id, total)
-                    self._send_grouped_item(message, res, data_output_queue)
+                    bucket = per_request.setdefault(period, {})
+                    bucket[store_id] = bucket.get(store_id, 0.0) + amount
+                    deltas.append((period, store_id, amount))
+
+                # Persist incremental changes and last seen msg for sender
+                sender_id = message.get_node_id()
+                lines = []
+                for period, s_id, delta in deltas:
+                    lines.append(f"agg;{period};{s_id};{delta}")
+                lines.append(f"sender;{sender_id};{message.msg_num}")
+                self.state_storage.data_by_request[message.request_id] = {"lines": lines}
+                self.state_storage.save_state(message.request_id)
 
             except Exception as e:
                 logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
@@ -124,6 +146,24 @@ class SemesterAggregator(Worker):
         
         data_input_queue.start_consuming(__on_message__)
 
+    def _emit_all_and_finalize(self, message: Message, data_output_queue: MessageMiddlewareQueue, eof_output_exchange: MessageMiddlewareExchange):
+        """Emit all aggregated Q3 intermediate results and then EOF downstream."""
+        request_id = message.request_id
+        try:
+            per_request = self._agg_by_request.get(request_id, {})
+            for period, store_map in per_request.items():
+                for store_id, total in store_map.items():
+                    res = Q3IntermediateResult(period, store_id, total)
+                    self._send_grouped_item(message, res, data_output_queue)
+        finally:
+            # Send EOF to downstream exchange for q3
+            eof_output_exchange.send(message.serialize(), str(message.type))
+            # Cleanup state both memory and disk
+            try:
+                del self._agg_by_request[request_id]
+            except Exception:
+                pass
+            self.state_storage.delete_state(request_id)
    
     def _send_grouped_item(self, message, item, data_output_queue):
         new_chunk = item.serialize()

@@ -19,7 +19,7 @@ class PikaConnection():
             # Enable publisher confirms for reliability
             self.channel.confirm_delivery()
         except Exception:
-            pass
+            pas
         
     def start(self):
         self.connect()
