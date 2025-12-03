@@ -16,7 +16,8 @@ class SemesterAggregator(Worker):
     def __init__(self, 
                  data_input_queue: str,
                  data_output_queue: str,
-                 host: str):
+                 host: str,
+                 expected_acks: int):
         
         self.__init_manager__()
         self.__init_middlewares_handler__()
@@ -24,6 +25,7 @@ class SemesterAggregator(Worker):
         self.connection = PikaConnection(host)
         self.data_input_queue = data_input_queue
         self.data_output_queue = data_output_queue
+        self.expected_acks = expected_acks
         # Track last seen message number per upstream node (store_aggregator)
         self._last_msg_by_sender = {}
         self._sender_lock = threading.Lock()
@@ -61,6 +63,12 @@ class SemesterAggregator(Worker):
         self.heartbeat_sender = start_heartbeat_sender()
 
         self.connection.start()
+        # Restore any previously persisted state once, on startup
+        try:
+            self._restore_persisted_state()
+            logging.info("action: semester_state_restore | result: success")
+        except Exception as e:
+            logging.error(f"action: semester_state_restore | result: fail | error: {type(e).__name__}: {e}")
         self._consume_data_queue()
         self.connection.start_consuming()
 
@@ -91,31 +99,13 @@ class SemesterAggregator(Worker):
                 self._ensure_request(message.request_id)
                 self._inc_inflight(message.request_id) 
 
-                # Load persisted state on first sight of request_id
-                if message.request_id not in self._agg_by_request:
-                    self._agg_by_request[message.request_id] = {}
-                    # Load persisted state and merge
-                    self.state_storage.load_state(message.request_id)
-                    persisted = self.state_storage.data_by_request.get(message.request_id, {})
-                    persisted_agg = persisted.get("agg", {})
-                    persisted_last = persisted.get("last_msg_by_sender", {})
-                    # Merge aggregation
-                    for period, store_map in persisted_agg.items():
-                        bucket = self._agg_by_request[message.request_id].setdefault(period, {})
-                        for store_id, total in store_map.items():
-                            bucket[store_id] = bucket.get(store_id, 0.0) + total
-                    # Merge last seen
-                    with self._sender_lock:
-                        for sender_id, last_num in persisted_last.items():
-                            self._last_msg_by_sender[sender_id] = max(self._last_msg_by_sender.get(sender_id, -1), last_num)
-
                 # Per-sender sequencing check
                 if not self._should_process_and_update(message):
                     return
 
                 items = message.process_message()
                 # Aggregate in-memory and persist incremental delta
-                per_request = self._agg_by_request[message.request_id]
+                per_request = self._agg_by_request.setdefault(message.request_id, {})
                 deltas = []  # list of (period, store_id, delta)
                 store_id = None
                 for it in items:
@@ -146,6 +136,30 @@ class SemesterAggregator(Worker):
         
         data_input_queue.start_consuming(__on_message__)
 
+    def _restore_persisted_state(self):
+        """
+        Load all previously persisted state once on startup and hydrate in-memory
+        aggregates and last-seen sender map.
+        """
+        # Load every request file present under storage dir
+        self.state_storage.load_state_all()
+        # Merge into in-memory structures
+        for req_id, persisted in self.state_storage.data_by_request.items():
+            # Restore aggregated totals per (period, store_id)
+            persisted_agg = persisted.get("agg", {})
+            if persisted_agg:
+                target = self._agg_by_request.setdefault(req_id, {})
+                for period, store_map in persisted_agg.items():
+                    bucket = target.setdefault(period, {})
+                    for store_id, total in store_map.items():
+                        bucket[store_id] = bucket.get(store_id, 0.0) + total
+            # Restore last seen message per sender (sender ids may already encode request)
+            persisted_last = persisted.get("last_msg_by_sender", {})
+            if persisted_last:
+                with self._sender_lock:
+                    for sender_id, last_num in persisted_last.items():
+                        self._last_msg_by_sender[sender_id] = max(self._last_msg_by_sender.get(sender_id, -1), last_num)
+    
     def _emit_all_and_finalize(self, message: Message, data_output_queue: MessageMiddlewareQueue):
         """Emit all aggregated Q3 intermediate results and then EOF downstream."""
         request_id = message.request_id
@@ -205,8 +219,9 @@ def main():
     initialize_log(config_params["logging_level"])
     
     aggregator = SemesterAggregator(config_params["input_queue"], 
-                                    config_params["output_queue"],  
-                                    config_params["rabbitmq_host"])
+                                   config_params["output_queue"],  
+                                   config_params["rabbitmq_host"],
+                                   config_params["expected_acks"])
     aggregator.start()
 
 if __name__ == "__main__":
