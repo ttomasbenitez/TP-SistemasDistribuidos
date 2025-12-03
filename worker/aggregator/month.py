@@ -12,7 +12,7 @@ import hashlib
 from pkg.message.utils import calculate_sub_message_id
 from pkg.message.constants import SUB_MESSAGE_START_ID
 
-BATCH_SIZE = 100
+BATCH_SIZE = 1000
 
 
 class AggregatorMonth(Worker):
@@ -24,7 +24,8 @@ class AggregatorMonth(Worker):
                  eof_output_queues: dict,
                  eof_self_queue: str,
                  eof_service_queue: str,
-                 host: str):
+                 host: str,
+                 container_name: str):
         self.__init_manager__()
         self.__init_middlewares_handler__()
         self.data_input_queue = data_input_queue
@@ -34,6 +35,15 @@ class AggregatorMonth(Worker):
         self.connection = PikaConnection(host)
         self.eof_self_queue= eof_self_queue
         self.eof_service_queue = eof_service_queue
+        
+        # Initialize msg_num_counter based on replica ID
+        try:
+            replica_id = int(container_name.split('-')[-1])
+        except ValueError:
+            replica_id = 1 # Default to 1 if parsing fails
+            logging.error(f"Could not parse replica_id from {container_name}, defaulting to 1")
+            
+        self.msg_num_counter = replica_id * 1000000
     
     def start(self):
         
@@ -134,7 +144,6 @@ class AggregatorMonth(Worker):
         return groups
     
     def _send_groups_sharded(self, original_message: Message, groups: dict, output_queues: list):
-        sub_msg_id = SUB_MESSAGE_START_ID
         for key, items in groups.items():
             # key is "YYYY-MM"
             # Use hash to select queue
@@ -142,12 +151,15 @@ class AggregatorMonth(Worker):
             queue_index = hash_val % len(output_queues)
             target_queue = output_queues[queue_index]
             new_chunk = ''.join(item.serialize() for item in items)
-            new_msg_num = calculate_sub_message_id(original_message.msg_num, sub_msg_id)
+            
+            # Use self.msg_num_counter for new message ID
+            new_msg_num = self.msg_num_counter
+            self.msg_num_counter += 1
+            
             new_message = original_message.new_from_original(new_chunk, msg_num=new_msg_num)
-            logging.info(f"action: sending group | key: {key} | to_queue_index: {queue_index} | request_id: {new_message.request_id} | type: {new_message.type}")
+            logging.info(f"action: sending group | key: {key} | to_queue_index: {queue_index} | request_id: {new_message.request_id} | type: {new_message.type} | msg_num: {new_msg_num}")
             serialized = new_message.serialize()
             target_queue.send(serialized)
-            sub_msg_id += 1
 
     def close(self):
         try:
@@ -218,7 +230,8 @@ def main():
                                 eof_output_queues,
                                 config_params["eof_self_queue"],
                                 config_params["eof_service_queue"],
-                                config_params["rabbitmq_host"])
+                                config_params["rabbitmq_host"],
+                                config_params["logger_name"])
     aggregator.start()
 
 if __name__ == "__main__":
