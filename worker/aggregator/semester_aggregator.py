@@ -20,6 +20,7 @@ class SemesterAggregator(Worker):
                  eof_output_queues: dict, 
                  eof_self_queue: str,
                  eof_service_queue: str,
+                 expected_acks: int,
                  host: str):
         
         self.__init_manager__()
@@ -32,6 +33,7 @@ class SemesterAggregator(Worker):
         self.eof_output_queues = eof_output_queues
         self.eof_service_queue = eof_service_queue
         self.eof_self_queue = eof_self_queue
+        self.expected_acks = expected_acks
         # Track last seen message number per upstream node (store_aggregator)
         self._last_msg_by_sender = {}
         self._sender_lock = threading.Lock()
@@ -40,6 +42,9 @@ class SemesterAggregator(Worker):
         # Persistent storage
         storage_dir = os.getenv('SEMESTER_STORAGE_DIR', './data/semester_agg')
         self.state_storage = SemesterAggregatorStateStorage(storage_dir)
+        # EOF accounting per request
+        self._eof_acks_by_request = {}
+        self._eof_lock = threading.Lock()
 
     def _should_process_and_update(self, message: Message) -> bool:
         """
@@ -83,7 +88,15 @@ class SemesterAggregator(Worker):
 
                 if message.type == MESSAGE_TYPE_EOF:
                     logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
-                    # On EOF: emit all aggregated results for this request_id, then send EOF downstream and cleanup
+                    # Accumulate EOF acks per request; emit only when expected_acks reached
+                    with self._eof_lock:
+                        current = self._eof_acks_by_request.get(message.request_id, 0) + 1
+                        self._eof_acks_by_request[message.request_id] = current
+                        reached = (current >= self.expected_acks)
+                    if not reached:
+                        logging.info(f"action: eof_partial | request_id: {message.request_id} | acks: {current}/{self.expected_acks}")
+                        return
+                    # All upstream EOFs received → emit and finalize
                     self._emit_all_and_finalize(message, data_output_queue)
                     return
                 
@@ -156,8 +169,8 @@ class SemesterAggregator(Worker):
                     res = Q3IntermediateResult(period, store_id, total)
                     self._send_grouped_item(message, res, data_output_queue)
         finally:
-            # Send EOF to downstream exchange for q3
-            data_output_queue.send(message.serialize(), str(message.type))
+            # Send EOF to downstream queue for q3
+            data_output_queue.send(message.serialize())
             # Cleanup state both memory and disk
             try:
                 del self._agg_by_request[request_id]
@@ -189,6 +202,7 @@ def initialize_config():
         "eof_queue_2": os.getenv('EOF_QUEUE_2'),
         "eof_service_queue": os.getenv('EOF_SERVICE_QUEUE'),
         "logging_level": os.getenv('LOG_LEVEL', 'INFO'),
+        "expected_acks": int(os.getenv('EXPECTED_ACKS')),
     }
 
     required_keys = [
@@ -217,6 +231,7 @@ def main():
                                     eof_exchange_queues,
                                     config_params["eof_self_queue"],
                                     config_params["eof_service_queue"],  
+                                    config_params["expected_acks"],
                                     config_params["rabbitmq_host"])
     aggregator.start()
 

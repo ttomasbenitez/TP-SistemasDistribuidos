@@ -19,7 +19,7 @@ class PikaConnection():
             # Enable publisher confirms for reliability
             self.channel.confirm_delivery()
         except Exception:
-            pas
+            pass
         
     def start(self):
         self.connect()
@@ -58,6 +58,18 @@ class PikaConnection():
     def stop_consuming(self):
         if self.connection is not None and not self.connection.is_closed:
             self.connection.close() 
+            
+    def close(self):
+        try:
+            if self.channel is not None and getattr(self.channel, "is_open", False):
+                self.channel.close()
+        except Exception:
+            pass
+        try:
+            if self.connection is not None and not self.connection.is_closed:
+                self.connection.close()
+        except Exception:
+            pass
             
     def delete_queue(self, queue_name: str):
         if self.channel is None or self.channel.is_closed:

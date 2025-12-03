@@ -448,6 +448,7 @@ services:
       EOF_QUEUE_2: eof-aggregator-semester-2
       EOF_SERVICE_QUEUE: eof-service-aggregator-semester
       LOG_LEVEL: INFO
+      EXPECTED_ACKS: 2
     networks:
     - testing_net
     depends_on:
@@ -469,6 +470,7 @@ services:
       EOF_QUEUE_2: eof-aggregator-semester-2
       EOF_SERVICE_QUEUE: eof-service-aggregator-semester
       LOG_LEVEL: INFO
+      EXPECTED_ACKS: 2
     networks:
     - testing_net
     depends_on:

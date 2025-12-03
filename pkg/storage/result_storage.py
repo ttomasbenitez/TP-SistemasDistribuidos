@@ -4,13 +4,15 @@ import threading
 from typing import Dict
 from pkg.message.message import Message
 from pkg.storage.format_results import FormatResults
+import hashlib
 
 
 class QueryBuf:
-    def __init__(self, file_path: str, lock: threading.Lock):
+    def __init__(self, file_path: str, lock: threading.Lock, seen_hashes: set):
         self.file_path = file_path
         self.eof = False
         self._lock = lock
+        self._seen_hashes = seen_hashes
 
     def append(self, message: Message):
         """Agrega un chunk de resultados al archivo NDJSON (una línea por item)."""
@@ -20,7 +22,13 @@ class QueryBuf:
         with self._lock:
             with open(self.file_path, "a", encoding="utf-8") as f:
                 for data_item in data:
-                    f.write(json.dumps(data_item, ensure_ascii=False) + "\n")
+                    line = json.dumps(data_item, ensure_ascii=False)
+                    # Deduplicación: evitar escribir líneas idénticas múltiples veces
+                    h = hashlib.sha256(line.encode("utf-8")).hexdigest()
+                    if h in self._seen_hashes:
+                        continue
+                    self._seen_hashes.add(h)
+                    f.write(line + "\n")
                 f.flush()
                 os.fsync(f.fileno())
 
@@ -31,7 +39,9 @@ class RunBuf:
         self.run_id = run_id
         self.file_path = file_path
         os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
-        self.query_buf = QueryBuf(self.file_path, lock)
+        # Conjunto de hashes para deduplicación por corrida (request_id)
+        self._seen_hashes = set()
+        self.query_buf = QueryBuf(self.file_path, lock, self._seen_hashes)
 
 
 class ResultStorage:
@@ -54,7 +64,10 @@ class ResultStorage:
 
     def close_run(self, request_id: str):
         """Marca el run como terminado (opcional, limpieza)."""
-        self._runs.pop(request_id, None)
+        rb = self._runs.pop(request_id, None)
+        if rb:
+            # Marcar EOF para no aceptar más appends por error
+            rb.query_buf.eof = True
 
     def add_chunk(self, message: Message):
         """Agrega un chunk de datos al archivo del request_id."""
@@ -62,7 +75,9 @@ class ResultStorage:
         rb = self._runs.get(rid)
 
         if not rb:
-            rb = RunBuf(rid, self.base_path, self._lock)
+            # Fallback: para este proceso de cliente, el storage se inicializa por request,
+            # por lo que reutilizamos el mismo file_path.
+            rb = RunBuf(rid, self.file_path, self._lock)
             self._runs[rid] = rb
 
         qbuf = rb.query_buf
