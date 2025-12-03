@@ -8,6 +8,7 @@ import os
 from pkg.message.q3_result import Q3IntermediateResult
 from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT
 from utils.heartbeat import start_heartbeat_sender
+import threading
 
 class SemesterAggregator(Worker):
 
@@ -30,6 +31,39 @@ class SemesterAggregator(Worker):
         self.eof_output_queues = eof_output_queues
         self.eof_service_queue = eof_service_queue
         self.eof_self_queue = eof_self_queue
+        # Track last seen message number per upstream node (store_aggregator)
+        self._last_msg_by_sender = {}
+        self._sender_lock = threading.Lock()
+
+    def _extract_sender_id(self, message: Message) -> str:
+        """
+        Returns the upstream node id that produced this message.
+        Expected to be provided by store_aggregator in future.
+        Current fallback groups all under a single sender 'default'.
+        """
+        # Placeholder: when store_aggregator includes a sender id, parse it here.
+        # For example, it could embed a header-like prefix in content or use properties.
+        return "default"
+
+    def _should_process_and_update(self, message: Message) -> bool:
+        """
+        Decide if message should be processed based on per-sender last msg_num.
+        - If equal to last -> duplicate (skip)
+        - If greater than last -> accept and update
+        - If less than last -> out-of-order (skip)
+        """
+        sender_id = message.get_node_id()
+        with self._sender_lock:
+            last = self._last_msg_by_sender.get(sender_id, -1)
+            if message.msg_num == last:
+                logging.info(f"action: duplicate_msg | sender: {sender_id} | msg_num: {message.msg_num} | decision: skip")
+                return False
+            if message.msg_num < last:
+                logging.warning(f"action: out_of_order_msg | sender: {sender_id} | msg_num: {message.msg_num} | last: {last} | decision: skip")
+                return False
+            # message.msg_num > last → accept
+            self._last_msg_by_sender[sender_id] = message.msg_num
+            return True
 
     def start(self):
         
@@ -60,6 +94,10 @@ class SemesterAggregator(Worker):
                 logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
                 self._ensure_request(message.request_id)
                 self._inc_inflight(message.request_id) 
+
+                # Per-sender sequencing check
+                if not self._should_process_and_update(message):
+                    return
 
                 items = message.process_message()
                 agg = dict()
