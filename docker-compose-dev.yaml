@@ -393,6 +393,7 @@ services:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-store-q3-queue-1
       OUTPUT_QUEUE_1: aggregated-semester-queue
+      STORAGE_DIR: ./data/aggregator-semester-1
       LOG_LEVEL: INFO
       EXPECTED_ACKS: 2
     networks:
@@ -410,6 +411,7 @@ services:
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-store-q3-queue-2
       OUTPUT_QUEUE_1: aggregated-semester-queue
+      STORAGE_DIR: ./data/aggregator-semester-2
       LOG_LEVEL: INFO
       EXPECTED_ACKS: 2
     networks:

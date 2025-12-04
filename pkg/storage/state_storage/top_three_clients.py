@@ -143,6 +143,14 @@ class TopThreeClientsStateStorage(StateStorage):
         for sender_id, last_msg in last_by_sender.items():
             line = f"S;{sender_id};{last_msg}\n"
             file_handle.write(line)
+
+        # Print aproximado de lo que se va a guardar (muestras pequeñas para no saturar salida)
+        sample_users_by_store = {sid: list(users.keys())[:3] for sid, users in list(users_by_store.items())[:1]}
+        sample_birthdates = list(users_birthdates.items())[:3]
+        sample_senders = list(last_by_sender.items())[:3]
+        print(f"[TopThreeClientsStateStorage] Persistiendo estado | request_id={request_id} | "
+              f"stores={len(users_by_store)} | birthdates={len(users_birthdates)} | senders={len(last_by_sender)} | "
+              f"samples -> stores:{sample_users_by_store} birthdates:{sample_birthdates} senders:{sample_senders}")
         
         logging.debug(f"action: state_written | request_id: {request_id} | stores: {len(users_by_store)} | birthdates: {len(users_birthdates)} | senders: {len(last_by_sender)}")
 
