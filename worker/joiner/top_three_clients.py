@@ -104,16 +104,20 @@ class TopThreeClientsJoiner(Joiner):
         self._top3_by_store[store_id] = top
         
     def _process_items_to_join(self, message):
-        items = message.process_message()
-        state = self.state_storage.get_data_from_request(message.request_id)
-        users_birthdates = state["users_birthdates"]
+        try:
+            items = message.process_message()
+            state = self.state_storage.get_data_from_request(message.request_id)
+            users_birthdates = state["users_birthdates"]
 
-        for item in items:
-            user_id = item.get_user_id()
-            birthdate = item.get_birthdate()
-            users_birthdates[user_id] = birthdate
-    
-        self.state_storage.data_by_request[message.request_id] = state
+            for item in items:
+                user_id = item.get_user_id()
+                birthdate = item.get_birthdate()
+                users_birthdates[user_id] = birthdate
+        except Exception as e:
+            logging.error(f"Error processing items to join: {e}")
+        finally:
+            self.state_storage.save_state(message.request_id)
+            self.state_storage.cleanup_data(message.request_id)
         
     def _send_results(self, message):
         data_output_queue = MessageMiddlewareQueue(self.data_output_queue, self.connection)

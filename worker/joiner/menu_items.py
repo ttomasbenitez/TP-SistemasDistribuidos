@@ -33,16 +33,22 @@ class JoinerMenuItems(Joiner):
         self.eofs_sent_by_request = {}
 
     def _process_items_to_join(self, message):
-        items = message.process_message()
-        state = self.state_storage.get_data_from_request(message.request_id)
-        menu_items_state = state.setdefault("menu_items", {})
-        
-        if message.type == MESSAGE_TYPE_MENU_ITEMS:
-            for item in items:
-                menu_items_state[item.get_id()] = item.get_name()
-        
-        self.state_storage.data_by_request[message.request_id] = state
-        logging.info(f"action: Menu Items updated | request_id: {message.request_id}")
+        try:
+            
+            items = message.process_message()
+            state = self.state_storage.get_data_from_request(message.request_id)
+            menu_items_state = state.setdefault("menu_items", {})
+            
+            if message.type == MESSAGE_TYPE_MENU_ITEMS:
+                for item in items:
+                    menu_items_state[item.get_id()] = item.get_name()
+            
+            self.state_storage.data_by_request[message.request_id] = state
+            logging.info(f"action: Menu Items updated | request_id: {message.request_id}")
+        except Exception as e:
+            logging.error(f"action: error processing items to join | request_id: {message.request_id} | error: {str(e)}")
+        finally:
+            self.state_storage.save_state(message.request_id)     
         
     def _send_results(self, message):
         data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, {}, self.connection)
@@ -60,7 +66,7 @@ class JoinerMenuItems(Joiner):
         menu_items = state.get("menu_items", {})
         
         for item in pending_results:
-            name = menu_items.get(item.item_data)
+            name = menu_items.get(parse_int(item.item_data))
             logging.info(f"action: processing pending Q2 results | request_id: {request_id} | ITEM ID: {item.item_data} | NAME: {name}")
             if name:
                 item.join_item_name(name)

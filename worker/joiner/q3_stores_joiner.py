@@ -107,6 +107,9 @@ class StoresJoiner(Joiner):
             logging.info(f"action: Stores updated | request_id: {message.request_id}")
         except Exception as e:
             logging.error(f"Error processing items to join: {e}")
+        finally:
+            self.state_storage.save_state(message.request_id)
+            
                     
     def _send_results(self, message):
         data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, {}, self.connection)

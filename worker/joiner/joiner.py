@@ -104,7 +104,5 @@ class Joiner(Worker, ABC):
                 return
                  
             self._process_items_to_join(message)
-            self.state_storage.save_state(message.request_id)
-            self.state_storage.cleanup_data(message.request_id)
             
         items_input_queue.start_consuming(__on_items_message__)

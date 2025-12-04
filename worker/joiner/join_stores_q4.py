@@ -28,15 +28,22 @@ class Q4StoresJoiner(Joiner):
         self.data_output_exchange = data_output_exchange
         
     def _process_items_to_join(self, message):
-        items = message.process_message()
-        state = self.state_storage.get_data_from_request(message.request_id)
-        store_state = state.setdefault("stores", {})
-        if message.type == MESSAGE_TYPE_STORES:
-            for item in items:
-                store_state[item.get_id()] = item.get_name()
-        
-        self.state_storage.data_by_request[message.request_id] = state
-        logging.info(f"action: Stores updated | request_id: {message.request_id}")
+        try:
+            
+            items = message.process_message()
+            state = self.state_storage.get_data_from_request(message.request_id)
+            store_state = state.setdefault("stores", {})
+            if message.type == MESSAGE_TYPE_STORES:
+                for item in items:
+                    store_state[item.get_id()] = item.get_name()
+            
+            self.state_storage.data_by_request[message.request_id] = state
+            logging.info(f"action: Stores updated | request_id: {message.request_id}")
+        except Exception as e:
+            logging.error(f"action: error processing items to join | request_id: {message.request_id} | error: {str(e)}")
+        finally:
+            self.state_storage.save_state(message.request_id)
+            
                     
     def _send_results(self, message):
         data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, {}, self.connection)
