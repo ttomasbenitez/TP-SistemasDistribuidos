@@ -7,6 +7,10 @@ from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_QUERY_4_INTERME
 from utils.custom_logging import initialize_log
 import os
 
+
+CANTIDAD_REPLICAS_AGGREGATOR_STORE = 2
+CANTIDAD_CLIENTES = 2
+
 class Q4StoresJoiner(Joiner):
 
     def __init__(self, 
@@ -16,7 +20,8 @@ class Q4StoresJoiner(Joiner):
                  host: str,
                  top_three_clients_replicas: int = 3):
         # Expected EOFs: 1 from stores + N from top_three_clients replicas
-        expected_eofs = 1 + top_three_clients_replicas * 2
+
+        expected_eofs = 1 + top_three_clients_replicas * CANTIDAD_REPLICAS_AGGREGATOR_STORE * CANTIDAD_CLIENTES
         super().__init_client_handler__(stores_input_queue, host, expected_eofs)
         self.data_input_queue = data_input_queue
         self.data_output_exchange = data_output_exchange
@@ -157,7 +162,7 @@ class Q4StoresJoiner(Joiner):
                 if store_name:
                     self.processed_clients.setdefault(req_id, []).append(Q4Result(store_name, item.get_birthdate(), item.get_purchases_qty()))
         
-        self.pending_clients = {k: v for k, v in self.pending_clients.items() if v.request_id != request_id}
+        self.pending_clients = {k: v for k, v in self.pending_clients.items() if k[1] != request_id}
 
     def _send_eof(self, message, data_output_exchange):
         message.update_content("4")
