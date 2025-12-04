@@ -7,6 +7,7 @@ from utils.custom_logging import initialize_log
 import os
 from pkg.storage.state_storage.top_three_clients import TopThreeClientsStateStorage
 from pkg.message.q4_result import Q4IntermediateResult
+from typing import List, Tuple
 
 EXPECTED_EOFS = 3 # 1 users, 2 store agg
 SNAPSHOT_COUNT = 1000
@@ -27,6 +28,8 @@ class TopThreeClientsJoiner(Joiner):
         }))
         self.data_input_queue = data_input_queue
         self.data_output_queue = data_output_queue
+        # Incremental top-3 per store_id: { store_id: [(user_id, count), ...] sorted desc by (count, -user_id) }
+        self._top3_by_store = {}
 
     def _consume_data_queue(self):
         data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
@@ -55,6 +58,7 @@ class TopThreeClientsJoiner(Joiner):
         state = self.state_storage.get_data_from_request(request_id)
         users_by_store = state["users_by_store"]
         store_id = None
+        updated_users = set()
 
         for item in items:
             user_id = item.get_user()
@@ -63,13 +67,39 @@ class TopThreeClientsJoiner(Joiner):
 
             store_id = store_id or item.get_store()
             store_users = users_by_store.setdefault(store_id, {})
-            store_users[user_id] = store_users.get(user_id, 0) + 1
+            new_count = store_users.get(user_id, 0) + 1
+            store_users[user_id] = new_count
+            updated_users.add(user_id)
 
         if store_id is None:
             return
             
         state["users_by_store"] = users_by_store
         self.state_storage.data_by_request[request_id] = state
+        # Update incremental top-3 for affected users
+        for u in updated_users:
+            self._update_top3(store_id, u, users_by_store[store_id][u])
+
+    def _update_top3(self, store_id: int, user_id: int, count: int):
+        """
+        Maintain a small sorted list (size <= 3) of (user_id, count) for each store_id.
+        Sorting: higher count first; tie-break by lower user_id.
+        """
+        top: List[Tuple[int, int]] = self._top3_by_store.get(store_id, [])
+        # Replace existing entry if user already present
+        replaced = False
+        for idx, (uid, c) in enumerate(top):
+            if uid == user_id:
+                top[idx] = (user_id, count)
+                replaced = True
+                break
+        if not replaced:
+            top.append((user_id, count))
+        # Sort by (-count, user_id) and trim to top-3
+        top.sort(key=lambda x: (-x[1], x[0]))
+        if len(top) > 3:
+            del top[3:]
+        self._top3_by_store[store_id] = top
         
     def _process_items_to_join(self, message):
         items = message.process_message()
@@ -102,19 +132,14 @@ class TopThreeClientsJoiner(Joiner):
             if store is None:
                 continue
 
-            # users: dict user_id -> count
-            sorted_users = sorted(users.items(), key=lambda x: (-x[1], x[0]))
+            # Prefer incremental top-3 if available; otherwise compute once
+            top3 = self._top3_by_store.get(store)
+            if not top3:
+                # Fallback: compute top-3 without full sort
+                # Get three best (count desc, user_id asc)
+                top3 = sorted(users.items(), key=lambda x: (-x[1], x[0]))[:3]
 
-            unique_values = []
-            for user_id, count in sorted_users:
-                if count not in unique_values:
-                    unique_values.append(count)
-                if len(unique_values) == 3:
-                    break
-
-            top_3_users = [user for user in sorted_users if user[1] in unique_values]
-
-            for user_id, transaction_count in top_3_users:
+            for user_id, transaction_count in top3:
                 birthdate = users_birthdates_state.get(user_id)
                 if birthdate:
                     chunk += Q4IntermediateResult(store, birthdate, transaction_count).serialize()
