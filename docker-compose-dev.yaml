@@ -112,130 +112,130 @@ services:
     depends_on:
     - gateway
 
-  # filter-time-1:
-  #  container_name: filter-time-1
-  #  image: worker:latest
-  #  command: "/worker/filter/time.py"
-  #  environment:
-  #    HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #    CONTAINER_NAME: filter-time-1
-  #    RABBITMQ_HOST: rabbitmq
-  #    INPUT_QUEUE_1: year-filtered-queue-q1-q3
-  #    EOF_SELF_QUEUE: EOF-filter-time-1
-  #    OUTPUT_QUEUE_Q1_1: time-filtered-queue-q1-1
-  #    OUTPUT_QUEUE_Q1_2: time-filtered-queue-q1-2
-  #    OUTPUT_QUEUE_Q1_3: time-filtered-queue-q1-3
-  #    OUTPUT_QUEUE_Q3_1: time-filtered-queue-q3-1
-  #    OUTPUT_QUEUE_Q3_2: time-filtered-queue-q3-2
-  #    EOF_QUEUE_NODO_1: EOF-filter-time-1
-  #    EOF_QUEUE_NODO_2: EOF-filter-time-2
-  #    EXCHANGE_NAME: time-filtered-exchange
-  #    EOF_EXCHANGE_NAME: eof-exchange-filter-time
-  #    EOF_SERVICE_QUEUE: eof-service-filter-time
-  #    LOG_LEVEL: INFO
-  #  networks:
-  #  - testing_net
-  #  depends_on:
-  #  - gateway
+  filter-time-1:
+   container_name: filter-time-1
+   image: worker:latest
+   command: "/worker/filter/time.py"
+   environment:
+     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+     CONTAINER_NAME: filter-time-1
+     RABBITMQ_HOST: rabbitmq
+     INPUT_QUEUE_1: year-filtered-queue-q1-q3
+     EOF_SELF_QUEUE: EOF-filter-time-1
+     OUTPUT_QUEUE_Q1_1: time-filtered-queue-q1-1
+     OUTPUT_QUEUE_Q1_2: time-filtered-queue-q1-2
+     OUTPUT_QUEUE_Q1_3: time-filtered-queue-q1-3
+     OUTPUT_QUEUE_Q3_1: time-filtered-queue-q3-1
+     OUTPUT_QUEUE_Q3_2: time-filtered-queue-q3-2
+     EOF_QUEUE_NODO_1: EOF-filter-time-1
+     EOF_QUEUE_NODO_2: EOF-filter-time-2
+     EXCHANGE_NAME: time-filtered-exchange
+     EOF_EXCHANGE_NAME: eof-exchange-filter-time
+     EOF_SERVICE_QUEUE: eof-service-filter-time
+     LOG_LEVEL: INFO
+   networks:
+   - testing_net
+   depends_on:
+   - gateway
 
-  # filter-time-2:
-  #  container_name: filter-time-2
-  #  image: worker:latest
-  #  command: "/worker/filter/time.py"
-  #  environment:
-  #    HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #    CONTAINER_NAME: filter-time-2
-  #    RABBITMQ_HOST: rabbitmq
-  #    INPUT_QUEUE_1: year-filtered-queue-q1-q3
-  #    EOF_SELF_QUEUE: EOF-filter-time-2
-  #    OUTPUT_QUEUE_Q1_1: time-filtered-queue-q1-1
-  #    OUTPUT_QUEUE_Q1_2: time-filtered-queue-q1-2
-  #    OUTPUT_QUEUE_Q1_3: time-filtered-queue-q1-3
-  #    OUTPUT_QUEUE_Q3_1: time-filtered-queue-q3-1
-  #    OUTPUT_QUEUE_Q3_2: time-filtered-queue-q3-2
-  #    EOF_QUEUE_NODO_1: EOF-filter-time-1
-  #    EOF_QUEUE_NODO_2: EOF-filter-time-2
-  #    EXCHANGE_NAME: time-filtered-exchange
-  #    EOF_EXCHANGE_NAME: eof-exchange-filter-time
-  #    EOF_SERVICE_QUEUE: eof-service-filter-time
-  #    LOG_LEVEL: INFO
-  #  networks:
-  #  - testing_net
-  #  depends_on:
-  #  - gateway
+  filter-time-2:
+   container_name: filter-time-2
+   image: worker:latest
+   command: "/worker/filter/time.py"
+   environment:
+     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+     CONTAINER_NAME: filter-time-2
+     RABBITMQ_HOST: rabbitmq
+     INPUT_QUEUE_1: year-filtered-queue-q1-q3
+     EOF_SELF_QUEUE: EOF-filter-time-2
+     OUTPUT_QUEUE_Q1_1: time-filtered-queue-q1-1
+     OUTPUT_QUEUE_Q1_2: time-filtered-queue-q1-2
+     OUTPUT_QUEUE_Q1_3: time-filtered-queue-q1-3
+     OUTPUT_QUEUE_Q3_1: time-filtered-queue-q3-1
+     OUTPUT_QUEUE_Q3_2: time-filtered-queue-q3-2
+     EOF_QUEUE_NODO_1: EOF-filter-time-1
+     EOF_QUEUE_NODO_2: EOF-filter-time-2
+     EXCHANGE_NAME: time-filtered-exchange
+     EOF_EXCHANGE_NAME: eof-exchange-filter-time
+     EOF_SERVICE_QUEUE: eof-service-filter-time
+     LOG_LEVEL: INFO
+   networks:
+   - testing_net
+   depends_on:
+   - gateway
 
-  # filter-time-eof-service:
-  #  container_name: filter-time-eof-service
-  #  image: worker:latest
-  #  command: "/worker/eof/eof_service_time.py"
-  #  environment:
-  #    HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #    CONTAINER_NAME: filter-time-eof-service
-  #    RABBITMQ_HOST: rabbitmq
-  #    INPUT_QUEUE: eof-service-filter-time
-  #    OUTPUT_QUEUE_1: time-filtered-queue-q1-1
-  #    OUTPUT_QUEUE_2: time-filtered-queue-q1-2
-  #    OUTPUT_QUEUE_3: time-filtered-queue-q1-3
-  #    OUTPUT_QUEUE_4: time-filtered-queue-q3-1
-  #    OUTPUT_QUEUE_5: time-filtered-queue-q3-2
-  #    EXCHANGE_NAME: time-filtered-exchange-eof
-  #    LOG_LEVEL: INFO
-  #    EXPECTED_ACKS: 2
-  #  networks:
-  #  - testing_net
-  #  depends_on:
-  #  - gateway
+  filter-time-eof-service:
+   container_name: filter-time-eof-service
+   image: worker:latest
+   command: "/worker/eof/eof_service_time.py"
+   environment:
+     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+     CONTAINER_NAME: filter-time-eof-service
+     RABBITMQ_HOST: rabbitmq
+     INPUT_QUEUE: eof-service-filter-time
+     OUTPUT_QUEUE_1: time-filtered-queue-q1-1
+     OUTPUT_QUEUE_2: time-filtered-queue-q1-2
+     OUTPUT_QUEUE_3: time-filtered-queue-q1-3
+     OUTPUT_QUEUE_4: time-filtered-queue-q3-1
+     OUTPUT_QUEUE_5: time-filtered-queue-q3-2
+     EXCHANGE_NAME: time-filtered-exchange-eof
+     LOG_LEVEL: INFO
+     EXPECTED_ACKS: 2
+   networks:
+   - testing_net
+   depends_on:
+   - gateway
 
-  # filter-amount-1:
-  #  container_name: filter-amount-1
-  #  image: worker:latest
-  #  command: "/worker/filter/amount.py"
-  #  environment:
-  #    HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #    CONTAINER_NAME: filter-amount-1
-  #    RABBITMQ_HOST: rabbitmq
-  #    INPUT_QUEUE_1: time-filtered-queue-q1-1
-  #    EXCHANGE_NAME: results-exchange
-  #    TOTAL_SHARDS: 3
-  #    LOG_LEVEL: INFO
-  #  networks:
-  #  - testing_net
-  #  depends_on:
-  #  - gateway
+  filter-amount-1:
+   container_name: filter-amount-1
+   image: worker:latest
+   command: "/worker/filter/amount.py"
+   environment:
+     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+     CONTAINER_NAME: filter-amount-1
+     RABBITMQ_HOST: rabbitmq
+     INPUT_QUEUE_1: time-filtered-queue-q1-1
+     EXCHANGE_NAME: results-exchange
+     TOTAL_SHARDS: 3
+     LOG_LEVEL: INFO
+   networks:
+   - testing_net
+   depends_on:
+   - gateway
 
-  # filter-amount-2:
-  #  container_name: filter-amount-2
-  #  image: worker:latest
-  #  command: "/worker/filter/amount.py"
-  #  environment:
-  #    HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #    CONTAINER_NAME: filter-amount-2
-  #    RABBITMQ_HOST: rabbitmq
-  #    INPUT_QUEUE_1: time-filtered-queue-q1-2
-  #    EXCHANGE_NAME: results-exchange
-  #    TOTAL_SHARDS: 3
-  #    LOG_LEVEL: INFO
-  #  networks:
-  #  - testing_net
-  #  depends_on:
-  #  - gateway
+  filter-amount-2:
+   container_name: filter-amount-2
+   image: worker:latest
+   command: "/worker/filter/amount.py"
+   environment:
+     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+     CONTAINER_NAME: filter-amount-2
+     RABBITMQ_HOST: rabbitmq
+     INPUT_QUEUE_1: time-filtered-queue-q1-2
+     EXCHANGE_NAME: results-exchange
+     TOTAL_SHARDS: 3
+     LOG_LEVEL: INFO
+   networks:
+   - testing_net
+   depends_on:
+   - gateway
 
-  # filter-amount-3:
-  #  container_name: filter-amount-3
-  #  image: worker:latest
-  #  command: "/worker/filter/amount.py"
-  #  environment:
-  #    HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #    CONTAINER_NAME: filter-amount-3
-  #    RABBITMQ_HOST: rabbitmq
-  #    INPUT_QUEUE_1: time-filtered-queue-q1-3
-  #    EXCHANGE_NAME: results-exchange
-  #    TOTAL_SHARDS: 3
-  #    LOG_LEVEL: INFO
-  #  networks:
-  #  - testing_net
-  #  depends_on:
-  #  - gateway
+  filter-amount-3:
+   container_name: filter-amount-3
+   image: worker:latest
+   command: "/worker/filter/amount.py"
+   environment:
+     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+     CONTAINER_NAME: filter-amount-3
+     RABBITMQ_HOST: rabbitmq
+     INPUT_QUEUE_1: time-filtered-queue-q1-3
+     EXCHANGE_NAME: results-exchange
+     TOTAL_SHARDS: 3
+     LOG_LEVEL: INFO
+   networks:
+   - testing_net
+   depends_on:
+   - gateway
 
   aggregator-month-1:
     container_name: aggregator-month-1
