@@ -2,15 +2,13 @@ from worker.joiner.joiner import Joiner
 from Middleware.middleware import MessageMiddlewareQueue
 import logging
 from pkg.message.message import Message
-from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_USERS, MESSAGE_TYPE_TRANSACTIONS, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT
+from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_TRANSACTIONS, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT
 from utils.custom_logging import initialize_log
 import os
 from pkg.storage.state_storage.top_three_clients import TopThreeClientsStateStorage
 from pkg.message.q4_result import Q4IntermediateResult
-import threading
 
 EXPECTED_EOFS = 3 # 1 users, 2 store agg
-SNAPSHOT_INTERVAL = 100  # Guardar snapshot cada N mensajes
 
 class TopThreeClientsJoiner(Joiner):
 
@@ -32,8 +30,6 @@ class TopThreeClientsJoiner(Joiner):
         self.node_id = node_id
     
         self.msg_num_counter = 0    
-        # Contador para snapshots
-        self.message_count_since_snapshot = {}
         # Track EOF sent per request_id to ensure only 1 EOF is sent per replica
         self.eofs_sent = set()
 
@@ -80,13 +76,8 @@ class TopThreeClientsJoiner(Joiner):
             store_users = users_by_store.setdefault(store_id, {})
             store_users[user_id] = store_users.get(user_id, 0) + 1
         
-        # Incrementar contador y hacer snapshot cada SNAPSHOT_INTERVAL mensajes
-        self.message_count_since_snapshot[request_id] = self.message_count_since_snapshot.get(request_id, 0) + 1
-        if self.message_count_since_snapshot[request_id] >= SNAPSHOT_INTERVAL:
-            self.state_storage.save_state(request_id)
-            self.state_storage.cleanup_data(request_id)
-            self.message_count_since_snapshot[request_id] = 0
-            logging.info(f"action: snapshot_saved | request_id: {request_id} | type: transactions")
+        self.state_storage.save_state(request_id)
+        self.state_storage.cleanup_data(request_id)
         
         logging.debug(f"action: transactions_accumulated | request_id: {request_id} | items: {len(items)}")
 
@@ -105,13 +96,8 @@ class TopThreeClientsJoiner(Joiner):
             if user_id and birthdate:
                 users_birthdates[user_id] = birthdate
 
-        # Incrementar contador y hacer snapshot cada SNAPSHOT_INTERVAL mensajes
-        self.message_count_since_snapshot[message.request_id] = self.message_count_since_snapshot.get(message.request_id, 0) + 1
-        if self.message_count_since_snapshot[message.request_id] >= SNAPSHOT_INTERVAL:
-            self.state_storage.save_state(message.request_id)
-            self.state_storage.cleanup_data(message.request_id)
-            self.message_count_since_snapshot[message.request_id] = 0
-            logging.info(f"action: snapshot_saved | request_id: {message.request_id}")
+        self.state_storage.save_state(message.request_id)
+        self.state_storage.cleanup_data(message.request_id)
         
         logging.debug(f"action: users_accumulated | request_id: {message.request_id} | items: {len(items)}")
         

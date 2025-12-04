@@ -83,11 +83,11 @@ class QuantityAndProfit(Worker):
     
     def _process_on_eof_message__(self, message, data_output_queue):
         """Handle EOF message: track, send results when all EOFs received, cleanup."""
+        state = self.state_storage.get_data_from_request(message.request_id)
+        state.eofs_by_request[message.request_id] = state.eofs_by_request.get(message.request_id, 0) + 1
+        logging.info(f"EOF received | request_id: {message.request_id} | count: {state.eofs_by_request[message.request_id]}/{self.expected_eofs}")
         
-        self.state_storage.eofs_by_request[message.request_id] = self.state_storage.eofs_by_request.get(message.request_id, 0) + 1
-        logging.info(f"EOF received | request_id: {message.request_id} | count: {self.state_storage.eofs_by_request[message.request_id]}/{self.expected_eofs}")
-        
-        if self.state_storage.eofs_by_request[message.request_id] < self.expected_eofs:
+        if state.eofs_by_request[message.request_id] < self.expected_eofs:
             return  # Wait for more EOFs
         
         self.state_storage.load_state(message.request_id)
@@ -99,7 +99,6 @@ class QuantityAndProfit(Worker):
         logging.info(f"EOF forwarded downstream | request_id: {message.request_id}")
         
         # Clean up
-        del self.state_storage.eofs_by_request[message.request_id]
         self.state_storage.delete_state(message.request_id)
             
     def _accumulate_items(self, items, request_id, sender_id=None, msg_num=None):

@@ -94,16 +94,6 @@ class AggregatorMonth(Worker):
 
                 if message.type == MESSAGE_TYPE_EOF:
                     logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
-                    
-                    # Flush all remaining buffers for this request_id
-                    if message.request_id in self.buffers:
-                        for month in list(self.buffers[message.request_id].keys()):
-                            _flush_buffer(message.request_id, month, data_output_queues)
-                        del self.buffers[message.request_id]
-                    
-                    if message.request_id in self.last_message:
-                        del self.last_message[message.request_id]
-
                     eof_output_exchange.send(message.serialize(), str(message.type))
                     return
 
@@ -116,15 +106,9 @@ class AggregatorMonth(Worker):
                 items = message.process_message()
                 groups = self._group_items_by_month(items)
                 
-                for month, group_items in groups.items():
-                    if month not in self.buffers[message.request_id]:
-                        self.buffers[message.request_id][month] = []
-                    
-                    self.buffers[message.request_id][month].extend(group_items)
-                    
-                    if len(self.buffers[message.request_id][month]) >= BATCH_SIZE:
-                        _flush_buffer(message.request_id, month, data_output_queues)
-
+                template_message = Message(message.request_id, MESSAGE_TYPE_QUERY_2_INTERMEDIATE_RESULT, message.msg_num, '')
+            
+                self._send_groups_sharded(template_message, groups, data_output_queues)
             except Exception as e:
                 logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
 
