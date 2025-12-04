@@ -3,7 +3,7 @@ from pkg.message.q2_result import Q2Result
 
 class JoinerMenuItemsStateStorage(StateStorage):
     
-    def _load_state_from_file(self, file_handle, request_id):
+    def _load_state_from_file(self, file_handle, request_id, specific_state=None):
         """
         Carga el estado desde archivo para un request_id.
 
@@ -29,6 +29,8 @@ class JoinerMenuItemsStateStorage(StateStorage):
         menu_items = state["menu_items"]
         last_by_sender = state["last_by_sender"]
         pending_results = state["pending_results"]
+        
+        has_specific_state = specific_state is not None
 
         for line in file_handle:
             line = line.strip()
@@ -39,7 +41,7 @@ class JoinerMenuItemsStateStorage(StateStorage):
 
             kind = parts[0]
 
-            if kind == "ME":
+            if kind == "ME" and (not has_specific_state or specific_state == "menu_items"):
                 _k, menu_item_id_str, menu_item_name = parts
                 try:
                     menu_item_id = int(menu_item_id_str)
@@ -49,7 +51,7 @@ class JoinerMenuItemsStateStorage(StateStorage):
                 menu_items[menu_item_id] = menu_item_name
                 continue
 
-            if kind == "SE":
+            if kind == "SE" and (not has_specific_state or specific_state == "last_by_sender"):
                 _k, sender_str, last_str = parts
 
                 try:
@@ -61,7 +63,7 @@ class JoinerMenuItemsStateStorage(StateStorage):
                 last_by_sender[sender_id] = max(last_by_sender.get(sender_id, -1), last_num)
                 continue
             
-            if kind == "PC":
+            if kind == "PC" and (not has_specific_state or specific_state == "pending_results"):
                 _k, year_month_created_at, item_data, value, result_type = parts
                 pending_results.append(Q2Result(year_month_created_at, item_data, value, result_type))
             

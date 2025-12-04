@@ -55,7 +55,7 @@ class JoinerMenuItems(Joiner):
         pending_results = state.get("pending_results", [])
         
         for item in pending_results:
-            name = item.get(parse_int(item.item_data))
+            name = item.item_data
             if name:
                 item.join_item_name(name)
                 ready_to_send += item.serialize()
@@ -90,6 +90,7 @@ class JoinerMenuItems(Joiner):
                     state = self.state_storage.get_data_from_request(message.request_id)
                     menu_items = state.setdefault("menu_items", {})
                     pending_results = state.setdefault("pending_results", [])
+                    logging.info(f"action: processing Q2 results | request_id: {message.request_id} | ITEMS: {items}")
                     for item in items:
                         name = menu_items.get(parse_int(item.item_data))
                         if name:

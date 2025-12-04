@@ -10,7 +10,7 @@ class SemesterAggregatorStateStorage(StateStorage):
       - S;{sender_id};{last_msg_num}    # Last message number for dedup
     """
 
-    def _load_state_from_file(self, file_handle, request_id):
+    def _load_state_from_file(self, file_handle, request_id, specific_state=None):
         """
         Load persisted state from file.
         Formats:
@@ -22,6 +22,8 @@ class SemesterAggregatorStateStorage(StateStorage):
         
         loaded_items = 0
         loaded_senders = 0
+        
+        has_specific_state = specific_state is not None
 
         for line in file_handle:
             line = line.strip()
@@ -35,7 +37,7 @@ class SemesterAggregatorStateStorage(StateStorage):
                     
                 kind = parts[0]
                 
-                if kind == "A" and len(parts) == 4:
+                if kind == "A" and len(parts) == 4 and (not has_specific_state or specific_state == "agg_by_period"):
                     # Aggregation: A;period;store_id;amount
                     _, period, store_id_str, amount_str = parts
                     try:
@@ -50,7 +52,7 @@ class SemesterAggregatorStateStorage(StateStorage):
                         logging.warning(f"action: load_agg_error | request_id: {request_id} | line: {line} | error: {e}")
                         continue
                 
-                elif kind == "S" and len(parts) == 3:
+                elif kind == "S" and len(parts) == 3 and (not has_specific_state or specific_state == "last_msg_by_sender"):
                     # Sender: S;sender_id;last_msg_num
                     _, sender_id, last_str = parts
                     try:
@@ -72,6 +74,12 @@ class SemesterAggregatorStateStorage(StateStorage):
         self.data_by_request[request_id]["last_msg_by_sender"] = last_msg_by_sender
         
         logging.info(f"action: state_loaded | request_id: {request_id} | items: {loaded_items} | senders: {loaded_senders}")
+        
+    def _load_specific_state_from_file(self, file_handle, request_id, specific_state):
+        """
+        For compatibility; delegates to _load_state_from_file.
+        """
+        self._load_state_from_file(file_handle, request_id, specific_state)
 
     def _save_state_to_file(self, file_handle, request_id):
         """

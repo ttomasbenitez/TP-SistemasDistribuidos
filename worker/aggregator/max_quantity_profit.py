@@ -27,18 +27,15 @@ class QuantityAndProfit(Worker):
         self.expected_eofs = expected_eofs
         self.eofs_by_request = {}
         self.state_storage = QuantityAndProfitStateStorage(storage_dir, {
-            'data_by_request': {}
+            'items_by_ym': {},
+            'last_by_sender': {}
         })
         self.msg_num_counter = 0
         
     def start(self):
         # Load persisted state once on startup and hydrate last-msg map
         logging.info(f"action: startup | loading persisted state for recovery")
-        self.state_storage.load_state_all()
-        for _rid, st in self.state_storage.data_by_request.items():
-            for sid, num in st.get("last_msg_by_sender", {}).items():
-                self._last_msg_by_sender[sid] = max(self._last_msg_by_sender.get(sid, -1), num)
-                logging.info(f"action: recovery_state_loaded | request_id: {_rid} | sender: {sid} | last_msg_num: {num}")
+        self.state_storage.load_specific_state_all('last_by_sender')
         
         self.heartbeat_sender = start_heartbeat_sender()
         
@@ -63,25 +60,25 @@ class QuantityAndProfit(Worker):
                 
                 # Dedup/ordering check
                 sender_id = message.get_node_id_and_request_id()
-                with self._sender_lock:
-                    last = self._last_msg_by_sender.get(sender_id, -1)
-                    logging.debug(f"action: dedup_check | sender:{sender_id} | msg_num:{message.msg_num} | last_seen:{last}")
-                    if message.msg_num <= last:
-                        if message.msg_num == last:
-                            logging.warning(f"action: DUPLICATE_FILTERED | sender:{sender_id} | msg:{message.msg_num} | last:{last}")
-                        else:
-                            logging.warning(f"action: OUT_OF_ORDER_FILTERED | sender:{sender_id} | msg:{message.msg_num} < last:{last}")
-                        return
-                    self._last_msg_by_sender[sender_id] = message.msg_num
-                    logging.debug(f"action: msg_accepted | sender:{sender_id} | msg_num:{message.msg_num}")
+                state = self.state_storage.get_data_from_request(message.request_id)
+                last_by_sender = state.get("last_by_sender", {})
+                # with self._sender_lock:
+                last = last_by_sender.get(sender_id, -1)
+                logging.debug(f"action: dedup_check | sender:{sender_id} | msg_num:{message.msg_num} | last_seen:{last}")
+                if message.msg_num <= last:
+                    if message.msg_num == last:
+                        logging.warning(f"action: DUPLICATE_FILTERED | sender:{sender_id} | msg:{message.msg_num} | last:{last}")
+                    else:
+                        logging.warning(f"action: OUT_OF_ORDER_FILTERED | sender:{sender_id} | msg:{message.msg_num} < last:{last}")
+                    return
+                state["last_by_sender"][sender_id] = message.msg_num
+                self.state_storage.data_by_request[message.request_id] = state
+                logging.debug(f"action: msg_accepted | sender:{sender_id} | msg_num:{message.msg_num}")
                 
                 items = message.process_message()
                 if items:
                     self._accumulate_items(items, message.request_id, sender_id, message.msg_num)
-                
-                #finally:
-                #    self._dec_inflight(message.request_id)
-                    
+            
             except Exception as e:
                 logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
         
@@ -89,12 +86,15 @@ class QuantityAndProfit(Worker):
     
     def _process_on_eof_message__(self, message, data_output_queue):
         """Handle EOF message: track, send results when all EOFs received, cleanup."""
+        
         self.eofs_by_request[message.request_id] = self.eofs_by_request.get(message.request_id, 0) + 1
         logging.info(f"EOF received | request_id: {message.request_id} | count: {self.eofs_by_request[message.request_id]}/{self.expected_eofs}")
         
         if self.eofs_by_request[message.request_id] < self.expected_eofs:
             return  # Wait for more EOFs
         
+        self.state_storage.load_state(message.request_id)
+        logging.info(f"State loaded for request_id: {message.request_id} upon receiving all EOFs {self.state_storage.data_by_request}")
         # All EOFs received, send results and forward EOF
         logging.info(f"All EOFs received, sending results | request_id: {message.request_id}")
         self._send_results_by_date(message.request_id, data_output_queue)
@@ -112,7 +112,7 @@ class QuantityAndProfit(Worker):
         with self.state_storage._lock:
             state = self.state_storage.data_by_request.setdefault(request_id, {
                 "items_by_ym": {},
-                "last_msg_by_sender": {},
+                "last_by_sender": {},
             })
             
             items_by_ym = state["items_by_ym"]
@@ -138,7 +138,7 @@ class QuantityAndProfit(Worker):
             
             # Persist last seen marker if provided
             if sender_id is not None and msg_num is not None:
-                state["last_msg_by_sender"][sender_id] = msg_num
+                state["last_by_sender"][sender_id] = msg_num
             
             # Log final state
             total_qty = sum(item.quantity for ym_dict in items_by_ym.values() for item in ym_dict.values())
@@ -146,8 +146,12 @@ class QuantityAndProfit(Worker):
             logging.info(f"action: accumulate_done | request_id: {request_id} | total_qty: {total_qty} | total_sub: {total_sub} | yms: {len(items_by_ym)}")
         
         # Save to disk but keep data in memory (reset_state=False)
+        logging.info(f"action: saving_state | request_id: {request_id}")
         self.state_storage.save_state(request_id, reset_state=False)
+        logging.info(f"action: state_saved | request_id: {request_id}")
+        self.state_storage.cleanup_data(request_id)
         logging.info(f"action: state_persisted | request_id: {request_id}")
+        logging.info(f"action: accumulate_finished | request_id: {self.state_storage.data_by_request}")
     
     def _send_results_by_date(self, request_id_of_eof, data_output_queue):
         chunk = ''
@@ -189,7 +193,7 @@ class QuantityAndProfit(Worker):
             message.add_node_id(self.node_id)
             serialized_message = message.serialize()
             data_output_queue.send(serialized_message)
-            logging.info(f"action: results_sent | msg_num: {new_msg_num} | node_id: {self.node_id} | request_id: {request_id_of_eof}")
+            logging.info(f"action: results_sent | msg_num: {new_msg_num} | node_id: {self.node_id} | request_id: {request_id_of_eof} | CHUNNKKKmakchunk: {chunk}")
         else:
             logging.warning(f"action: send_results_empty | request_id: {request_id_of_eof} | no_results")
 

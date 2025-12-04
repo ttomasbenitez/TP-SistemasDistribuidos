@@ -49,7 +49,7 @@ class TopThreeClientsJoiner(Joiner):
             try:
                 items = message.process_message()
                 if message.type == MESSAGE_TYPE_TRANSACTIONS:
-                    self._accumulate_items(items, message.request_id, sender_id, message.msg_num)
+                    self._accumulate_items(items, message.request_id)
             finally:
                 self.state_storage.save_state(message.request_id)
                 self.state_storage.cleanup_data(message.request_id)

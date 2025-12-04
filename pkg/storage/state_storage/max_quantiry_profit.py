@@ -4,7 +4,7 @@ import logging
 
 class QuantityAndProfitStateStorage(StateStorage):
 
-    def _load_state_from_file(self, file_handle, request_id):
+    def _load_state_from_file(self, file_handle, request_id, specific_state=None):
         """
         Carga el estado desde un archivo específico para un request_id.
         
@@ -17,17 +17,19 @@ class QuantityAndProfitStateStorage(StateStorage):
             request_id,
             {
                 "items_by_ym": {},
-                "last_msg_by_sender": {},
+                "last_by_sender": {},
             },
         )
         
         items_by_ym = state["items_by_ym"]
-        last_msg_by_sender = state["last_msg_by_sender"]
+        last_by_sender = state["last_by_sender"]
         
         loaded_items = 0
-        loaded_senders = 0
+        loaded_senders = 0        
+        has_specific_state = specific_state is not None
         
         for line in file_handle:
+            logging.info(f"action: processing_line | request_id: {request_id} | line: {line.strip()}")
             line = line.strip()
             if not line:
                 continue
@@ -35,7 +37,7 @@ class QuantityAndProfitStateStorage(StateStorage):
             parts = line.split(";", 1)
             kind = parts[0]
             
-            if kind == "I":
+            if kind == "I" and (not has_specific_state or specific_state == "items_by_ym"):
                 # Item format: I;ym;item_data
                 try:
                     rest = parts[1].split(";", 1)
@@ -65,7 +67,7 @@ class QuantityAndProfitStateStorage(StateStorage):
                     continue
                 continue
             
-            if kind == "S":
+            if kind == "S" and (not has_specific_state or specific_state == "last_by_sender"):
                 # Sender format: S;sender_id;last_msg_num
                 try:
                     rest_parts = parts[1].split(";")
@@ -73,7 +75,7 @@ class QuantityAndProfitStateStorage(StateStorage):
                         continue
                     sender_id, last_str = rest_parts
                     last = int(last_str)
-                    last_msg_by_sender[sender_id] = max(last_msg_by_sender.get(sender_id, -1), last)
+                    last_by_sender[sender_id] = max(last_by_sender.get(sender_id, -1), last)
                     logging.info(f"action: loaded_sender_dedup | request_id: {request_id} | sender: {sender_id} | last_msg: {last}")
                     loaded_senders += 1
                 except (IndexError, ValueError) as e:
@@ -107,7 +109,13 @@ class QuantityAndProfitStateStorage(StateStorage):
         total_qty = sum(item.quantity for ym_dict in items_by_ym.values() for item in ym_dict.values())
         total_sub = sum(item.subtotal for ym_dict in items_by_ym.values() for item in ym_dict.values())
         logging.info(f"action: load_state_summary | request_id: {request_id} | loaded_items: {loaded_items} | loaded_senders: {loaded_senders} | total_qty: {total_qty} | total_sub: {total_sub}")
-            
+        
+    def _load_specific_state_from_file(self, file_handle, request_id, specific_state):
+        """
+        For compatibility; delegates to _load_state_from_file.
+        """
+        self._load_state_from_file(file_handle, request_id, specific_state)
+        
     def _save_state_to_file(self, file_handle, request_id):
         """Guarda el estado en un archivo específico para un request_id."""
         state = self.data_by_request.get(request_id)
@@ -116,7 +124,7 @@ class QuantityAndProfitStateStorage(StateStorage):
             return
         
         items_by_ym = state.get("items_by_ym", {})
-        last_msg_by_sender = state.get("last_msg_by_sender", {})
+        last_by_sender = state.get("last_by_sender", {})
         
         saved_items = 0
         saved_senders = 0
@@ -130,7 +138,7 @@ class QuantityAndProfitStateStorage(StateStorage):
                 logging.info(f"action: saved_item | request_id: {request_id} | ym: {ym} | item_id: {item.item_id} | qty: {item.quantity} | sub: {item.subtotal}")
         
         # Save dedup markers
-        for sender_id, last_msg_num in last_msg_by_sender.items():
+        for sender_id, last_msg_num in last_by_sender.items():
             file_handle.write(f"S;{sender_id};{last_msg_num}\n")
             saved_senders += 1
             logging.info(f"action: saved_sender_dedup | request_id: {request_id} | sender: {sender_id} | last_msg: {last_msg_num}")

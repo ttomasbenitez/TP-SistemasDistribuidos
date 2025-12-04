@@ -112,7 +112,7 @@ services:
     depends_on:
     - gateway
 
-  #filter-time-1:
+  # filter-time-1:
   #  container_name: filter-time-1
   #  image: worker:latest
   #  command: "/worker/filter/time.py"
@@ -137,8 +137,8 @@ services:
   #  - testing_net
   #  depends_on:
   #  - gateway
-#
-  #filter-time-2:
+
+  # filter-time-2:
   #  container_name: filter-time-2
   #  image: worker:latest
   #  command: "/worker/filter/time.py"
@@ -163,8 +163,8 @@ services:
   #  - testing_net
   #  depends_on:
   #  - gateway
-#
-  #filter-time-eof-service:
+
+  # filter-time-eof-service:
   #  container_name: filter-time-eof-service
   #  image: worker:latest
   #  command: "/worker/eof/eof_service_time.py"
@@ -185,8 +185,8 @@ services:
   #  - testing_net
   #  depends_on:
   #  - gateway
-#
-  #filter-amount-1:
+
+  # filter-amount-1:
   #  container_name: filter-amount-1
   #  image: worker:latest
   #  command: "/worker/filter/amount.py"
@@ -202,8 +202,8 @@ services:
   #  - testing_net
   #  depends_on:
   #  - gateway
-#
-  #filter-amount-2:
+
+  # filter-amount-2:
   #  container_name: filter-amount-2
   #  image: worker:latest
   #  command: "/worker/filter/amount.py"
@@ -219,8 +219,8 @@ services:
   #  - testing_net
   #  depends_on:
   #  - gateway
-#
-  #filter-amount-3:
+
+  # filter-amount-3:
   #  container_name: filter-amount-3
   #  image: worker:latest
   #  command: "/worker/filter/amount.py"
@@ -377,7 +377,7 @@ services:
       INPUT_QUEUE_2: menu-items-queue
       OUTPUT_EXCHANGE: results-exchange
       STORAGE_DIR: ./data/join_menu_items
-      EXPECTED_EOFS: 3
+      EXPECTED_EOFS: 4
       LOG_LEVEL: INFO
     networks:
     - testing_net
