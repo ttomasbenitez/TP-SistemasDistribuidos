@@ -9,7 +9,7 @@ from Middleware.connection import PikaConnection
 EXPECTED_QUERIES = 4
 
 class ClientHandler(threading.Thread):
-    def __init__(self, request_id, client_sock, exchange: MessageMiddlewareExchange, in_queue: MessageMiddlewareQueue, output_exchange_name: str, connection: PikaConnection):
+    def __init__(self, request_id, client_sock, exchange: MessageMiddlewareExchange, in_queue: MessageMiddlewareQueue, output_exchange_name: str, connection: PikaConnection, q1_replicas: int):
         super().__init__()
         self._request_id = request_id
         self._protocol = Protocol(client_sock)
@@ -20,6 +20,9 @@ class ClientHandler(threading.Thread):
         self._running = True
         self._output_exchange_name = output_exchange_name
         self.connection = connection
+        self._q1_replicas = q1_replicas
+        self._q1_eofs_received = 0
+        self._sent_eofs = set()
 
     def run(self):
         try:
@@ -67,13 +70,32 @@ class ClientHandler(threading.Thread):
     def _on_result_message(self, raw_msg):
         """Callback que envía los mensajes del backend al cliente."""
         msg = Message.deserialize(raw_msg)
+        if msg.request_id != self._request_id:
+            logging.warning(f"action: on_result_message | result: ignored | reason: request_id_mismatch | expected: {self._request_id} | received: {msg.request_id}")
+            return
+
         if msg.type == MESSAGE_TYPE_EOF:
+            query_id = msg.content
+            logging.info(f"action: eof_received | request_id: {msg.request_id} | query_id: {query_id}")
+
+            if query_id == "1":
+                self._q1_eofs_received += 1
+                if self._q1_eofs_received < self._q1_replicas:
+                    return
+            
+            if query_id in self._sent_eofs:
+                return
+
+            self._sent_eofs.add(query_id)
             self._finished_queries += 1
             logging.info(f"action: send_eof_to_client | result: success | request_id: {msg.request_id} | finished_queries: {self._finished_queries}/{EXPECTED_QUERIES}")
+            
+            
             if self._finished_queries == EXPECTED_QUERIES:
                 logging.info("action: all_results_sent | result: success")
                 self._protocol.send_message(raw_msg)
             return
+            
         self._protocol.send_message(raw_msg)
 
     def close(self):

@@ -67,6 +67,7 @@ class FilterAmountNode(Worker):
     def _handle_eof(self, message, data_output_exchange):
         logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
         
+        message.update_content("1")
         data_output_exchange.send(message.serialize(), str(message.type))
         self.dedup_strategy.update_state_on_eof(message)
         

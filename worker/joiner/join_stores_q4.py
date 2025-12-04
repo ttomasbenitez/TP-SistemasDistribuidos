@@ -84,6 +84,7 @@ class Q4StoresJoiner(Joiner):
         self.pending_clients = {k: v for k, v in self.pending_clients.items() if v.request_id != request_id}
 
     def _send_eof(self, message, data_output_exchange):
+        message.update_content("4")
         data_output_exchange.send(message.serialize(), str(message.request_id))
         logging.info(f"action: EOF sent | request_id: {message.request_id} | type: {message.type}")
 

@@ -14,23 +14,25 @@ from pkg.message.q3_result import Q3Result
 import hashlib
 import threading
 
-EXPECTED_EOFS = 3 # 1 stores, 2 semester
-
 class StoresJoiner(Joiner):
 
     def __init__(self, 
                  data_input_queue: str,
                  data_output_exchange: str,  
                  stores_input_queue: str,
-                 host: str):
+                 host: str,
+                 aggregator_semester_replicas: int = 2):
         
-        super().__init_client_handler__(stores_input_queue, host, EXPECTED_EOFS)
+        # Expected EOFs: 1 from stores + N from aggregator-semester replicas
+        expected_eofs = 1 + aggregator_semester_replicas
+        super().__init_client_handler__(stores_input_queue, host, expected_eofs)
         self.data_input_queue = data_input_queue
         self.data_output_exchange = data_output_exchange
         self.pending_transactions = []
         self.processed_transactions = {}
         self._seen_lock = threading.Lock()
         self._seen_messages = set()
+        self.eofs_sent_by_request = {}
 
     def _consume_data_queue(self):
         data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
@@ -109,7 +111,14 @@ class StoresJoiner(Joiner):
         logging.info(f"action: results sent | request_id: {message.request_id}")
 
     def _send_eof(self, message, data_output_exchange):
+        # Send EOF only once per request_id, even if called multiple times
+        if message.request_id in self.eofs_sent_by_request:
+            logging.debug(f"action: EOF already sent | request_id: {message.request_id}")
+            return
+        
+        message.update_content("3")
         data_output_exchange.send(message.serialize(), str(message.request_id))
+        self.eofs_sent_by_request[message.request_id] = True
         logging.info(f"EOF sent | request_id: {message.request_id}")
 
 
@@ -120,6 +129,7 @@ def initialize_config():
     config_params["input_queue_2"] = os.getenv('INPUT_QUEUE_2')
     config_params["output_exchange_q3"] = os.getenv('OUTPUT_EXCHANGE_NAME')
     config_params["logging_level"] = os.getenv('LOG_LEVEL', 'INFO')
+    config_params["aggregator_semester_replicas"] = int(os.getenv('AGGREGATOR_SEMESTER_REPLICAS', '2'))
 
     if None in [config_params["rabbitmq_host"], config_params["input_queue_1"],
                 config_params["input_queue_2"]]:
@@ -136,7 +146,8 @@ def main():
         config_params["input_queue_1"],
         config_params["output_exchange_q3"],
         config_params["input_queue_2"], 
-        config_params["rabbitmq_host"])
+        config_params["rabbitmq_host"],
+        config_params["aggregator_semester_replicas"])
     joiner.start()
 
 

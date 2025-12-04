@@ -17,11 +17,14 @@ class JoinerMenuItems(Joiner):
                  data_output_exchange: str,
                  menu_items_input_queue: str,
                  host: str,
-                 expected_eofs: int):
+                 aggregator_quantity_profit_replicas: int = 2):
+        # Expected EOFs: 1 from menu_items + N from aggregator-quantity-profit replicas
+        expected_eofs = 1 + aggregator_quantity_profit_replicas
         super().__init_client_handler__(menu_items_input_queue, host, expected_eofs)
         self.data_input_queue = data_input_queue
         self.data_output_exchange = data_output_exchange
         self.pending_items = []
+        self.eofs_sent_by_request = {}
 
     def _process_items_to_join(self, message):
         items = message.process_message()
@@ -97,7 +100,14 @@ class JoinerMenuItems(Joiner):
         data_input_queue.start_consuming(__on_message__)
         
     def _send_eof(self, message, data_output_exchange):
+        # Send EOF only once per request_id, even if called multiple times
+        if message.request_id in self.eofs_sent_by_request:
+            logging.debug(f"action: EOF already sent | request_id: {message.request_id}")
+            return
+        
+        message.update_content("2")
         data_output_exchange.send(message.serialize(), str(message.request_id))
+        self.eofs_sent_by_request[message.request_id] = True
         logging.info(f"action: EOF sent | request_id: {message.request_id} | type: {message.type}")
 
 
@@ -118,7 +128,7 @@ def initialize_config():
     config_params["input_queue_1"] = os.getenv('INPUT_QUEUE_1')
     config_params["input_queue_2"] = os.getenv('INPUT_QUEUE_2')
     config_params["output_exchange_q2"] = os.getenv('OUTPUT_EXCHANGE')
-    config_params["expected_eofs"] = int(os.getenv('EXPECTED_EOFS', '3'))
+    config_params["aggregator_quantity_profit_replicas"] = int(os.getenv('AGGREGATOR_QUANTITY_PROFIT_REPLICAS', '2'))
     config_params["logging_level"] = os.getenv('LOG_LEVEL', 'INFO')
 
     if None in (config_params["rabbitmq_host"], config_params["input_queue_1"],
@@ -135,7 +145,7 @@ def main():
                                  config_params["output_exchange_q2"],
                                  config_params["input_queue_2"],
                                  config_params["rabbitmq_host"],
-                                 config_params["expected_eofs"])
+                                 config_params["aggregator_quantity_profit_replicas"])
     joiner.start()
 
 if __name__ == "__main__":
