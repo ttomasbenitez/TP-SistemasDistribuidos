@@ -25,7 +25,7 @@ class SemesterAggregator(Worker):
         self.data_input_queue = data_input_queue
         self.data_output_queue = data_output_queue
         self.host = host
-        self.state_storage = SemesterAggregatorStateStorage(storage_dir)
+        self.state_storage = SemesterAggregatorStateStorage(storage_dir, {'agg_by_period': {}, 'last_msg_by_sender': {}})
         self.expected_eofs = expected_eofs
         self.eofs_by_request = {}
         
