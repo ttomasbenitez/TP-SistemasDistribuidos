@@ -19,7 +19,8 @@ class TopThreeClientsJoiner(Joiner):
                  data_output_queue: str,
                  users_input_queue: str,
                  host: str,
-                 storage_dir: str):
+                 storage_dir: str,
+                 node_id: str):
         
         super().__init_client_handler__(users_input_queue, host, EXPECTED_EOFS, TopThreeClientsStateStorage(storage_dir, {
             "users_by_store": {},
@@ -28,9 +29,14 @@ class TopThreeClientsJoiner(Joiner):
         }))
         self.data_input_queue = data_input_queue
         self.data_output_queue = data_output_queue
+<<<<<<< Updated upstream
         # Incremental top-3 per store_id: { store_id: [(user_id, count), ...] sorted desc by (count, -user_id) }
         self._top3_by_store = {}
 
+=======
+        self.node_id = node_id
+        
+>>>>>>> Stashed changes
     def _consume_data_queue(self):
         data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
         self.message_middlewares.append(data_input_queue)
@@ -127,7 +133,6 @@ class TopThreeClientsJoiner(Joiner):
         users_birthdates_state = saved_state.get("users_birthdates", {})
         
         chunk = ''
-
         for store, users in users_by_store_state.items():
             if store is None:
                 continue
@@ -144,11 +149,10 @@ class TopThreeClientsJoiner(Joiner):
                 if birthdate:
                     chunk += Q4IntermediateResult(store, birthdate, transaction_count).serialize()
         
-        # TODO: numero de mensaje
         if chunk:
-            msg = Message(request_id, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT, 1, chunk)
+            msg = Message(request_id, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT, 0, chunk)
+            msg.add_node_id(self.node_id)
             data_output_queue.send(msg.serialize())
-        
         
     def _send_eof(self, message, data_output_queue):
         data_output_queue.send(message.serialize())
@@ -162,6 +166,7 @@ def initialize_config():
     config_params["output_queue"] = os.getenv('OUTPUT_QUEUE_1')
     config_params["logging_level"] = os.getenv('LOG_LEVEL', 'INFO')
     config_params["storage_dir"] = os.getenv('STORAGE_DIR', './data')
+    config_params["node_id"] = os.getenv('NODE_ID', '1')
 
     if None in [config_params["rabbitmq_host"], config_params["input_queue_1"],
                 config_params["input_queue_2"], config_params["output_queue"]]:
@@ -178,7 +183,8 @@ def main():
                                    config_params["output_queue"], 
                                    config_params["input_queue_2"], 
                                    config_params["rabbitmq_host"],
-                                   config_params["storage_dir"])
+                                   config_params["storage_dir"],
+                                   config_params["node_id"])
     joiner.start()
 
 

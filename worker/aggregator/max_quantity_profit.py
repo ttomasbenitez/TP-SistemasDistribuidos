@@ -17,10 +17,12 @@ class QuantityAndProfit(Worker):
                  data_output_queue: str, 
                  eof_service_queue: str, 
                  storage_dir: str,
-                 host: str):
+                 host: str,
+                 node_id: int = 0):
         self.data_input_queue = data_input_queue
         self.data_output_queue = data_output_queue
         self.eof_service_queue = eof_service_queue
+        self.node_id = node_id
         self.connection = PikaConnection(host)
         self.state_storage = QuantityAndProfitStateStorage(storage_dir, {
             'data_by_request': {}
@@ -114,7 +116,9 @@ class QuantityAndProfit(Worker):
 
         if chunk:
             logging.info(f"Enviando resultados acumulados | request_id: {request_id_of_eof}")
-            serialized_message = Message(request_id_of_eof, MESSAGE_TYPE_QUERY_2_RESULT, 0, chunk).serialize()
+            message = Message(request_id_of_eof, MESSAGE_TYPE_QUERY_2_RESULT, 0, chunk)
+            message.add_node_id(self.node_id)
+            serialized_message = serialized_message.serialize()
             data_output_queue.send(serialized_message)
         
         # Clean up state
@@ -147,6 +151,7 @@ def initialize_config():
     config_params["eof_service_queue"] = os.getenv('EOF_SERVICE_QUEUE')
     config_params["logging_level"] = os.getenv('LOG_LEVEL', 'INFO')
     config_params["storage_dir"] = os.getenv('STORAGE_DIR', './data')
+    config_params["node_id"] = int(os.getenv('NODE_ID', '0'))
 
     if config_params["rabbitmq_host"] is None or config_params["input_queue"] is None or config_params["output_queue"] is None or config_params["eof_service_queue"] is None:
         raise ValueError("Expected value not found. Aborting filter.")
@@ -158,7 +163,12 @@ def main():
 
     initialize_log(config_params["logging_level"])
     
-    aggregator = QuantityAndProfit(config_params["input_queue"], config_params["output_queue"], config_params["eof_service_queue"], config_params["storage_dir"], config_params["rabbitmq_host"])
+    aggregator = QuantityAndProfit(config_params["input_queue"], 
+                                   config_params["output_queue"], 
+                                   config_params["eof_service_queue"], 
+                                   config_params["storage_dir"], 
+                                   config_params["rabbitmq_host"],
+                                   config_params["node_id"])
     aggregator.start()
 
 if __name__ == "__main__":

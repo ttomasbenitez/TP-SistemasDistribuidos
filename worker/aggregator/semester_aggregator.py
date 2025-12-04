@@ -52,7 +52,7 @@ class SemesterAggregator(Worker):
         with self._sender_lock:
             last = self._last_msg_by_sender.get(sender_id, -1)
             if message.msg_num == last:
-                logging.info(f"action: duplicate_msg | sender: {sender_id} | msg_num: {message.msg_num} | decision: skip")
+                logging.info(f"action: duplicate_msg | sender: {sender_id} | msg_num: {message.msg_num} | last {last} |decision: skip")
                 return False
             if message.msg_num < last:
                 logging.warning(f"action: out_of_order_msg | sender: {sender_id} | msg_num: {message.msg_num} | last: {last} | decision: skip")
@@ -98,7 +98,7 @@ class SemesterAggregator(Worker):
                     self._emit_all_and_finalize(message, data_output_queue)
                     return
                 
-                logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
+                logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type} | msg_num: {message.msg_num} | sender: {message.node_id}")
                 # self._ensure_request(message.request_id)
                 # self._inc_inflight(message.request_id) 
 
@@ -171,13 +171,15 @@ class SemesterAggregator(Worker):
         try:
             per_request = self._agg_by_request.get(request_id, {})
             for period, store_map in per_request.items():
+                logging.info(f"action: emitting_semester_agg | request_id: {request_id} | period: {period} | stores_count: {len(store_map)}")
                 for store_id, total in store_map.items():
                     res = Q3IntermediateResult(period, store_id, total)
                     chunk += res.serialize()
 
         finally:
             # Send EOF to downstream exchange for q3
-            self._send_grouped_item(message, chunk, data_output_queue, new_msg_num)
+            new_message = Message(message.request_id, MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT, new_msg_num, chunk)
+            data_output_queue.send(new_message.serialize())
             # Cleanup state both memory and disk
             try:
                 del self._agg_by_request[request_id]
@@ -185,10 +187,6 @@ class SemesterAggregator(Worker):
                 pass
             self.state_storage.delete_state(request_id)
    
-    def _send_grouped_item(self, message, item, data_output_queue, new_msg_num):
-        new_chunk = item.serialize()
-        new_message = Message(message.request_id, MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT, new_msg_num, new_chunk)
-        data_output_queue.send(new_message.serialize())
 
 def initialize_config():
     """ Parse env variables to find program config params

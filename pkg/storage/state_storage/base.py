@@ -144,10 +144,10 @@ class StateStorage(ABC):
             del self.data_by_request[request_id]
             logging.debug(f"Estado en memoria limpiado para request_id: {request_id}")
             
-    def cleanup_data(self, request_id):
+    def cleanup_data(self, request_id, keys_to_mantain: list = ['last_by_sender']):
         """Limpia una clave específica del estado en memoria para un request_id."""
         if request_id in self.data_by_request:
             for (key, data) in self.data_by_request[request_id]:
-                if key is not 'last_by_sender':
+                if key not in keys_to_mantain:
                     del self.data_by_request[request_id][key]
                     logging.debug(f"Clave '{key}' limpiada del estado en memoria para request_id: {request_id}")

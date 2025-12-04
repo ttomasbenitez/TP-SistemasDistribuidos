@@ -21,7 +21,7 @@ class StoreAggregator(Worker):
                  total_shards: int,
                  storage_dir: str,
                  sharding_key: str,
-                 node_number: int):
+                 node_id: int):
         
         self.__init_manager__()
         self.__init_middlewares_handler__()
@@ -31,7 +31,7 @@ class StoreAggregator(Worker):
         self.connection = PikaConnection(host)
         self.total_shards = total_shards
         self.sharding_key = sharding_key
-        self.node_id = node_number
+        self.node_id = node_id
         self.dedup_strategy = SlidingWindowDedupStrategy(total_shards, storage_dir)
 
     def start(self):    
@@ -85,7 +85,6 @@ class StoreAggregator(Worker):
             new_chunk = ''.join(item.serialize() for item in items)
             new_message = Message(original_message.request_id, original_message.type, current_msg_num, new_chunk)
             new_message.add_node_id(self.node_id)
-            logging.info(f'npde_id added: {self.node_id}')
             serialized = new_message.serialize()
             first_item = items[0]
             sharding_key_value = first_item.get_sharding_key(self.sharding_key)
@@ -112,7 +111,7 @@ def initialize_config():
         "total_shards": int(os.getenv('TOTAL_SHARDS', 3)),
         "storage_dir": os.getenv('STORAGE_DIR', './data'),
         "sharding_key": os.getenv('SHARDING_KEY', 'request_id'),
-        "node_number": int(os.getenv('NODE_NUMBER', 1)),
+        "node_id": int(os.getenv('NODE_ID', 1)),
     }
 
     required_keys = [
@@ -154,7 +153,7 @@ def main():
                                  config_params["total_shards"],
                                  config_params["storage_dir"],
                                  config_params["sharding_key"],
-                                 config_params["node_number"])
+                                 config_params["node_id"])
     aggregator.start()
 
 if __name__ == "__main__":

@@ -54,16 +54,16 @@ class StoresJoiner(Joiner):
            
             try:
                 # Idempotencia adicional por hash del cuerpo (opc.)
-                try:
-                    raw_bytes = msg if isinstance(msg, (bytes, bytearray)) else str(msg).encode("utf-8")
-                except Exception:
-                    raw_bytes = message.serialize().encode("utf-8")
-                body_hash = hashlib.sha256(raw_bytes).hexdigest()
-                dedup_key = (message.request_id, message.type, body_hash)
-                with self._seen_lock:
-                    if dedup_key in self._seen_messages:
-                        return
-                    self._seen_messages.add(dedup_key)
+                # try:
+                #     raw_bytes = msg if isinstance(msg, (bytes, bytearray)) else str(msg).encode("utf-8")
+                # except Exception:
+                #     raw_bytes = message.serialize().encode("utf-8")
+                # body_hash = hashlib.sha256(raw_bytes).hexdigest()
+                # dedup_key = (message.request_id, message.type, body_hash)
+                # with self._seen_lock:
+                #     if dedup_key in self._seen_messages:
+                #         return
+                #     self._seen_messages.add(dedup_key)
 
                 items = message.process_message()
                 
@@ -79,6 +79,7 @@ class StoresJoiner(Joiner):
                             ready_to_send += q3.serialize()
                         else:
                             pending_results.append(item)
+                            logging.info(f"action: Q3Result pending store join | request_id: {message.request_id} | store_id: {item.get_store()}")
                     if ready_to_send:
                         out = Message(message.request_id, MESSAGE_TYPE_QUERY_3_RESULT, message.msg_num, ready_to_send)
                         data_output_exchange.send(out.serialize(), str(message.request_id))
@@ -117,7 +118,7 @@ class StoresJoiner(Joiner):
         
         pending_results = state.get("pending_results", [])
         stores = state.get("stores", {})
-        
+        logging.info(f"action: Processing pending Q3 results | request_id: {request_id} | pending_count: {len(pending_results)} | {pending_results}")
         for item in pending_results:
             store_name = stores.get(item.get_store())
             if store_name:

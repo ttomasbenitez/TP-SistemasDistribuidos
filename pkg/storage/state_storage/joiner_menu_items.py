@@ -17,7 +17,6 @@ class JoinerMenuItemsStateStorage(StateStorage):
                 "menu_items": { menu_item_id: name },
                 "last_by_sender": { sender_id: last_num_sent },
                 "pending_results": [Q2Result],
-                "current_msg_num": int
             }
         """
 
@@ -25,13 +24,11 @@ class JoinerMenuItemsStateStorage(StateStorage):
             "menu_items": {},
             "last_by_sender": {},
             "pending_results": [],
-            "current_msg_num": -1
         })
 
         menu_items = state["menu_items"]
         last_by_sender = state["last_by_sender"]
         pending_results = state["pending_results"]
-        current_msg_num = state["current_msg_num"]
 
         for line in file_handle:
             line = line.strip()
@@ -67,13 +64,6 @@ class JoinerMenuItemsStateStorage(StateStorage):
             if kind == "PC":
                 _k, year_month_created_at, item_data, value, result_type = parts
                 pending_results.append(Q2Result(year_month_created_at, item_data, value, result_type))
-                
-            if kind == "CM":
-                _k, current_msg_num_str = parts
-                try:
-                    current_msg_num_saved = int(current_msg_num_str)
-                except ValueError as e:
-                    current_msg_num = max(current_msg_num_saved, current_msg_num)
             
     def _append_sender_data(self, last_by_sender, file_handle):
         for sender_id, last_num in last_by_sender.items():
@@ -90,10 +80,6 @@ class JoinerMenuItemsStateStorage(StateStorage):
             serialialized = q2_result.serialize()
             line = f"PC;{serialialized}"
             file_handle.write(line)
-            
-    def _append_current_msg_num(self, current_msg_num, file_handle):
-        line = f"CM;{current_msg_num}\n"
-        file_handle.write(line)
     
     def _save_state_to_file(self, file_handle, request_id):
         state = self.data_by_request.get(request_id)
@@ -103,5 +89,4 @@ class JoinerMenuItemsStateStorage(StateStorage):
         self._append_sender_data(state["last_by_sender"], file_handle)
         self._append_menu_items(state["menu_items"], file_handle)
         self._append_pending_results(state["pending_results"], file_handle)
-        self._append_current_msg_num(state["current_msg_num"], file_handle)
         
