@@ -133,6 +133,9 @@ def main():
     res["missing_examples"] = pretty_missing_examples(res["missing_examples"])
     print(json.dumps(res, ensure_ascii=False, indent=2))
 
+    res = subset_check_ndjson("data/kaggle/results.ndjson", "../client/storage/client-1.ndjson", atol=1e-6)
+    res["missing_examples"] = pretty_missing_examples(res["missing_examples"])
+    print(json.dumps(res, ensure_ascii=False, indent=2))
 
     raise SystemExit(0 if res["ok"] else 1)
 

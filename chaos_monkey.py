@@ -5,7 +5,24 @@ import random
 import sys
 import threading
 
-EXCLUDED_CONTAINERS = ['rabbitmq', 'gateway','filter-year-eof-service', 'client_1', 'client_2', 'aggregator-users-eof-service', 'aggregator-batches-eof-service']
+EXCLUDED_CONTAINERS = ['rabbitmq', 'gateway', 
+                       'filter-year-1', 
+                       'filter-year-2', 
+                       'filter-year-eof-service',
+                       'client_1', 'client_2', 
+                       #'joiner-menu-items', 
+                       'aggregator-month-1', 
+                       'aggregator-month-2', 
+                       'aggregator-month-eof-service',
+                       'join-stores-q3',
+                        #'join-stores-q4',
+                       'aggregator-store-q3-1', 'aggregator-store-q3-2', 'aggregator-store-q3-eof-service',
+                       #'aggregator-store-q4-1', 'aggregator-store-q4-2', 'aggregator-store-q4-eof-service',
+                       'filter-time-1', 'filter-time-2', 'filter-time-eof-service',
+                       'top-three-clients-1', 'top-three-clients-2', 'top-three-clients-3',
+                       'joiner-stores-q4',
+                       #'aggregator-store-q4', 
+                       'health-monitor-1', 'health-monitor-2', 'health-monitor-3']
 
 def get_running_containers():
     """Returns a list of running container names for the current project."""
