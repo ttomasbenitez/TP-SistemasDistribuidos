@@ -19,7 +19,7 @@ class SemesterAggregatorStateStorage(StateStorage):
         """
         agg_by_period = {}
         last_by_sender = {}
-        
+        eofs_by_request = 0
         loaded_items = 0
         loaded_senders = 0
         
@@ -63,7 +63,16 @@ class SemesterAggregatorStateStorage(StateStorage):
                     except (ValueError, IndexError) as e:
                         logging.warning(f"action: load_sender_error | request_id: {request_id} | line: {line} | error: {e}")
                         continue
-                        
+                
+                elif kind == "E" and len(parts) == 2 and (not has_specific_state or specific_state == "eofs_by_request"):
+                    # EOF: E;eofs_by_request
+                    _, eofs_str = parts
+                    try:
+                        eofs_by_request = int(eofs_str)
+                        logging.info(f"action: loaded_eof | request_id: {request_id} | eofs: {eofs_by_request}")
+                    except (ValueError, IndexError) as e:
+                        logging.warning(f"action: load_eof_error | request_id: {request_id} | line: {line} | error: {e}")
+                        continue
             except Exception as e:
                 logging.warning(f"action: state_parse_error | request_id: {request_id} | line: {line} | error: {e}")
                 continue
@@ -91,7 +100,12 @@ class SemesterAggregatorStateStorage(StateStorage):
         during accumulation and we write them incrementally to disk.
         """
         state = self.data_by_request.get(request_id, {})
-        
+        eofs_by_request = state.get("eofs_by_request", 0)
+
+        # Write EOFs
+        file_handle.write(f"E;{eofs_by_request}\n")
+        logging.info(f"action: saved_eof | request_id: {request_id} | eofs: {eofs_by_request}")
+
         # Write aggregations
         agg_by_period = state.get("agg_by_period", {})
         for period, store_map in agg_by_period.items():

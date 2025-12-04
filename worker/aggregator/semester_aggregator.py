@@ -25,9 +25,8 @@ class SemesterAggregator(Worker):
         self.data_input_queue = data_input_queue
         self.data_output_queue = data_output_queue
         self.host = host
-        self.state_storage = SemesterAggregatorStateStorage(storage_dir, {'agg_by_period': {}, 'last_by_sender': {}})
+        self.state_storage = SemesterAggregatorStateStorage(storage_dir, {'agg_by_period': {}, 'last_by_sender': {}, 'eofs_by_request': 0})
         self.expected_eofs = expected_eofs
-        self.eofs_by_request = {}
         
         # Message numbering: start at 0, incremental
         # Extract node_id from container name (e.g., "semester-aggregator-1" -> 1)
@@ -80,10 +79,11 @@ class SemesterAggregator(Worker):
 
     def _process_on_eof_message__(self, message, data_output_queue):
         """Handle EOF message: track, send results when all EOFs received, cleanup."""
-        self.eofs_by_request[message.request_id] = self.eofs_by_request.get(message.request_id, 0) + 1
-        logging.info(f"EOF received | request_id: {message.request_id} | count: {self.eofs_by_request[message.request_id]}/{self.expected_eofs}")
+        state = self.state_storage.get_data_from_request(message.request_id)
+        state["eofs_by_request"] = state.get("eofs_by_request", 0) + 1
+        logging.info(f"EOF received | request_id: {message.request_id} | count: {state["eofs_by_request"]}/{self.expected_eofs}")
         
-        if self.eofs_by_request[message.request_id] < self.expected_eofs:
+        if state["eofs_by_request"] < self.expected_eofs:
             return  # Wait for more EOFs
         
         self.state_storage.load_state(message.request_id)
@@ -95,7 +95,7 @@ class SemesterAggregator(Worker):
         logging.info(f"EOF forwarded downstream | request_id: {message.request_id}")
         
         # Clean up
-        del self.eofs_by_request[message.request_id]
+        del state["eofs_by_request"]
         self.state_storage.delete_state(message.request_id)
 
     def _accumulate_items(self, items, request_id):
