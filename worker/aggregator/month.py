@@ -12,8 +12,6 @@ import hashlib
 from pkg.message.utils import calculate_sub_message_id
 from pkg.message.constants import SUB_MESSAGE_START_ID
 
-BATCH_SIZE = 1000
-
 
 class AggregatorMonth(Worker):
     
@@ -123,9 +121,7 @@ class AggregatorMonth(Worker):
                         self.buffers[message.request_id][month] = []
                     
                     self.buffers[message.request_id][month].extend(group_items)
-                    
-                    if len(self.buffers[message.request_id][month]) >= BATCH_SIZE:
-                        _flush_buffer(message.request_id, month, data_output_queues)
+                    _flush_buffer(message.request_id, month, data_output_queues)
 
             except Exception as e:
                 logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
