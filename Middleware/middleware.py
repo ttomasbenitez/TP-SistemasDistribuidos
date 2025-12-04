@@ -79,6 +79,22 @@ class MessageMiddlewareQueue(MessageMiddleware):
             auto_ack=False
         )
 
+    def start_consuming_with_batch_ack(self, on_message_callback, prefetch_count=100):
+        """
+        Consume messages with manual ACK for batch processing.
+        Optimized prefetch count for batch operations (default 100).
+        Callback signature: on_message_callback(body, ch, method)
+        """
+        def callback(ch, method, properties, body):
+            on_message_callback(body, ch, method)
+                    
+        self.connection.add_basic_consume(
+            queue_name=self.queue_name,
+            on_message_callback=callback,
+            prefetch_count=prefetch_count,
+            auto_ack=False
+        )
+
     def stop_consuming(self):
         self.connection.stop_consuming()
         
