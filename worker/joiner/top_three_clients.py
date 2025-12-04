@@ -7,10 +7,10 @@ from utils.custom_logging import initialize_log
 import os
 from pkg.storage.state_storage.top_three_clients import TopThreeClientsStateStorage
 from pkg.message.q4_result import Q4IntermediateResult
-from typing import List, Tuple
+import threading
 
 EXPECTED_EOFS = 3 # 1 users, 2 store agg
-SNAPSHOT_COUNT = 1000
+SNAPSHOT_INTERVAL = 100  # Guardar snapshot cada N mensajes
 
 class TopThreeClientsJoiner(Joiner):
 
@@ -20,7 +20,7 @@ class TopThreeClientsJoiner(Joiner):
                  users_input_queue: str,
                  host: str,
                  storage_dir: str,
-                 node_id: str):
+                 node_id: str = None):
         
         super().__init_client_handler__(users_input_queue, host, EXPECTED_EOFS, TopThreeClientsStateStorage(storage_dir, {
             "users_by_store": {},
@@ -29,10 +29,14 @@ class TopThreeClientsJoiner(Joiner):
         }))
         self.data_input_queue = data_input_queue
         self.data_output_queue = data_output_queue
-        # Incremental top-3 per store_id: { store_id: [(user_id, count), ...] sorted desc by (count, -user_id) }
-        self._top3_by_store = {}
         self.node_id = node_id
-        
+    
+        self.msg_num_counter = 0    
+        # Contador para snapshots
+        self.message_count_since_snapshot = {}
+        # Track EOF sent per request_id to ensure only 1 EOF is sent per replica
+        self.eofs_sent = set()
+
     def _consume_data_queue(self):
         data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
         self.message_middlewares.append(data_input_queue)
@@ -43,121 +47,137 @@ class TopThreeClientsJoiner(Joiner):
 
             if message.type == MESSAGE_TYPE_EOF:
                 return self._process_on_eof_message__(message)
+
+            # Solo procesar TRANSACTIONS aquí
+            # Los USERS llegan por el otro queue (_process_items_to_join)
+            if message.type != MESSAGE_TYPE_TRANSACTIONS:
+                return
             
+            # Dedup/ordering check
             if self.is_dupped(message, stream="data"):
                 return
-            try:
-                items = message.process_message()
-                if message.type == MESSAGE_TYPE_TRANSACTIONS:
-                    self._accumulate_items(items, message.request_id)
-            finally:
-                self.state_storage.save_state(message.request_id)
-                self.state_storage.cleanup_data(message.request_id)
                 
+            items = message.process_message()
+            self._accumulate_transactions(items, message.request_id)
+         
         data_input_queue.start_consuming(__on_message__)
         
-    def _accumulate_items(self, items, request_id):
+    def _accumulate_transactions(self, items, request_id):
+        """Acumula transacciones por tienda y usuario (solo en memoria)."""
+  
+            
         state = self.state_storage.get_data_from_request(request_id)
         users_by_store = state["users_by_store"]
-        store_id = None
-        updated_users = set()
-
+        
         for item in items:
             user_id = item.get_user()
             if not user_id:
                 continue
 
-            store_id = store_id or item.get_store()
+            store_id = item.get_store()
+            if store_id is None:
+                continue
+                
             store_users = users_by_store.setdefault(store_id, {})
-            new_count = store_users.get(user_id, 0) + 1
-            store_users[user_id] = new_count
-            updated_users.add(user_id)
-
-        if store_id is None:
-            return
-            
-        state["users_by_store"] = users_by_store
-        self.state_storage.data_by_request[request_id] = state
-        # Update incremental top-3 for affected users
-        for u in updated_users:
-            self._update_top3(store_id, u, users_by_store[store_id][u])
-
-    def _update_top3(self, store_id: int, user_id: int, count: int):
-        """
-        Maintain a small sorted list (size <= 3) of (user_id, count) for each store_id.
-        Sorting: higher count first; tie-break by lower user_id.
-        """
-        top: List[Tuple[int, int]] = self._top3_by_store.get(store_id, [])
-        # Replace existing entry if user already present
-        replaced = False
-        for idx, (uid, c) in enumerate(top):
-            if uid == user_id:
-                top[idx] = (user_id, count)
-                replaced = True
-                break
-        if not replaced:
-            top.append((user_id, count))
-        # Sort by (-count, user_id) and trim to top-3
-        top.sort(key=lambda x: (-x[1], x[0]))
-        if len(top) > 3:
-            del top[3:]
-        self._top3_by_store[store_id] = top
+            store_users[user_id] = store_users.get(user_id, 0) + 1
         
-    def _process_items_to_join(self, message):
-        try:
-            items = message.process_message()
-            state = self.state_storage.get_data_from_request(message.request_id)
-            users_birthdates = state["users_birthdates"]
+        # Incrementar contador y hacer snapshot cada SNAPSHOT_INTERVAL mensajes
+        self.message_count_since_snapshot[request_id] = self.message_count_since_snapshot.get(request_id, 0) + 1
+        if self.message_count_since_snapshot[request_id] >= SNAPSHOT_INTERVAL:
+            self.state_storage.save_state(request_id)
+            self.state_storage.cleanup_data(request_id)
+            self.message_count_since_snapshot[request_id] = 0
+            logging.info(f"action: snapshot_saved | request_id: {request_id} | type: transactions")
+        
+        logging.debug(f"action: transactions_accumulated | request_id: {request_id} | items: {len(items)}")
 
-            for item in items:
-                user_id = item.get_user_id()
-                birthdate = item.get_birthdate()
+    def _process_items_to_join(self, message):
+        """Process user items from the users queue (abstract method implementation)."""
+        
+        items = message.process_message()
+        # Acumular usuarios directamente sin pasar por _consume_data_queue
+        
+        state = self.state_storage.get_data_from_request(message.request_id)
+        users_birthdates = state["users_birthdates"]
+
+        for item in items:
+            user_id = item.get_user_id()
+            birthdate = item.get_birthdate()
+            if user_id and birthdate:
                 users_birthdates[user_id] = birthdate
-        except Exception as e:
-            logging.error(f"Error processing items to join: {e}")
-        finally:
+
+        # Incrementar contador y hacer snapshot cada SNAPSHOT_INTERVAL mensajes
+        self.message_count_since_snapshot[message.request_id] = self.message_count_since_snapshot.get(message.request_id, 0) + 1
+        if self.message_count_since_snapshot[message.request_id] >= SNAPSHOT_INTERVAL:
             self.state_storage.save_state(message.request_id)
             self.state_storage.cleanup_data(message.request_id)
+            self.message_count_since_snapshot[message.request_id] = 0
+            logging.info(f"action: snapshot_saved | request_id: {message.request_id}")
+        
+        logging.debug(f"action: users_accumulated | request_id: {message.request_id} | items: {len(items)}")
         
     def _send_results(self, message):
         data_output_queue = MessageMiddlewareQueue(self.data_output_queue, self.connection)
         self.message_middlewares.append(data_output_queue)
+        self.state_storage.load_state(message.request_id)
         self._process_top_3_by_request(message.request_id, data_output_queue)
         self._send_eof(message, data_output_queue)
+    
         self.state_storage.delete_state(message.request_id)
         
     def _process_top_3_by_request(self, request_id, data_output_queue):
+        """Send 1 message per store with top-3 users joined with birthdates."""
         saved_state = self.state_storage.data_by_request.get(request_id, {})
         users_by_store_state = saved_state.get("users_by_store", {})
         users_birthdates_state = saved_state.get("users_birthdates", {})
         
-        chunk = ''
-        for store, users in users_by_store_state.items():
-            if store is None:
+        stores_sent = 0
+
+        for store_id, users in users_by_store_state.items():
+            if store_id is None:
                 continue
 
-            # Prefer incremental top-3 if available; otherwise compute once
-            top3 = self._top3_by_store.get(store)
-            if not top3:
-                # Fallback: compute top-3 without full sort
-                # Get three best (count desc, user_id asc)
-                top3 = sorted(users.items(), key=lambda x: (-x[1], x[0]))[:3]
+            # users: dict user_id -> count
+            sorted_users = sorted(users.items(), key=lambda x: (-x[1], x[0]))
 
-            for user_id, transaction_count in top3:
+            unique_values = []
+            for user_id, count in sorted_users:
+                if count not in unique_values:
+                    unique_values.append(count)
+                if len(unique_values) == 3:
+                    break
+
+            top_3_users = [user for user in sorted_users if user[1] in unique_values]
+
+            # Construir un SOLO chunk/mensaje para este store con todos sus top-3 usuarios
+            chunk = ""
+            for user_id, transaction_count in top_3_users:
                 birthdate = users_birthdates_state.get(user_id)
                 if birthdate:
-                    chunk += Q4IntermediateResult(store, birthdate, transaction_count).serialize()
+                    res = Q4IntermediateResult(store_id, birthdate, transaction_count)
+                    chunk += res.serialize()
+            
+            # Enviar UN SOLO mensaje por store con todos sus top-3 usuarios
+            if chunk:
+                new_msg_num = self.msg_num_counter
+                self.msg_num_counter += 1
+                new_message = Message(request_id, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT, new_msg_num, chunk)
+                new_message.add_node_id(self.node_id)
+                data_output_queue.send(new_message.serialize())
+                stores_sent += 1
+                logging.debug(f"action: store_result_sent | request_id: {request_id} | store_id: {store_id} | top_3_count: {len(top_3_users)}")
         
-        
-        if chunk:
-            msg = Message(request_id, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT, 0, chunk)
-            msg.add_node_id(self.node_id)
-            data_output_queue.send(msg.serialize())
-            logging.info(f"Results sent | request_id: {request_id} | msg_num: {new_msg_num}")
+        logging.info(f"action: send_results_done | request_id: {request_id} | stores_sent: {stores_sent}")
         
     def _send_eof(self, message, data_output_queue):
+        """Forward EOF downstream - ensure only 1 EOF per request_id."""
+        if message.request_id in self.eofs_sent:
+            logging.warning(f"action: eof_already_sent | request_id: {message.request_id} | node_id: {self.node_id}")
+            return
+        
+        self.eofs_sent.add(message.request_id)
         data_output_queue.send(message.serialize())
-        logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")
+        logging.info(f"action: eof_forwarded | request_id: {message.request_id} | node_id: {self.node_id}")
 
 
 def initialize_config():

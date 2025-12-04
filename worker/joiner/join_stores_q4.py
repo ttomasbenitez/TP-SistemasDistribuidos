@@ -9,8 +9,6 @@ from pkg.storage.state_storage.joiner_stores import JoinerStoresQ4StateStorage
 
 import os
 
-EXPECTED_EOFS = 3
-
 class Q4StoresJoiner(Joiner):
 
     def __init__(self, 
@@ -18,14 +16,22 @@ class Q4StoresJoiner(Joiner):
                  data_output_exchange: str, 
                  stores_input_queue: str,
                  host: str,
-                 storage_dir: str):
-        super().__init_client_handler__(stores_input_queue, host, EXPECTED_EOFS, JoinerStoresQ4StateStorage(storage_dir, {
+                 storage_dir: str,
+                 top_three_clients_replicas: int = 3):
+        # Expected EOFs: 1 from stores + N from top_three_clients replicas
+        expected_eofs = 1 + top_three_clients_replicas
+        super().__init_client_handler__(stores_input_queue, host, expected_eofs, JoinerStoresQ4StateStorage(storage_dir, {
             "stores": {},
             "last_by_sender": {},
             "pending_results": []
         }))
         self.data_input_queue = data_input_queue
         self.data_output_exchange = data_output_exchange
+        self.pending_clients = {}
+        self.processed_clients = dict()
+        self.top_three_clients_replicas = top_three_clients_replicas
+        # Track EOFs by source: 'stores' and 'top_three_clients'
+        self.eofs_by_source = {}
         
     def _process_items_to_join(self, message):
         try:
@@ -44,6 +50,77 @@ class Q4StoresJoiner(Joiner):
         finally:
             self.state_storage.save_state(message.request_id)
             
+    
+    def _process_on_eof_from_stores(self, message):
+        """Handle EOF from stores queue."""
+        key = f"{message.request_id}:stores"
+        self.eofs_by_source[key] = self.eofs_by_source.get(key, 0) + 1
+        logging.info(f"action: EOF from stores | request_id: {message.request_id} | count: {self.eofs_by_source[key]}")
+        
+        # Check if we have all EOFs from top_three_clients before processing
+        top_three_key = f"{message.request_id}:top_three_clients"
+        top_three_count = self.eofs_by_source.get(top_three_key, 0)
+        
+        if top_three_count >= self.top_three_clients_replicas:
+            # We have all EOFs from top_three_clients replicas, now we can send results
+            try:
+                self._ensure_request(message.request_id)
+                self.drained[message.request_id].wait()
+                logging.info(f"action: EOF processing complete | request_id: {message.request_id} | stores_eofs: 1 | top_three_eofs: {top_three_count}")
+                self._send_results(message)
+            except Exception as e:
+                logging.error(f"Error al procesar mensajes pendientes: {e}")
+        else:
+            logging.info(f"action: Waiting for top_three_clients EOFs | request_id: {message.request_id} | received: {top_three_count}/{self.top_three_clients_replicas}")
+    
+    def _process_on_eof_from_top_three_clients(self, message):
+        """Handle EOF from top_three_clients queue."""
+        key = f"{message.request_id}:top_three_clients"
+        self.eofs_by_source[key] = self.eofs_by_source.get(key, 0) + 1
+        current_count = self.eofs_by_source[key]
+        
+        logging.info(f"action: EOF from top_three_clients | request_id: {message.request_id} | count: {current_count}/{self.top_three_clients_replicas}")
+        
+        # If we have received all EOFs from top_three_clients replicas, check if we can send results
+        if current_count >= self.top_three_clients_replicas:
+            stores_key = f"{message.request_id}:stores"
+            stores_count = self.eofs_by_source.get(stores_key, 0)
+            
+            if stores_count > 0:
+                # We have EOF from stores, so we can send results
+                try:
+                    self._ensure_request(message.request_id)
+                    self.drained[message.request_id].wait()
+                    logging.info(f"action: EOF processing complete | request_id: {message.request_id} | stores_eofs: {stores_count} | top_three_eofs: {current_count}")
+                    self._send_results(message)
+                except Exception as e:
+                    logging.error(f"Error al procesar mensajes pendientes: {e}")
+            else:
+                logging.info(f"action: Waiting for stores EOF | request_id: {message.request_id} | top_three_eofs: {current_count}")
+    
+    def _consume_items_to_join_queue(self):
+        """Override to handle EOFs from stores queue."""
+        from Middleware.middleware import MessageMiddlewareQueue
+        items_input_queue = MessageMiddlewareQueue(self.items_input_queue, self.connection)
+        self.message_middlewares.append(items_input_queue)
+        
+        def __on_items_message__(message):
+            message = Message.deserialize(message)
+            logging.info(f"action: message received in stores queue | request_id: {message.request_id} | msg_type: {message.type}")
+             
+            if message.type == MESSAGE_TYPE_EOF:
+                return self._process_on_eof_from_stores(message)
+            
+            self._ensure_request(message.request_id)
+            self._inc_inflight(message.request_id)
+            try:
+                self._process_items_to_join(message)
+            finally:
+                if message.type != MESSAGE_TYPE_EOF:
+                    self._dec_inflight(message.request_id)
+            
+        items_input_queue.start_consuming(__on_items_message__)
+
                     
     def _send_results(self, message):
         data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, {}, self.connection)
@@ -58,11 +135,10 @@ class Q4StoresJoiner(Joiner):
         
         def __on_message__(msg):
             message = Message.deserialize(msg)
-            logging.info(f"action: message received | request_id: {message.request_id} | type: {message.type}")
+            logging.info(f"action: message received from top_three_clients | request_id: {message.request_id} | type: {message.type}")
             
             if message.type == MESSAGE_TYPE_EOF:
-                return self._process_on_eof_message__(message)
-
+                return self._process_on_eof_from_top_three_clients(message)
             if self.is_dupped(message, stream="data"):
                 return
             
@@ -118,6 +194,7 @@ def initialize_config():
     config_params["input_queue_2"] = os.getenv('INPUT_QUEUE_2')
     config_params["output_exchange_q4"] = os.getenv('OUTPUT_EXCHANGE_NAME')
     config_params["logging_level"] = os.getenv('LOG_LEVEL', 'INFO')
+    config_params["top_three_clients_replicas"] = int(os.getenv('TOP_THREE_CLIENTS_REPLICAS', '3'))
     config_params["storage_dir"] = os.getenv('STORAGE_DIR', './data')
 
     if None in [config_params["rabbitmq_host"], config_params["input_queue_1"],
@@ -135,7 +212,8 @@ def main():
                             config_params["output_exchange_q4"],
                             config_params["input_queue_2"],
                             config_params["rabbitmq_host"],
-                            config_params["storage_dir"])
+                            config_params["storage_dir"],
+                            config_params["top_three_clients_replicas"])
     joiner.start()
 
 if __name__ == "__main__":

@@ -26,6 +26,8 @@ class Joiner(Worker, ABC):
     def start(self):
         self.heartbeat_sender = start_heartbeat_sender()
         
+        self.state_storage.load_specific_state_all('last_by_sender')
+        
         self.connection.start()
         self._consume_data_queue()
         self._consume_items_to_join_queue()
