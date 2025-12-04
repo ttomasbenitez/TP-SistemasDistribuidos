@@ -23,7 +23,7 @@ class QuantityAndProfitStateStorage(StateStorage):
         
         items_by_ym = state["items_by_ym"]
         last_by_sender = state["last_by_sender"]
-        
+        eofs_by_request = state["eofs_by_request"]
         loaded_items = 0
         loaded_senders = 0        
         has_specific_state = specific_state is not None
@@ -82,7 +82,15 @@ class QuantityAndProfitStateStorage(StateStorage):
                     logging.warning(f"action: failed_to_load_sender | request_id: {request_id} | error: {e}")
                     continue
                 continue
-            
+
+            if kind == "E" and (not has_specific_state or specific_state == "eofs_by_request"):
+                # EOF format: E;eofs_by_request
+                try:
+                    eofs_by_request = int(parts[1])
+                    logging.info(f"action: loaded_eof | request_id: {request_id} | eofs: {eofs_by_request}")
+                except (IndexError, ValueError) as e:
+                    logging.warning(f"action: failed_to_load_eof | request_id: {request_id} | error: {e}")
+                    continue
             # Legacy format: ym;item_data (without prefix)
             try:
                 if len(parts) == 2:
@@ -125,7 +133,8 @@ class QuantityAndProfitStateStorage(StateStorage):
         
         items_by_ym = state.get("items_by_ym", {})
         last_by_sender = state.get("last_by_sender", {})
-        
+        eofs_by_request = state.get("eofs_by_request", 0)
+
         saved_items = 0
         saved_senders = 0
         
@@ -142,6 +151,10 @@ class QuantityAndProfitStateStorage(StateStorage):
             file_handle.write(f"S;{sender_id};{last_msg_num}\n")
             saved_senders += 1
             logging.info(f"action: saved_sender_dedup | request_id: {request_id} | sender: {sender_id} | last_msg: {last_msg_num}")
+
+        # Save EOFs
+        file_handle.write(f"E;{eofs_by_request}\n")
+        logging.info(f"action: saved_eof | request_id: {request_id} | eofs: {eofs_by_request}")
         
         # Log summary
         total_qty = sum(item.quantity for ym_dict in items_by_ym.values() for item in ym_dict.values())

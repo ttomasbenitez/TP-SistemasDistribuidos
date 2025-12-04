@@ -28,7 +28,7 @@ class QuantityAndProfit(Worker):
         self.state_storage = QuantityAndProfitStateStorage(storage_dir, {
             'items_by_ym': {},
             'last_by_sender': {},
-            'eofs_by_request': {}
+            'eofs_received': 0
         })
         self.msg_num_counter = 0
         
@@ -84,10 +84,10 @@ class QuantityAndProfit(Worker):
     def _process_on_eof_message__(self, message, data_output_queue):
         """Handle EOF message: track, send results when all EOFs received, cleanup."""
         state = self.state_storage.get_data_from_request(message.request_id)
-        state.eofs_by_request[message.request_id] = state.eofs_by_request.get(message.request_id, 0) + 1
-        logging.info(f"EOF received | request_id: {message.request_id} | count: {state.eofs_by_request[message.request_id]}/{self.expected_eofs}")
+        state["eofs_received"] = state.get("eofs_received", 0) + 1
+        logging.info(f"EOF received | request_id: {message.request_id} | count: {state['eofs_received']}/{self.expected_eofs}")
         
-        if state.eofs_by_request[message.request_id] < self.expected_eofs:
+        if state["eofs_received"] < self.expected_eofs:
             return  # Wait for more EOFs
         
         self.state_storage.load_state(message.request_id)
