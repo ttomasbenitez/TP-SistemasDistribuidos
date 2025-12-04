@@ -166,15 +166,18 @@ class SemesterAggregator(Worker):
     def _emit_all_and_finalize(self, message: Message, data_output_queue: MessageMiddlewareQueue):
         """Emit all aggregated Q3 intermediate results and then EOF downstream."""
         request_id = message.request_id
+        new_msg_num = 0
+        chunk = ''
         try:
             per_request = self._agg_by_request.get(request_id, {})
             for period, store_map in per_request.items():
                 for store_id, total in store_map.items():
                     res = Q3IntermediateResult(period, store_id, total)
-                    self._send_grouped_item(message, res, data_output_queue)
+                    chunk += res.serialize()
+
         finally:
             # Send EOF to downstream exchange for q3
-            data_output_queue.send(message.serialize())
+            self._send_grouped_item(message, chunk, data_output_queue, new_msg_num)
             # Cleanup state both memory and disk
             try:
                 del self._agg_by_request[request_id]
@@ -182,9 +185,9 @@ class SemesterAggregator(Worker):
                 pass
             self.state_storage.delete_state(request_id)
    
-    def _send_grouped_item(self, message, item, data_output_queue):
+    def _send_grouped_item(self, message, item, data_output_queue, new_msg_num):
         new_chunk = item.serialize()
-        new_message = Message(message.request_id, MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT, message.msg_num, new_chunk)
+        new_message = Message(message.request_id, MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT, new_msg_num, new_chunk)
         data_output_queue.send(new_message.serialize())
 
 def initialize_config():
