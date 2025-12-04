@@ -497,6 +497,7 @@ services:
       OUTPUT_EXCHANGE: aggregated-store-q4-exchange
       OUTPUT_QUEUE_1: aggregated-store-q4-queue-1
       OUTPUT_QUEUE_2: aggregated-store-q4-queue-2
+      OUTPUT_QUEUE_3: aggregated-store-q4-queue-3
       # EOF_SERVICE_QUEUE: eof-service-aggregator-store-q4
       NODE_ID: 1
       TOTAL_SHARDS: 2
@@ -519,6 +520,7 @@ services:
       OUTPUT_EXCHANGE: aggregated-store-q4-exchange
       OUTPUT_QUEUE_1: aggregated-store-q4-queue-1
       OUTPUT_QUEUE_2: aggregated-store-q4-queue-2
+      OUTPUT_QUEUE_3: aggregated-store-q4-queue-3
       # EOF_SERVICE_QUEUE: eof-service-aggregator-store-q4
       NODE_ID: 2
       TOTAL_SHARDS: 2
@@ -558,6 +560,7 @@ services:
       INPUT_QUEUE_2: users-queue-1
       OUTPUT_QUEUE_1: top-clients-queue
       STORAGE_DIR: ./data/top-three-clients
+      NODE_ID: 
       LOG_LEVEL: INFO
     networks:
     - testing_net
@@ -578,6 +581,7 @@ services:
       INPUT_QUEUE_2: users-queue-2
       OUTPUT_QUEUE_1: top-clients-queue
       STORAGE_DIR: ./data/top-three-clients
+      NODE_ID: 2
       LOG_LEVEL: INFO
     networks:
     - testing_net
@@ -598,6 +602,7 @@ services:
       INPUT_QUEUE_2: users-queue-3
       OUTPUT_QUEUE_1: top-clients-queue
       STORAGE_DIR: ./data/top-three-clients
+      NODE_ID: 3
       LOG_LEVEL: INFO
     networks:
     - testing_net

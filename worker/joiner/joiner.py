@@ -45,7 +45,6 @@ class Joiner(Worker, ABC):
     def _send_results(self, message):
         pass
     
-
     def _process_on_eof_message__(self, message):
         self.eofs_by_client[message.request_id] = self.eofs_by_client.get(message.request_id, 0) + 1
         if self.eofs_by_client[message.request_id] < self.expected_eofs:

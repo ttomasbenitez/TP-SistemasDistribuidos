@@ -64,7 +64,6 @@ class TopThreeClientsJoiner(Joiner):
         
     def _accumulate_transactions(self, items, request_id):
         """Acumula transacciones por tienda y usuario (solo en memoria)."""
-  
             
         state = self.state_storage.get_data_from_request(request_id)
         users_by_store = state["users_by_store"]
@@ -119,7 +118,22 @@ class TopThreeClientsJoiner(Joiner):
     def _send_results(self, message):
         data_output_queue = MessageMiddlewareQueue(self.data_output_queue, self.connection)
         self.message_middlewares.append(data_output_queue)
+        not_saved_state = self.state_storage.get_data_from_request(message.request_id)
         self.state_storage.load_state(message.request_id)
+        current_state = self.state_storage.get_data_from_request(message.request_id)
+        
+        current = current_state["users_by_store"]
+        incoming = not_saved_state.get("users_by_store", {})
+
+        for store_id, users_dict in incoming.items():
+            if store_id not in current:
+            # Si la tienda no existe, copio todo el dict
+                current[store_id] = users_dict.copy()
+            else:
+                # Si la tienda existe, sumo por usuario
+                for user_id, count in users_dict.items():
+                    current[store_id][user_id] = current[store_id].get(user_id, 0) + count
+        
         self._process_top_3_by_request(message.request_id, data_output_queue)
         self._send_eof(message, data_output_queue)
     
