@@ -1,5 +1,5 @@
 from worker.base import Worker 
-from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
+from Middleware.middleware import MessageMiddlewareQueue
 import logging
 from pkg.message.message import Message
 from utils.custom_logging import initialize_log
@@ -16,27 +16,32 @@ class SemesterAggregator(Worker):
     def __init__(self, 
                  data_input_queue: str,
                  data_output_queue: str,
+                 storage_dir: str,
                  host: str,
-                 expected_acks: int):
-        
-        self.__init_manager__()
-        self.__init_middlewares_handler__()
+                 expected_eofs: int = 2,
+                 container_name: str = None):
         
         self.connection = PikaConnection(host)
         self.data_input_queue = data_input_queue
         self.data_output_queue = data_output_queue
-        self.expected_acks = expected_acks
-        # Track last seen message number per upstream node (store_aggregator)
-        self._last_msg_by_sender = {}
-        self._sender_lock = threading.Lock()
-        # In-memory aggregation by request_id -> period -> store_id -> total
-        self._agg_by_request = {}
-        # Persistent storage
-        storage_dir = os.getenv('SEMESTER_STORAGE_DIR', './data/semester_agg')
+        self.host = host
         self.state_storage = SemesterAggregatorStateStorage(storage_dir)
-        # EOF accounting per request
-        self._eof_acks_by_request = {}
-        self._eof_lock = threading.Lock()
+        self.expected_eofs = expected_eofs
+        self.eofs_by_request = {}
+        
+        # Message numbering: start at 0, incremental
+        # Extract node_id from container name (e.g., "semester-aggregator-1" -> 1)
+        try:
+            self.node_id = int(container_name.split('-')[-1]) if container_name else 1
+        except (ValueError, AttributeError, IndexError):
+            self.node_id = 1
+            logging.error(f"Could not parse node_id from {container_name}, defaulting to 1")
+        
+        self.msg_num_counter = 0
+        
+        # Dedup / sequencing state per sender
+        self._sender_lock = threading.Lock()
+        self._last_msg_by_sender = {}
 
     def _should_process_and_update(self, message: Message) -> bool:
         """
@@ -49,140 +54,163 @@ class SemesterAggregator(Worker):
         with self._sender_lock:
             last = self._last_msg_by_sender.get(sender_id, -1)
             if message.msg_num == last:
-                logging.info(f"action: duplicate_msg | sender: {sender_id} | msg_num: {message.msg_num} | decision: skip")
+                logging.warning(f"action: DUPLICATE_FILTERED | sender:{sender_id} | msg:{message.msg_num} | last:{last}")
                 return False
             if message.msg_num < last:
-                logging.warning(f"action: out_of_order_msg | sender: {sender_id} | msg_num: {message.msg_num} | last: {last} | decision: skip")
+                logging.warning(f"action: OUT_OF_ORDER_FILTERED | sender:{sender_id} | msg:{message.msg_num} < last:{last}")
                 return False
             # message.msg_num > last → accept
             self._last_msg_by_sender[sender_id] = message.msg_num
+            logging.debug(f"action: msg_accepted | sender:{sender_id} | msg_num:{message.msg_num}")
             return True
 
     def start(self):
+        # Load persisted state once on startup and hydrate last-msg map
+        logging.info(f"action: startup | loading persisted state for recovery")
+        self.state_storage.load_state_all()
+        for _rid, st in self.state_storage.data_by_request.items():
+            for sid, num in st.get("last_msg_by_sender", {}).items():
+                self._last_msg_by_sender[sid] = max(self._last_msg_by_sender.get(sid, -1), num)
+                logging.info(f"action: recovery_state_loaded | request_id: {_rid} | sender: {sid} | last_msg_num: {num}")
         
         self.heartbeat_sender = start_heartbeat_sender()
 
         self.connection.start()
-        # Restore any previously persisted state once, on startup
-        try:
-            self._restore_persisted_state()
-            logging.info("action: semester_state_restore | result: success")
-        except Exception as e:
-            logging.error(f"action: semester_state_restore | result: fail | error: {type(e).__name__}: {e}")
         self._consume_data_queue()
         self.connection.start_consuming()
 
     def _consume_data_queue(self):
         data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
         data_output_queue = MessageMiddlewareQueue(self.data_output_queue, self.connection)
-        self.message_middlewares.extend([data_input_queue, data_output_queue])
         
-        def __on_message__(message):
+        def __on_message__(msg):
             try:
-                message = Message.deserialize(message)
-
-                if message.type == MESSAGE_TYPE_EOF:
-                    logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
-                    # Accumulate EOF acks per request; emit only when expected_acks reached
-                    with self._eof_lock:
-                        current = self._eof_acks_by_request.get(message.request_id, 0) + 1
-                        self._eof_acks_by_request[message.request_id] = current
-                        reached = (current >= self.expected_acks)
-                    if not reached:
-                        logging.info(f"action: eof_partial | request_id: {message.request_id} | acks: {current}/{self.expected_acks}")
-                        return
-                    # All upstream EOFs received → emit and finalize
-                    self._emit_all_and_finalize(message, data_output_queue)
-                    return
+                message = Message.deserialize(msg)
+                logging.info(f"action: message received | request_id: {message.request_id} | type: {message.type}")
                 
-                logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
-                self._ensure_request(message.request_id)
-                self._inc_inflight(message.request_id) 
-
-                # Per-sender sequencing check
-                if not self._should_process_and_update(message):
-                    return
-
-                items = message.process_message()
-                # Aggregate in-memory and persist incremental delta
-                per_request = self._agg_by_request.setdefault(message.request_id, {})
-                deltas = []  # list of (period, store_id, delta)
-                store_id = None
-                for it in items:
-                    year = it.get_year()
-                    sem  = it.get_semester()
-                    period = f"{year}-H{sem}"
-                    if store_id is None:
-                        store_id = it.store_id
-                    amount = it.get_final_amount()
-                    bucket = per_request.setdefault(period, {})
-                    bucket[store_id] = bucket.get(store_id, 0.0) + amount
-                    deltas.append((period, store_id, amount))
-
-                # Persist incremental changes and last seen msg for sender
+                if message.type == MESSAGE_TYPE_EOF:
+                    return self._process_on_eof_message__(message, data_output_queue)
+                
+                # Dedup/ordering check
                 sender_id = message.get_node_id_and_request_id()
-                lines = []
-                for period, s_id, delta in deltas:
-                    lines.append(f"agg;{period};{s_id};{delta}")
-                lines.append(f"sender;{sender_id};{message.msg_num}")
-                self.state_storage.data_by_request[message.request_id] = {"lines": lines}
-                self.state_storage.save_state(message.request_id)
-
+                with self._sender_lock:
+                    last = self._last_msg_by_sender.get(sender_id, -1)
+                    logging.debug(f"action: dedup_check | sender:{sender_id} | msg_num:{message.msg_num} | last_seen:{last}")
+                    if message.msg_num <= last:
+                        if message.msg_num == last:
+                            logging.warning(f"action: DUPLICATE_FILTERED | sender:{sender_id} | msg:{message.msg_num} | last:{last}")
+                        else:
+                            logging.warning(f"action: OUT_OF_ORDER_FILTERED | sender:{sender_id} | msg:{message.msg_num} < last:{last}")
+                        return
+                    self._last_msg_by_sender[sender_id] = message.msg_num
+                    logging.debug(f"action: msg_accepted | sender:{sender_id} | msg_num:{message.msg_num}")
+                
+                items = message.process_message()
+                if items:
+                    self._accumulate_items(items, message.request_id, sender_id, message.msg_num)
+                    
             except Exception as e:
-                logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
-            finally:
-                if message.type != MESSAGE_TYPE_EOF:
-                    self._dec_inflight(message.request_id)
+                logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
         
         data_input_queue.start_consuming(__on_message__)
 
-    def _restore_persisted_state(self):
+    def _process_on_eof_message__(self, message, data_output_queue):
+        """Handle EOF message: track, send results when all EOFs received, cleanup."""
+        self.eofs_by_request[message.request_id] = self.eofs_by_request.get(message.request_id, 0) + 1
+        logging.info(f"EOF received | request_id: {message.request_id} | count: {self.eofs_by_request[message.request_id]}/{self.expected_eofs}")
+        
+        if self.eofs_by_request[message.request_id] < self.expected_eofs:
+            return  # Wait for more EOFs
+        
+        # All EOFs received, send results and forward EOF
+        logging.info(f"All EOFs received, sending results | request_id: {message.request_id}")
+        self._send_all_results(message.request_id, data_output_queue)
+        data_output_queue.send(message.serialize())
+        logging.info(f"EOF forwarded downstream | request_id: {message.request_id}")
+        
+        # Clean up
+        del self.eofs_by_request[message.request_id]
+        self.state_storage.delete_state(message.request_id)
+
+    def _accumulate_items(self, items, request_id, sender_id=None, msg_num=None):
         """
-        Load all previously persisted state once on startup and hydrate in-memory
-        aggregates and last-seen sender map.
+        Acumula cantidad por periodo y store, persistiendo estado incremental
+        Similar a max_quantity_profit, mantenemos estado en memoria y persistimos en disco.
         """
-        # Load every request file present under storage dir
-        self.state_storage.load_state_all()
-        # Merge into in-memory structures
-        for req_id, persisted in self.state_storage.data_by_request.items():
-            # Restore aggregated totals per (period, store_id)
-            persisted_agg = persisted.get("agg", {})
-            if persisted_agg:
-                target = self._agg_by_request.setdefault(req_id, {})
-                for period, store_map in persisted_agg.items():
-                    bucket = target.setdefault(period, {})
-                    for store_id, total in store_map.items():
-                        bucket[store_id] = bucket.get(store_id, 0.0) + total
-            # Restore last seen message per sender (sender ids may already encode request)
-            persisted_last = persisted.get("last_msg_by_sender", {})
-            if persisted_last:
-                with self._sender_lock:
-                    for sender_id, last_num in persisted_last.items():
-                        self._last_msg_by_sender[sender_id] = max(self._last_msg_by_sender.get(sender_id, -1), last_num)
-    
-    def _emit_all_and_finalize(self, message: Message, data_output_queue: MessageMiddlewareQueue):
-        """Emit all aggregated Q3 intermediate results and then EOF downstream."""
-        request_id = message.request_id
+        with self.state_storage._lock:
+            state = self.state_storage.data_by_request.setdefault(request_id, {
+                "agg_by_period": {},
+                "last_msg_by_sender": {},
+            })
+            
+            agg_by_period = state["agg_by_period"]
+            logging.info(f"action: accumulate_start | request_id: {request_id} | items_count: {len(items)} | sender: {sender_id} | msg_num: {msg_num}")
+            
+            for it in items:
+                year = it.get_year()
+                sem  = it.get_semester()
+                period = f"{year}-H{sem}"
+                store_id = it.store_id
+                amount = it.get_final_amount()
+                
+                bucket = agg_by_period.setdefault(period, {})
+                old_val = bucket.get(store_id, 0.0)
+                bucket[store_id] = old_val + amount
+                
+                logging.debug(f"action: agg_updated | period: {period} | store_id: {store_id} | amount: {amount} | old: {old_val} | new: {bucket[store_id]}")
+            
+            # Persist last seen marker if provided
+            if sender_id is not None and msg_num is not None:
+                state["last_msg_by_sender"][sender_id] = msg_num
+            
+            # Log final state
+            total_amount = sum(store_total for period_dict in agg_by_period.values() for store_total in period_dict.values())
+            logging.info(f"action: accumulate_done | request_id: {request_id} | total_amount: {total_amount} | periods: {len(agg_by_period)}")
+        
+        # Save to disk but keep data in memory (reset_state=False)
+        self.state_storage.save_state(request_id, reset_state=False)
+        logging.info(f"action: state_persisted | request_id: {request_id}")
+
+    def _send_all_results(self, request_id, data_output_queue):
+        """Send all aggregated Q3 intermediate results."""
         try:
-            per_request = self._agg_by_request.get(request_id, {})
-            for period, store_map in per_request.items():
+            if request_id not in self.state_storage.data_by_request:
+                logging.warning(f"action: send_results_no_data | request_id: {request_id}")
+                return
+
+            data_for_request = self.state_storage.data_by_request[request_id]
+            agg_by_period = data_for_request.get("agg_by_period", {})
+            
+            logging.info(f"action: send_results_start | request_id: {request_id} | periods_count: {len(agg_by_period)}")
+
+            results_count = 0
+            for period, store_map in agg_by_period.items():
                 for store_id, total in store_map.items():
                     res = Q3IntermediateResult(period, store_id, total)
-                    self._send_grouped_item(message, res, data_output_queue)
-        finally:
-            # Send EOF to downstream exchange for q3
-            data_output_queue.send(message.serialize())
-            # Cleanup state both memory and disk
-            try:
-                del self._agg_by_request[request_id]
-            except Exception:
-                pass
-            self.state_storage.delete_state(request_id)
-   
-    def _send_grouped_item(self, message, item, data_output_queue):
+                    self._send_grouped_item(request_id, res, data_output_queue)
+                    results_count += 1
+            
+            logging.info(f"action: send_results_done | request_id: {request_id} | results_count: {results_count}")
+        except Exception as e:
+            logging.error(f"action: send_results_error | request_id: {request_id} | error: {type(e).__name__}: {e}")
+
+    def _send_grouped_item(self, request_id, item, data_output_queue):
         new_chunk = item.serialize()
-        new_message = Message(message.request_id, MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT, message.msg_num, new_chunk)
+        new_msg_num = self.msg_num_counter
+        self.msg_num_counter += 1
+        new_message = Message(request_id, MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT, new_msg_num, new_chunk)
+        # Add node_id to message for dedup tracking per source
+        new_message.add_node_id(self.node_id)
         data_output_queue.send(new_message.serialize())
+
+    def close(self):
+        try:
+            self.heartbeat_sender.stop()
+            self.connection.close()
+            logging.info(f"action=close_connections | status=success")
+        except Exception as e:
+            logging.error(f"Error al cerrar: {type(e).__name__}: {e}")
+
 
 def initialize_config():
     """ Parse env variables to find program config params
@@ -198,7 +226,9 @@ def initialize_config():
         "input_queue": os.getenv('INPUT_QUEUE_1'),
         "output_queue": os.getenv('OUTPUT_QUEUE_1'),
         "logging_level": os.getenv('LOG_LEVEL', 'INFO'),
-        "expected_acks": int(os.getenv('EXPECTED_ACKS')),
+        "expected_eofs": int(os.getenv('EXPECTED_EOFS', '2')),
+        "storage_dir": os.getenv('STORAGE_DIR', './data'),
+        "container_name": os.getenv('CONTAINER_NAME', 'semester-aggregator'),
     }
 
     required_keys = [
@@ -213,16 +243,22 @@ def initialize_config():
     
     return config_params
 
+
 def main():
     config_params = initialize_config()
 
     initialize_log(config_params["logging_level"])
     
-    aggregator = SemesterAggregator(config_params["input_queue"], 
-                                   config_params["output_queue"],  
-                                   config_params["rabbitmq_host"],
-                                   config_params["expected_acks"])
+    aggregator = SemesterAggregator(
+        config_params["input_queue"], 
+        config_params["output_queue"],  
+        config_params["storage_dir"],
+        config_params["rabbitmq_host"],
+        config_params["expected_eofs"],
+        config_params["container_name"]
+    )
     aggregator.start()
+
 
 if __name__ == "__main__":
     main()
