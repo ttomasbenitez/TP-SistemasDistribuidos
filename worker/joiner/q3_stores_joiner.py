@@ -24,18 +24,21 @@ class StoresJoiner(Joiner):
                  data_output_exchange: str,  
                  stores_input_queue: str,
                  host: str, 
-                 storage_dir: str):
+                 storage_dir: str,
+                 aggregator_semester_replicas: int = 2):
         
         super().__init_client_handler__(stores_input_queue, host, EXPECTED_EOFS, JoinerStoresQ3StateStorage(storage_dir, {
             "stores": {},
             "last_by_sender": {},
             "pending_results": []
         }))
+        expected_eofs = 1 + aggregator_semester_replicas
         self.data_input_queue = data_input_queue
         self.data_output_exchange = data_output_exchange
         self.pending_transactions = []
         self._seen_lock = threading.Lock()
         self._seen_messages = set()
+        self.eofs_sent_by_request = {}
 
     def _consume_data_queue(self):
         data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
@@ -132,7 +135,14 @@ class StoresJoiner(Joiner):
         self.state_storage.delete_state(request_id)
 
     def _send_eof(self, message, data_output_exchange):
+        # Send EOF only once per request_id, even if called multiple times
+        if message.request_id in self.eofs_sent_by_request:
+            logging.debug(f"action: EOF already sent | request_id: {message.request_id}")
+            return
+        
+        message.update_content("3")
         data_output_exchange.send(message.serialize(), str(message.request_id))
+        self.eofs_sent_by_request[message.request_id] = True
         logging.info(f"EOF sent | request_id: {message.request_id}")
 
 
@@ -144,6 +154,7 @@ def initialize_config():
     config_params["output_exchange_q3"] = os.getenv('OUTPUT_EXCHANGE_NAME')
     config_params["logging_level"] = os.getenv('LOG_LEVEL', 'INFO')
     config_params["storage_dir"] = os.getenv('STORAGE_DIR', './data')
+    config_params["aggregator_semester_replicas"] = int(os.getenv('AGGREGATOR_SEMESTER_REPLICAS', '2'))
 
     if None in [config_params["rabbitmq_host"], config_params["input_queue_1"],
                 config_params["input_queue_2"]]:
@@ -161,7 +172,8 @@ def main():
         config_params["output_exchange_q3"],
         config_params["input_queue_2"], 
         config_params["rabbitmq_host"],
-        config_params["storage_dir"])
+        config_params["storage_dir"],
+        config_params["aggregator_semester_replicas"])
     joiner.start()
 
 

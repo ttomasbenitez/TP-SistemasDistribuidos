@@ -17,9 +17,11 @@ class JoinerMenuItems(Joiner):
                  data_input_queue: str, 
                  data_output_exchange: str,
                  menu_items_input_queue: str,
-                 host: str, 
-                 expected_eofs: int,
-                 storage_dir: str = None):
+                 host: str,
+                 storage_dir: str = None,
+                 aggregator_quantity_profit_replicas: int = 2): 
+        # Expected EOFs: 1 from menu_items + N from aggregator-quantity-profit replicas
+        expected_eofs = 1 + aggregator_quantity_profit_replicas
         super().__init_client_handler__(menu_items_input_queue, host, expected_eofs, JoinerMenuItemsStateStorage(storage_dir, {
             "menu_items": {},
             "last_by_sender": {},
@@ -27,6 +29,8 @@ class JoinerMenuItems(Joiner):
         }))
         self.data_input_queue = data_input_queue
         self.data_output_exchange = data_output_exchange
+        self.pending_items = []
+        self.eofs_sent_by_request = {}
 
     def _process_items_to_join(self, message):
         items = message.process_message()
@@ -53,9 +57,11 @@ class JoinerMenuItems(Joiner):
         self.state_storage.load_state(request_id)
         state = self.state_storage.get_data_from_request(request_id)
         pending_results = state.get("pending_results", [])
+        menu_items = state.get("menu_items", {})
         
         for item in pending_results:
-            name = item.item_data
+            name = menu_items.get(item.item_data)
+            logging.info(f"action: processing pending Q2 results | request_id: {request_id} | ITEM ID: {item.item_data} | NAME: {name}")
             if name:
                 item.join_item_name(name)
                 ready_to_send += item.serialize()
@@ -113,7 +119,14 @@ class JoinerMenuItems(Joiner):
         data_input_queue.start_consuming(__on_message__)
         
     def _send_eof(self, message, data_output_exchange):
+        # Send EOF only once per request_id, even if called multiple times
+        if message.request_id in self.eofs_sent_by_request:
+            logging.debug(f"action: EOF already sent | request_id: {message.request_id}")
+            return
+        
+        message.update_content("2")
         data_output_exchange.send(message.serialize(), str(message.request_id))
+        self.eofs_sent_by_request[message.request_id] = True
         logging.info(f"action: EOF sent | request_id: {message.request_id} | type: {message.type}")
 
                        
@@ -133,7 +146,7 @@ def initialize_config():
     config_params["input_queue_1"] = os.getenv('INPUT_QUEUE_1')
     config_params["input_queue_2"] = os.getenv('INPUT_QUEUE_2')
     config_params["output_exchange_q2"] = os.getenv('OUTPUT_EXCHANGE')
-    config_params["expected_eofs"] = int(os.getenv('EXPECTED_EOFS', '3'))
+    config_params["aggregator_quantity_profit_replicas"] = int(os.getenv('AGGREGATOR_QUANTITY_PROFIT_REPLICAS', '2'))
     config_params["logging_level"] = os.getenv('LOG_LEVEL', 'INFO')
     config_params["storage_dir"] = os.getenv('STORAGE_DIR', './data')
 
@@ -151,8 +164,8 @@ def main():
                                  config_params["output_exchange_q2"],
                                  config_params["input_queue_2"],
                                  config_params["rabbitmq_host"],
-                                 config_params["expected_eofs"],
-                                 config_params["storage_dir"])
+                                 config_params["storage_dir"],
+                                 config_params["aggregator_quantity_profit_replicas"])
     joiner.start()
 
 if __name__ == "__main__":

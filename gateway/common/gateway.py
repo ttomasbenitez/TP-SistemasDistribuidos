@@ -10,7 +10,7 @@ from pkg.message.constants import MESSAGE_TYPE_USERS, MESSAGE_TYPE_MENU_ITEMS, M
 import os
 
 class Gateway:
-    def __init__(self, port, listen_backlog, exchange_name, in_queue_prefix, output_exchange_name,  rabbitmq_host):
+    def __init__(self, port, listen_backlog, exchange_name, in_queue_prefix, output_exchange_name,  rabbitmq_host, q1_replicas):
         self._listen_backlog = listen_backlog
         self._exchange_name = exchange_name
         self._in_queue_prefix = in_queue_prefix
@@ -19,6 +19,7 @@ class Gateway:
         self._rabbitmq_host = rabbitmq_host
         self._request_id = 0
         self._output_exchange_name = output_exchange_name
+        self._q1_replicas = q1_replicas
 
         self._gateway_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._gateway_socket.bind(('', port))
@@ -43,7 +44,7 @@ class Gateway:
                 queues_dict = self.create_queues_dict()
                 exchange = MessageMiddlewareExchange(self._exchange_name, queues_dict, connection)
 
-                handler = ClientHandler(self._request_id, client_sock, exchange, results_in_queue, self._output_exchange_name, connection)
+                handler = ClientHandler(self._request_id, client_sock, exchange, results_in_queue, self._output_exchange_name, connection, self._q1_replicas)
                 self._request_id += 1
 
                 self._clients.append(handler)

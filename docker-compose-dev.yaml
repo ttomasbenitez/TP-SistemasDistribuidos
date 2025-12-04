@@ -377,7 +377,7 @@ services:
       INPUT_QUEUE_2: menu-items-queue
       OUTPUT_EXCHANGE: results-exchange
       STORAGE_DIR: ./data/join_menu_items
-      EXPECTED_EOFS: 4
+      AGGREGATOR_QUANTITY_PROFIT_REPLICAS: 3
       LOG_LEVEL: INFO
     networks:
     - testing_net
@@ -475,7 +475,7 @@ services:
       OUTPUT_EXCHANGE_NAME: results-exchange
       STORAGE_DIR: ./data/join_stores_q3
       LOG_LEVEL: INFO
-      EXPECTED_ACKS: 2
+      AGGREGATOR_SEMESTER_REPLICAS: 3
     networks:
     - testing_net
     depends_on:
