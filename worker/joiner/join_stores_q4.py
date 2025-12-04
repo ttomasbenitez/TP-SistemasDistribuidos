@@ -16,7 +16,7 @@ class Q4StoresJoiner(Joiner):
                  host: str,
                  top_three_clients_replicas: int = 3):
         # Expected EOFs: 1 from stores + N from top_three_clients replicas
-        expected_eofs = 1 + top_three_clients_replicas
+        expected_eofs = 1 + top_three_clients_replicas * 2
         super().__init_client_handler__(stores_input_queue, host, expected_eofs)
         self.data_input_queue = data_input_queue
         self.data_output_exchange = data_output_exchange
