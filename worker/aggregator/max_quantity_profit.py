@@ -191,7 +191,7 @@ class QuantityAndProfit(Worker):
             results_count += 2
 
         if chunk:
-            logging.info(f"action: send_results_done | request_id: {request_id_of_eof} | results_count: {results_count}")
+            logging.info(f"action: send_results_done | request_id: {request_id_of_eof} | results_count: {results_count} | CHUNK: {chunk}")
             new_msg_num = self.msg_num_counter
             self.msg_num_counter += 1
             message = Message(request_id_of_eof, MESSAGE_TYPE_QUERY_2_RESULT, new_msg_num, chunk)
