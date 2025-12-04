@@ -10,7 +10,8 @@ from pkg.message.q4_result import Q4IntermediateResult
 import threading
 
 EXPECTED_EOFS = 3 # 1 users, 2 store agg
-SNAPSHOT_INTERVAL = 100  # Guardar snapshot cada N mensajes
+SNAPSHOT_INTERVAL = 200  # Guardar snapshot cada N mensajes (máximo entre batches)
+BATCH_ACK_PREFETCH = 250  # Prefetch for batch ACK to avoid queue blocking
 
 class TopThreeClientsJoiner(Joiner):
 
@@ -39,10 +40,12 @@ class TopThreeClientsJoiner(Joiner):
         
         self.msg_num_counter = 0
         
-        # Contador para snapshots
-        self.message_count_since_snapshot = {}
+        # Manual ACK tracking for batch users
+        self.users_ack_pending = []  # (ch, method) tuples to ACK after save
+        self.users_count_since_save = {}  # Per request tracking
+        self.global_users_count = 0  # Global counter for batch ACK trigger
         
-        # Track EOF sent per request_id to ensure only 1 EOF is sent per replica
+        # Track EOF forwarding to avoid duplicates
         self.eofs_sent = set()
 
     def start(self):
@@ -51,7 +54,90 @@ class TopThreeClientsJoiner(Joiner):
         for _rid, st in self.state_storage.data_by_request.items():
             for sid, num in st.get("last_msg_by_sender", {}).items():
                 self._last_msg_by_sender[sid] = max(self._last_msg_by_sender.get(sid, -1), num)
+        logging.info(f"action: top_three_clients_starting | items_input_queue: {self.items_input_queue}")
         super().start()
+
+    def _consume_items_to_join_queue(self):
+        """Override to use manual ACK for batch user messages."""
+        logging.info(f"_consume_items_to_join_queue called with queue: {self.items_input_queue}")
+        items_input_queue = MessageMiddlewareQueue(self.items_input_queue, self.connection)
+        self.message_middlewares.append(items_input_queue)
+        
+        def __on_items_message__(msg_body, ch, method):
+            try:
+                message = Message.deserialize(msg_body)
+                logging.info(f"action: message received in items to join queue | request_id: {message.request_id} | msg_type: {message.type}")
+                 
+                if message.type == MESSAGE_TYPE_EOF:
+                    # EOF: ACK immediately (no batch pending)
+                    self._ack_pending_users()
+                    ch.basic_ack(delivery_tag=method.delivery_tag)
+                    logging.info(f"action: eof_received_and_acked | request_id: {message.request_id}")
+                    return self._process_on_eof_message__(message)
+                
+                self._ensure_request(message.request_id)
+                self._inc_inflight(message.request_id)
+                try:
+                    # Track for manual ACK
+                    self.users_ack_pending.append((ch, method))
+                    self._process_items_to_join(message)
+                    
+                    # Check if we should save and ACK batch (using global counter)
+                    self.users_count_since_save[message.request_id] = self.users_count_since_save.get(message.request_id, 0) + 1
+                    self.global_users_count += 1
+                    logging.debug(f"action: user_message_received | request_id: {message.request_id} | global_count: {self.global_users_count}")
+                    if self.global_users_count >= SNAPSHOT_INTERVAL:
+                        self._ack_pending_users()
+                        self.users_count_since_save.clear()
+                        self.global_users_count = 0
+                        logging.info(f"action: users_batch_acked | batch_size: {SNAPSHOT_INTERVAL} | pending_acks_after: {len(self.users_ack_pending)}")
+                        
+                except Exception as e:
+                    logging.error(f"Error procesando mensaje de usuarios: {type(e).__name__}: {e}", exc_info=True)
+                    # NACK on error - message returns to queue
+                    if self.users_ack_pending and self.users_ack_pending[-1] == (ch, method):
+                        self.users_ack_pending.pop()  # Remove the ACK we added
+                    ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+                finally:
+                    if message.type != MESSAGE_TYPE_EOF:
+                        self._dec_inflight(message.request_id)
+            except Exception as e:
+                logging.error(f"Fatal error in items_to_join callback: {type(e).__name__}: {e}", exc_info=True)
+                ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+        
+        logging.info(f"Starting items_to_join queue consumption with manual ACK")
+        # Use new batch ACK method with optimized prefetch
+        items_input_queue.start_consuming_with_batch_ack(__on_items_message__, prefetch_count=BATCH_ACK_PREFETCH)
+
+    def _ack_pending_users(self):
+        """Save to disk and flush all pending ACKs after batch."""
+        if not self.users_ack_pending:
+            logging.debug(f"action: no_pending_users_to_ack")
+            return
+        
+        pending_count = len(self.users_ack_pending)
+        logging.info(f"action: batch_ack_starting | pending_count: {pending_count}")
+        
+        # Guardar a disco ANTES de ACK
+        try:
+            for request_id in list(self.users_count_since_save.keys()):
+                self.state_storage.save_state(request_id, reset_state=False)
+            logging.info(f"action: state_saved_to_disk | request_ids: {len(self.users_count_since_save)}")
+        except Exception as e:
+            logging.error(f"Error saving state to disk: {type(e).__name__}: {e}", exc_info=True)
+            return
+        
+        # Ahora ACK todos los mensajes
+        acked_count = 0
+        for ch, method in self.users_ack_pending:
+            try:
+                ch.basic_ack(delivery_tag=method.delivery_tag)
+                acked_count += 1
+            except Exception as e:
+                logging.error(f"Error acking message: {type(e).__name__}: {e}")
+        
+        self.users_ack_pending = []
+        logging.info(f"action: batch_acked_complete | acked_count: {acked_count}")
 
     def _consume_data_queue(self):
         data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
@@ -93,7 +179,7 @@ class TopThreeClientsJoiner(Joiner):
         data_input_queue.start_consuming(__on_message__)
         
     def _accumulate_transactions(self, items, request_id, sender_id=None, msg_num=None):
-        """Acumula transacciones por tienda y usuario (solo en memoria)."""
+        """Acumula transacciones por tienda y usuario (guardando después de cada batch)."""
         with self.state_storage._lock:
             state = self.state_storage.data_by_request.setdefault(request_id, {
                 "users_by_store": {},
@@ -118,17 +204,12 @@ class TopThreeClientsJoiner(Joiner):
             if sender_id is not None and msg_num is not None:
                 state["last_msg_by_sender"][sender_id] = msg_num
         
-        # Incrementar contador y hacer snapshot cada SNAPSHOT_INTERVAL mensajes
-        self.message_count_since_snapshot[request_id] = self.message_count_since_snapshot.get(request_id, 0) + 1
-        if self.message_count_since_snapshot[request_id] >= SNAPSHOT_INTERVAL:
-            self.state_storage.save_state(request_id, reset_state=False)
-            self.message_count_since_snapshot[request_id] = 0
-            logging.info(f"action: snapshot_saved | request_id: {request_id} | type: transactions")
-        
+        # Guardar SIEMPRE después de procesar batch (tolerante a fallos)
+        self.state_storage.save_state(request_id, reset_state=False)
         logging.debug(f"action: transactions_accumulated | request_id: {request_id} | items: {len(items)}")
 
     def _accumulate_users(self, items, request_id, sender_id=None, msg_num=None):
-        """Acumula información de usuarios (birthdates - solo en memoria)."""
+        """Acumula información de usuarios (guardando después de cada batch)."""
         with self.state_storage._lock:
             state = self.state_storage.data_by_request.setdefault(request_id, {
                 "users_by_store": {},
@@ -147,17 +228,12 @@ class TopThreeClientsJoiner(Joiner):
             if sender_id is not None and msg_num is not None:
                 state["last_msg_by_sender"][sender_id] = msg_num
         
-        # Incrementar contador y hacer snapshot cada SNAPSHOT_INTERVAL mensajes
-        self.message_count_since_snapshot[request_id] = self.message_count_since_snapshot.get(request_id, 0) + 1
-        if self.message_count_since_snapshot[request_id] >= SNAPSHOT_INTERVAL:
-            self.state_storage.save_state(request_id, reset_state=False)
-            self.message_count_since_snapshot[request_id] = 0
-            logging.info(f"action: snapshot_saved | request_id: {request_id} | type: users")
-        
+        # Guardar SIEMPRE después de procesar batch (tolerante a fallos)
+        self.state_storage.save_state(request_id, reset_state=False)
         logging.debug(f"action: users_accumulated | request_id: {request_id} | items: {len(items)}")
 
     def _process_items_to_join(self, message):
-        """Process user items from the users queue (abstract method implementation)."""
+        """Process user items from the users queue (NO save here - done in batch)."""
         # This is called by the base Joiner class when processing the users_input_queue
         sender_id = message.get_node_id_and_request_id()
         with self._sender_lock:
@@ -171,7 +247,7 @@ class TopThreeClientsJoiner(Joiner):
             self._last_msg_by_sender[sender_id] = message.msg_num
         
         items = message.process_message()
-        # Acumular usuarios directamente sin pasar por _consume_data_queue
+        # Acumular usuarios directamente en memoria (NO guardar aquí)
         with self.state_storage._lock:
             state = self.state_storage.data_by_request.setdefault(message.request_id, {
                 "users_by_store": {},
@@ -189,13 +265,6 @@ class TopThreeClientsJoiner(Joiner):
             # Actualizar marcador de último mensaje
             state["last_msg_by_sender"][sender_id] = message.msg_num
         
-        # Incrementar contador y hacer snapshot cada SNAPSHOT_INTERVAL mensajes
-        self.message_count_since_snapshot[message.request_id] = self.message_count_since_snapshot.get(message.request_id, 0) + 1
-        if self.message_count_since_snapshot[message.request_id] >= SNAPSHOT_INTERVAL:
-            self.state_storage.save_state(message.request_id, reset_state=False)
-            self.message_count_since_snapshot[message.request_id] = 0
-            logging.info(f"action: snapshot_saved | request_id: {message.request_id}")
-        
         logging.debug(f"action: users_accumulated | request_id: {message.request_id} | items: {len(items)}")
 
     def _process_on_eof_message__(self, message):
@@ -205,6 +274,16 @@ class TopThreeClientsJoiner(Joiner):
     def _send_results(self, message):
         data_output_queue = MessageMiddlewareQueue(self.data_output_queue, self.connection)
         self.message_middlewares.append(data_output_queue)
+        
+        # Force save any pending users before EOF (in case batch threshold not reached)
+        if self.global_users_count > 0:
+            logging.info(f"action: flushing_pending_users_before_eof | request_id: {message.request_id} | pending_count: {self.global_users_count}")
+            self._ack_pending_users()
+        
+        # Reload from disk to ensure consistency before sending results
+        # (en caso de que haya habido un issue con la memoria)
+        self.state_storage.load_state(message.request_id)
+        
         self._process_top_3_by_request(message.request_id, data_output_queue)
         self._send_eof(message, data_output_queue)
         
