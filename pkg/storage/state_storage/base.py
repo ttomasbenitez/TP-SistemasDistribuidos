@@ -36,8 +36,7 @@ class StateStorage(ABC):
         try:
             with self._lock:
                 with open(filepath, "r") as f:
-                    self._load_state_from_file(f, request_id)
-                    
+                    self._load_state_from_file(f, request_id) 
             logging.info(f"Estado cargado para request_id: {request_id}")
         except Exception as e:
             logging.error(f"Error al cargar estado de {filepath}: {e}")
@@ -117,13 +116,14 @@ class StateStorage(ABC):
                     self._save_state_to_file(f, request_id)
                     f.flush()
                     os.fsync(f.fileno())
-                if reset_state:
-                    self.cleanup_state(request_id)
+            if reset_state:
+                self.cleanup_state(request_id)
 
             logging.debug(f"Estado (append) guardado para request_id: {request_id}")
             
         except Exception as e:
             logging.error(f"Error al guardar estado para request_id {request_id}: {e.args}")
+    
     def save_specific_state(self, request_id, key, reset_state=False):
         """
         Guarda en disco el estado NUEVO de un request_id agregando
@@ -149,8 +149,7 @@ class StateStorage(ABC):
             logging.debug(f"Estado (append) guardado para request_id: {request_id}")
             
         except Exception as e:
-            logging.error(f"Error al guardar estado para request_id {request_id}: {e.args}")
-            
+            logging.error(f"Error al guardar estado para request_id {request_id}: {e.args}")          
     
     @abstractmethod
     def _save_state_to_file(self, file_handle, request_id):
@@ -161,9 +160,6 @@ class StateStorage(ABC):
     
     def delete_state(self, request_id):
         """Borra el estado de un request_id de memoria y disco."""
-        with self._lock:
-            if request_id in self.data_by_request:
-                del self.data_by_request[request_id]
             
         filepath = os.path.join(self.storage_dir, f"{request_id}.txt")
         if os.path.exists(filepath):
@@ -172,14 +168,17 @@ class StateStorage(ABC):
                 logging.info(f"Estado borrado para request_id: {request_id}")
             except Exception as e:
                 logging.error(f"Error al borrar archivo de estado {filepath}: {e}")
+        else:
+            logging.info(f"No existe archivo de estado para borrar: {filepath}")
                 
         self.cleanup_state(request_id)
 
     def cleanup_state(self, request_id):
         """Limpia el estado en memoria para un request_id específico."""
-        if request_id in self.data_by_request:
-            del self.data_by_request[request_id]
-            logging.debug(f"Estado en memoria limpiado para request_id: {request_id}")
+        with self._lock:
+            if request_id in self.data_by_request:
+                del self.data_by_request[request_id]
+                logging.debug(f"Estado en memoria limpiado para request_id: {request_id}")
             
     def cleanup_data(self, request_id, keys_to_maintain: list = None):
         """Limpia las claves del estado en memoria para un request_id, 
@@ -190,11 +189,13 @@ class StateStorage(ABC):
 
         if request_id not in self.data_by_request:
             return
-        state = self.data_by_request[request_id]
         
-        # Iteramos sobre una lista de keys para poder borrar del dict
-        for key in list(state.keys()):
-            logging.info(f"Revisando key: {key}")
-            if key not in keys_to_maintain:
-                state[key].clear()
+        with self._lock:
+            state = self.data_by_request[request_id]
+            
+            # Iteramos sobre una lista de keys para poder borrar del dict
+            for key in list(state.keys()):
+                logging.info(f"Revisando key: {key}")
+                if key not in keys_to_maintain:
+                    state[key].clear()
                 

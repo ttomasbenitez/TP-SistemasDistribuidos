@@ -134,16 +134,14 @@ class TopThreeClientsJoiner(Joiner):
                 for user_id, count in users_dict.items():
                     current[store_id][user_id] = current[store_id].get(user_id, 0) + count
         
-        self._process_top_3_by_request(message.request_id, data_output_queue)
+        self._process_top_3_by_request(message.request_id, data_output_queue, current_state)
         self._send_eof(message, data_output_queue)
-    
         self.state_storage.delete_state(message.request_id)
         
-    def _process_top_3_by_request(self, request_id, data_output_queue):
+    def _process_top_3_by_request(self, request_id, data_output_queue, current_state):
         """Send 1 message per store with top-3 users joined with birthdates."""
-        saved_state = self.state_storage.data_by_request.get(request_id, {})
-        users_by_store_state = saved_state.get("users_by_store", {})
-        users_birthdates_state = saved_state.get("users_birthdates", {})
+        users_by_store_state = current_state.get("users_by_store", {})
+        users_birthdates_state = current_state.get("users_birthdates", {})
         
         stores_sent = 0
 

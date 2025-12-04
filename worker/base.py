@@ -115,7 +115,6 @@ class Worker(ABC):
         Returns True if the message is a duplicate or out-of-order for the given stream
         (based on last seen msg_num for its sender+request). Updates last seen on accept.
         """
-        logging.info(f"el mensaje {message.type} tiene msg num {message.msg_num} y request id {message.request_id} y nodo id {message.node_id}")
         key = self._sender_key(message, stream)
         state = self.state_storage.get_data_from_request(message.request_id)
         last_msg_by_sender = state.get("last_by_sender", {})
