@@ -3,6 +3,7 @@ import subprocess
 import time
 import random
 import sys
+import threading
 
 EXCLUDED_CONTAINERS = ['rabbitmq', 'gateway','filter-year-eof-service', 'client_1', 'client_2', 'aggregator-users-eof-service', 'aggregator-batches-eof-service']
 
@@ -55,16 +56,71 @@ def run_random_chaos(interval):
         print(f"Sleeping for {interval} seconds...")
         time.sleep(interval)
 
+def run_top_three_chaos(interval):
+    """Kills all top-three containers every interval seconds."""
+    print(f"😈 Starting Chaos Monkey (Top-Three Mode). Interval: {interval}s")
+    print(f"🎯 Target services: top-three-clients-1, top-three-clients-2, top-three-clients-3")
+    
+    while True:
+        containers = get_running_containers()
+        # Filter for top-three containers
+        targets = [c for c in containers if c in ['top-three-clients-1', 'top-three-clients-2', 'top-three-clients-3']]
+        
+        if not targets:
+            print("No top-three containers found.")
+        else:
+            print(f"Found {len(targets)} top-three container(s): {targets}")
+            for target in targets:
+                kill_container(target)
+        
+        print(f"Sleeping for {interval} seconds...")
+        time.sleep(interval)
+
+def run_combined_chaos(random_interval, top_three_interval):
+    """Runs both random and top-three chaos simultaneously in separate threads."""
+    print(f"😈 Starting Chaos Monkey (Combined Mode)")
+    print(f"   - Random Mode Interval: {random_interval}s")
+    print(f"   - Top-Three Mode Interval: {top_three_interval}s")
+    print(f"🛡️  Excluded services: {EXCLUDED_CONTAINERS}")
+    
+    # Thread para modo random
+    random_thread = threading.Thread(target=run_random_chaos, args=(random_interval,), daemon=True)
+    # Thread para modo top-three
+    top_three_thread = threading.Thread(target=run_top_three_chaos, args=(top_three_interval,), daemon=True)
+    
+    random_thread.start()
+    top_three_thread.start()
+    
+    # Keep main thread alive
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\n😇 Chaos Monkey stopped.")
+
 def main():
     parser = argparse.ArgumentParser(description='Chaos Monkey for Docker Compose')
     parser.add_argument('--random', action='store_true', help='Enable random killing mode')
-    parser.add_argument('--interval', type=int, default=2, help='Interval in seconds for random mode (default: 10)')
+    parser.add_argument('--top-three', action='store_true', help='Enable top-three killing mode')
+    parser.add_argument('--combined', action='store_true', help='Enable both random and top-three modes simultaneously')
+    parser.add_argument('--interval', type=float, default=0.2, help='Interval in seconds for random mode (default: 0.2)')
+    parser.add_argument('--top-three-interval', type=float, default=15, help='Interval in seconds for top-three mode (default: 5)')
     parser.add_argument('--node', type=str, help='Specific node (service name) to kill')
     
     args = parser.parse_args()
 
     if args.node:
         kill_container(args.node)
+    elif args.combined:
+        try:
+            run_combined_chaos(args.interval, args.top_three_interval)
+        except KeyboardInterrupt:
+            print("\n😇 Chaos Monkey stopped.")
+    elif args.top_three:
+        try:
+            run_top_three_chaos(args.top_three_interval)
+        except KeyboardInterrupt:
+            print("\n😇 Chaos Monkey stopped.")
     elif args.random:
         try:
             run_random_chaos(args.interval)

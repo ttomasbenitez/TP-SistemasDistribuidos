@@ -75,8 +75,12 @@ class JoinerMenuItems(Joiner):
 
         # TODO: numero mensaje
         if ready_to_send:
-            serialized = Message(request_id, MESSAGE_TYPE_QUERY_2_RESULT, 0, ready_to_send).serialize()
+            serialized = Message(request_id, MESSAGE_TYPE_QUERY_2_RESULT, message.seq_number, ready_to_send).serialize()
+            logging.info("SENDING PENDING")
             data_output_exchange.send(serialized, str(request_id))
+            logging.info(f"action: pending results sent | request_id: {request_id} | items_count: {len(pending_results)}")
+        else:
+            logging.info(f"action: no pending results to send | request_id: {request_id}")
             
         self.state_storage.delete_state(request_id)
         
@@ -100,10 +104,11 @@ class JoinerMenuItems(Joiner):
                 items = message.process_message()
                 if message.type == MESSAGE_TYPE_QUERY_2_RESULT:
                     ready_to_send = ''
+                    self.state_storage.load_state(message.request_id)
                     state = self.state_storage.get_state(message.request_id)
                     menu_items = state.setdefault("menu_items", {})
                     pending_results = state.setdefault("pending_results", [])
-                    logging.info(f"action: processing Q2 results | request_id: {message.request_id} | ITEMS: {items}")
+                    logging.info(f"action: processing Q2 results | request_id: {message.request_id} | ITEMS: {len(items)} | menu_items_available: {len(menu_items)}")
                     for item in items:
                         name = menu_items.get(parse_int(item.item_data))
                         if name:
@@ -111,14 +116,19 @@ class JoinerMenuItems(Joiner):
                             ready_to_send += item.serialize()
                         else:
                             pending_results.append(item)
+                            logging.info(f"action: item added to pending | request_id: {message.request_id} | item_id: {item.item_data}")
 
                     if ready_to_send:
                         message.update_content(ready_to_send)
                         serialized = message.serialize()
+                        logging.info(f"action: Q2 results sent | request_id: {message.request_id} | items_count: {len(items)}")
                         data_output_exchange.send(serialized, str(message.request_id))
                         
                     if len(pending_results) > 0:                
                         self.state_storage.data_by_request[message.request_id] = state
+                        logging.info(f"action: pending results stored | request_id: {message.request_id} | count: {len(pending_results)}")
+            except Exception as e:
+                logging.error(f"action: error processing data queue | request_id: {message.request_id} | error: {str(e)}")
             finally:
                 self.state_storage.save_state(message.request_id)
                     
