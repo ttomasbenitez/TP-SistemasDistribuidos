@@ -121,7 +121,6 @@ class JoinerMenuItems(Joiner):
                         self.state_storage.data_by_request[message.request_id] = state
             finally:
                 self.state_storage.save_state(message.request_id)
-                self.state_storage.cleanup_data(message.request_id)
                     
         data_input_queue.start_consuming(__on_message__)
         
