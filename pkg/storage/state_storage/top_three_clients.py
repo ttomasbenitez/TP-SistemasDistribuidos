@@ -25,7 +25,14 @@ class TopThreeClientsStateStorage(StateStorage):
         """
         users_by_store = {}
         users_birthdates = {}
-        last_msg_by_sender = {}
+        last_by_sender = {}
+        
+        state = self.data_by_request.setdefault(request_id, {
+            "users_by_store": {},
+            "last_by_sender": {},
+            "users_birthdates": [],
+            "last_eof_count": 0,
+        })
         
         loaded_transactions = 0
         loaded_birthdates = 0
@@ -76,13 +83,22 @@ class TopThreeClientsStateStorage(StateStorage):
                     _, sender_id, last_str = parts
                     try:
                         last = int(last_str)
-                        last_msg_by_sender[sender_id] = max(last_msg_by_sender.get(sender_id, -1), last)
+                        last_by_sender[sender_id] = max(last_by_sender.get(sender_id, -1), last)
                         loaded_senders += 1
                         logging.debug(f"action: loaded_sender | request_id: {request_id} | sender: {sender_id} | last_msg: {last}")
                     except (ValueError, IndexError) as e:
                         logging.warning(f"action: load_sender_error | request_id: {request_id} | line: {line} | error: {e}")
+                        continue   
+                
+                if kind == "LE":
+                    _k, last_eof_str = parts
+                    try:
+                        last_eof = int(last_eof_str)
+                    except ValueError as e:
                         continue
-                        
+                    last_eof_count = max(state["last_eof_count"], last_eof)
+                    continue
+
             except Exception as e:
                 logging.warning(f"action: state_parse_error | request_id: {request_id} | line: {line} | error: {e}")
                 continue
@@ -91,7 +107,8 @@ class TopThreeClientsStateStorage(StateStorage):
         self.data_by_request.setdefault(request_id, {})
         self.data_by_request[request_id]["users_by_store"] = users_by_store
         self.data_by_request[request_id]["users_birthdates"] = users_birthdates
-        self.data_by_request[request_id]["last_msg_by_sender"] = last_msg_by_sender
+        self.data_by_request[request_id]["last_by_sender"] = last_by_sender
+        self.data_by_request[request_id]["last_eof_count"] = last_eof_count
         
         logging.info(f"action: state_loaded | request_id: {request_id} | transactions: {loaded_transactions} | birthdates: {loaded_birthdates} | senders: {loaded_senders}")
 
@@ -103,7 +120,7 @@ class TopThreeClientsStateStorage(StateStorage):
           S;sender_id;last_msg_num
         
         The caller sets state["users_by_store"], state["users_birthdates"], and
-        state["last_msg_by_sender"] during accumulation and we write them
+        state["last_by_sender"] during accumulation and we write them
         incrementally to disk.
         """
         state = self.data_by_request.get(request_id, {})
@@ -122,12 +139,12 @@ class TopThreeClientsStateStorage(StateStorage):
             file_handle.write(line)
         
         # Write sender last-msg markers (unified)
-        last_msg_by_sender = state.get("last_msg_by_sender", {})
-        for sender_id, last_msg in last_msg_by_sender.items():
+        last_by_sender = state.get("last_by_sender", {})
+        for sender_id, last_msg in last_by_sender.items():
             line = f"S;{sender_id};{last_msg}\n"
             file_handle.write(line)
         
-        logging.debug(f"action: state_written | request_id: {request_id} | stores: {len(users_by_store)} | birthdates: {len(users_birthdates)} | senders: {len(last_msg_by_sender)}")
+        logging.debug(f"action: state_written | request_id: {request_id} | stores: {len(users_by_store)} | birthdates: {len(users_birthdates)} | senders: {len(last_by_sender)}")
 
     def append_user_birthdates(self, request_id, user_birthdates_delta):
         """DEPRECATED: Not used anymore. Kept for backwards compatibility."""

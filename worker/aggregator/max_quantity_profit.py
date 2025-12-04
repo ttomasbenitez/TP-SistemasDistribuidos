@@ -39,15 +39,15 @@ class QuantityAndProfit(Worker):
         
         # Dedup / sequencing state per sender
         self._sender_lock = threading.Lock()
-        self._last_msg_by_sender = {}
+        self._last_by_sender = {}
         
     def start(self):
         # Load persisted state once on startup and hydrate last-msg map
         logging.info(f"action: startup | loading persisted state for recovery")
         self.state_storage.load_state_all()
         for _rid, st in self.state_storage.data_by_request.items():
-            for sid, num in st.get("last_msg_by_sender", {}).items():
-                self._last_msg_by_sender[sid] = max(self._last_msg_by_sender.get(sid, -1), num)
+            for sid, num in st.get("last_by_sender", {}).items():
+                self._last_by_sender[sid] = max(self._last_by_sender.get(sid, -1), num)
                 logging.info(f"action: recovery_state_loaded | request_id: {_rid} | sender: {sid} | last_msg_num: {num}")
         
         self.heartbeat_sender = start_heartbeat_sender()
@@ -74,7 +74,7 @@ class QuantityAndProfit(Worker):
                 # Dedup/ordering check
                 sender_id = message.get_node_id_and_request_id()
                 with self._sender_lock:
-                    last = self._last_msg_by_sender.get(sender_id, -1)
+                    last = self._last_by_sender.get(sender_id, -1)
                     logging.debug(f"action: dedup_check | sender:{sender_id} | msg_num:{message.msg_num} | last_seen:{last}")
                     if message.msg_num <= last:
                         if message.msg_num == last:
@@ -82,7 +82,7 @@ class QuantityAndProfit(Worker):
                         else:
                             logging.warning(f"action: OUT_OF_ORDER_FILTERED | sender:{sender_id} | msg:{message.msg_num} < last:{last}")
                         return
-                    self._last_msg_by_sender[sender_id] = message.msg_num
+                    self._last_by_sender[sender_id] = message.msg_num
                     logging.debug(f"action: msg_accepted | sender:{sender_id} | msg_num:{message.msg_num}")
                 
                 items = message.process_message()
@@ -122,7 +122,7 @@ class QuantityAndProfit(Worker):
         with self.state_storage._lock:
             state = self.state_storage.data_by_request.setdefault(request_id, {
                 "items_by_ym": {},
-                "last_msg_by_sender": {},
+                "last_by_sender": {},
             })
             
             items_by_ym = state["items_by_ym"]
@@ -148,7 +148,7 @@ class QuantityAndProfit(Worker):
             
             # Persist last seen marker if provided
             if sender_id is not None and msg_num is not None:
-                state["last_msg_by_sender"][sender_id] = msg_num
+                state["last_by_sender"][sender_id] = msg_num
             
             # Log final state
             total_qty = sum(item.quantity for ym_dict in items_by_ym.values() for item in ym_dict.values())

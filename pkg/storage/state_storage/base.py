@@ -4,17 +4,25 @@ from abc import ABC, abstractmethod
 import threading
 import tempfile
 import shutil
+import copy
 
 class StateStorage(ABC):
     
-    def __init__(self, storage_dir: str):
+    def __init__(self, storage_dir: str, default_state: dict = {}):
         self.data_by_request = dict()
         self.storage_dir = storage_dir
         self._lock = threading.Lock()
+        self.default_state = default_state
         
         if not os.path.exists(self.storage_dir):
             os.makedirs(self.storage_dir)
-        
+            
+    def get_state(self, request_id):
+        with self._lock:
+            if request_id not in self.data_by_request:
+                self.data_by_request[request_id] = copy.deepcopy(self.default_state)
+            return self.data_by_request[request_id]
+    
     def load_state(self, request_id):
         """Carga el estado desde los archivos en el directorio de almacenamiento."""
         logging.info(f"Cargando estado desde {self.storage_dir}")

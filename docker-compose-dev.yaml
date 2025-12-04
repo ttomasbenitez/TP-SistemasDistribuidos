@@ -479,7 +479,7 @@ services:
      depends_on:
      - gateway
   
-  join-stores-q3:
+  joiner-stores-q3:
     container_name: joiner-stores-q3
     image: worker:latest
     command: "/worker/joiner/q3_stores_joiner.py"
@@ -490,12 +490,15 @@ services:
       INPUT_QUEUE_1: aggregated-semester-queue
       INPUT_QUEUE_2: stores-queue-1
       OUTPUT_EXCHANGE_NAME: results-exchange
+      STORAGE_DIR: ./data/join_stores_q3
       LOG_LEVEL: INFO
-      EXPECTED_ACKS: 2
+      AGGREGATOR_SEMESTER_REPLICAS: 3
     networks:
     - testing_net
     depends_on:
     - gateway
+    volumes:
+      - ./data/join_stores_q3:/data/join_stores_q3
 
   aggregator-store-q4-1:
     container_name: aggregator-store-q4-1
@@ -571,14 +574,15 @@ services:
       INPUT_QUEUE_1: aggregated-store-q4-queue-1
       INPUT_QUEUE_2: users-queue-1
       OUTPUT_QUEUE_1: top-clients-queue
-      STORAGE_DIR: ./data/top-three-clients
+      STORAGE_DIR: ./data/top-three-clients-1
+      NODE_ID: 
       LOG_LEVEL: INFO
     networks:
     - testing_net
     depends_on:
     - gateway
     volumes:
-      - ./data/top-three-clients:/data/top-three-clients
+      - ./data/top-three-clients-1:/data/top-three-clients-1
 
   top-three-clients-2:
     container_name: top-three-clients-2
@@ -591,14 +595,15 @@ services:
       INPUT_QUEUE_1: aggregated-store-q4-queue-2
       INPUT_QUEUE_2: users-queue-2
       OUTPUT_QUEUE_1: top-clients-queue
-      STORAGE_DIR: ./data/top-three-clients
+      STORAGE_DIR: ./data/top-three-clients-2
+      NODE_ID: 2
       LOG_LEVEL: INFO
     networks:
     - testing_net
     depends_on:
     - gateway
     volumes:
-      - ./data/top-three-clients:/data/top-three-clients
+      - ./data/top-three-clients-2:/data/top-three-clients-2
 
   top-three-clients-3:
     container_name: top-three-clients-3
@@ -611,14 +616,15 @@ services:
       INPUT_QUEUE_1: aggregated-store-q4-queue-3
       INPUT_QUEUE_2: users-queue-3
       OUTPUT_QUEUE_1: top-clients-queue
-      STORAGE_DIR: ./data/top-three-clients
+      STORAGE_DIR: ./data/top-three-clients-3
+      NODE_ID: 3
       LOG_LEVEL: INFO
     networks:
     - testing_net
     depends_on:
     - gateway
     volumes:
-      - ./data/top-three-clients:/data/top-three-clients
+      - ./data/top-three-clients-3:/data/top-three-clients-3
 
   join-stores-q4:
     container_name: join-stores-q4
