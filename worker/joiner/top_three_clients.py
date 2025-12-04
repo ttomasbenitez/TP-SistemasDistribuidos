@@ -78,7 +78,6 @@ class TopThreeClientsJoiner(Joiner):
             store_users[user_id] = store_users.get(user_id, 0) + 1
         
         self.state_storage.save_state(request_id)
-        self.state_storage.cleanup_data(request_id)
         logging.info(f"action: snapshot_saved | request_id: {request_id} | type: transactions")
         
         logging.debug(f"action: transactions_accumulated | request_id: {request_id} | items: {len(items)}")
@@ -99,7 +98,6 @@ class TopThreeClientsJoiner(Joiner):
                 users_birthdates[user_id] = birthdate
 
         self.state_storage.save_state(message.request_id)
-        self.state_storage.cleanup_data(message.request_id)
         logging.info(f"action: snapshot_saved | request_id: {message.request_id}")
         
         logging.debug(f"action: users_accumulated | request_id: {message.request_id} | items: {len(items)}")
