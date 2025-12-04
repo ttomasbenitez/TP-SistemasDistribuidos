@@ -492,7 +492,7 @@ services:
       OUTPUT_EXCHANGE_NAME: results-exchange
       STORAGE_DIR: ./data/join_stores_q3
       LOG_LEVEL: INFO
-      AGGREGATOR_SEMESTER_REPLICAS: 3
+      AGGREGATOR_SEMESTER_REPLICAS: 2
     networks:
     - testing_net
     depends_on:
