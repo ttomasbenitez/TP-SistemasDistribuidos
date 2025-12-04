@@ -559,7 +559,7 @@ services:
       INPUT_QUEUE_1: aggregated-store-q4-queue-1
       INPUT_QUEUE_2: users-queue-1
       OUTPUT_QUEUE_1: top-clients-queue
-      STORAGE_DIR: ./data/top-three-clients
+      STORAGE_DIR: ./data/top-three-clients-1
       NODE_ID: 
       LOG_LEVEL: INFO
     networks:
@@ -567,7 +567,7 @@ services:
     depends_on:
     - gateway
     volumes:
-      - ./data/top-three-clients:/data/top-three-clients
+      - ./data/top-three-clients-1:/data/top-three-clients-1
 
   top-three-clients-2:
     container_name: top-three-clients-2
@@ -580,7 +580,7 @@ services:
       INPUT_QUEUE_1: aggregated-store-q4-queue-2
       INPUT_QUEUE_2: users-queue-2
       OUTPUT_QUEUE_1: top-clients-queue
-      STORAGE_DIR: ./data/top-three-clients
+      STORAGE_DIR: ./data/top-three-clients-2
       NODE_ID: 2
       LOG_LEVEL: INFO
     networks:
@@ -588,7 +588,7 @@ services:
     depends_on:
     - gateway
     volumes:
-      - ./data/top-three-clients:/data/top-three-clients
+      - ./data/top-three-clients-2:/data/top-three-clients-2
 
   top-three-clients-3:
     container_name: top-three-clients-3
@@ -601,7 +601,7 @@ services:
       INPUT_QUEUE_1: aggregated-store-q4-queue-3
       INPUT_QUEUE_2: users-queue-3
       OUTPUT_QUEUE_1: top-clients-queue
-      STORAGE_DIR: ./data/top-three-clients
+      STORAGE_DIR: ./data/top-three-clients-3
       NODE_ID: 3
       LOG_LEVEL: INFO
     networks:
@@ -609,7 +609,7 @@ services:
     depends_on:
     - gateway
     volumes:
-      - ./data/top-three-clients:/data/top-three-clients
+      - ./data/top-three-clients-3:/data/top-three-clients-3
 
   join-stores-q4:
     container_name: join-stores-q4
