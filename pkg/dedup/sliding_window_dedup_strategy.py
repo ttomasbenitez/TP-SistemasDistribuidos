@@ -1,7 +1,7 @@
 from pkg.message.message import Message
 from pkg.dedup.base import DedupStrategy
 import logging
-from pkg.storage.state_storage.filter_amount import FilterAmountStateStorage
+from pkg.storage.state_storage.dedup_storage import DedupStorage
 
 MAX_PENDING_SIZE = 5000
 
@@ -12,7 +12,7 @@ class SlidingWindowDedupStrategy(DedupStrategy):
         self.last_contiguous_msg_num = {}
         self.pending_messages = {}
         self.current_msg_num = {}
-        self.state_storage = FilterAmountStateStorage(storage_dir, {
+        self.state_storage = DedupStorage(storage_dir, {
             'msg_num': -1,
             'last_contiguous_msg_num': -1, 
             'current_msg_num': -1

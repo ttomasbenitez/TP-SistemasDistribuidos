@@ -1,6 +1,6 @@
 from pkg.storage.state_storage.base import StateStorage
 
-class FilterAmountStateStorage(StateStorage):
+class DedupStorage(StateStorage):
 
     def _load_state_from_file(self, file_handle, request_id):
         """

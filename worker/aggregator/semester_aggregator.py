@@ -34,8 +34,8 @@ class SemesterAggregator(Worker):
         # Persistent storage
         storage_dir = os.getenv('SEMESTER_STORAGE_DIR', './data/semester_agg')
         self.state_storage = SemesterAggregatorStateStorage(storage_dir, {
-            "agg": True,
-            "last_msg_by_sender": True
+            "agg": {},
+            "last_msg_by_sender": {}
         })
         # EOF accounting per request
         self._eof_acks_by_request = {}

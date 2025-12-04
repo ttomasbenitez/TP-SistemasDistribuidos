@@ -96,18 +96,6 @@ class JoinerStoresStateStorage(StateStorage, ABC):
         self._append_sender_data(state["last_by_sender"], file_handle)
         self._append_stores(state["stores"], file_handle)
         self._append_pending_results(state["pending_results"], file_handle)
-        
-    # def _save_specific_state_to_file(self, file_handle, key, request_id):
-    #     state = self.data_by_request.get(request_id)
-    #     if key == 'stores':
-    #         stores = state["stores"]
-    #         self._append_stores(self, stores)
-    #     elif key == 'last_by_sender':
-    #         last_by_sender = state["last_by_sender"]
-    #         self._append_sender_data(last_by_sender, file_handle)    
-    #     else:
-    #         pending_results = state["pending_results"]
-    #         self._append_pending_results(pending_results, file_handle)           
             
     @abstractmethod
     def _load_pending_clients(self, parts):
