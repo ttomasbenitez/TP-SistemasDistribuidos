@@ -80,13 +80,9 @@ class TopThreeClientsJoiner(Joiner):
             store_users = users_by_store.setdefault(store_id, {})
             store_users[user_id] = store_users.get(user_id, 0) + 1
         
-        # Incrementar contador y hacer snapshot cada SNAPSHOT_INTERVAL mensajes
-        self.message_count_since_snapshot[request_id] = self.message_count_since_snapshot.get(request_id, 0) + 1
-        if self.message_count_since_snapshot[request_id] >= SNAPSHOT_INTERVAL:
-            self.state_storage.save_state(request_id)
-            self.state_storage.cleanup_data(request_id)
-            self.message_count_since_snapshot[request_id] = 0
-            logging.info(f"action: snapshot_saved | request_id: {request_id} | type: transactions")
+        self.state_storage.save_state(request_id)
+        self.state_storage.cleanup_data(request_id)
+        logging.info(f"action: snapshot_saved | request_id: {request_id} | type: transactions")
         
         logging.debug(f"action: transactions_accumulated | request_id: {request_id} | items: {len(items)}")
 
@@ -105,41 +101,25 @@ class TopThreeClientsJoiner(Joiner):
             if user_id and birthdate:
                 users_birthdates[user_id] = birthdate
 
-        # Incrementar contador y hacer snapshot cada SNAPSHOT_INTERVAL mensajes
-        self.message_count_since_snapshot[message.request_id] = self.message_count_since_snapshot.get(message.request_id, 0) + 1
-        if self.message_count_since_snapshot[message.request_id] >= SNAPSHOT_INTERVAL:
-            self.state_storage.save_state(message.request_id)
-            self.state_storage.cleanup_data(message.request_id)
-            self.message_count_since_snapshot[message.request_id] = 0
-            logging.info(f"action: snapshot_saved | request_id: {message.request_id}")
+        self.state_storage.save_state(message.request_id)
+        self.state_storage.cleanup_data(message.request_id)
+        logging.info(f"action: snapshot_saved | request_id: {message.request_id}")
         
         logging.debug(f"action: users_accumulated | request_id: {message.request_id} | items: {len(items)}")
         
     def _send_results(self, message):
         data_output_queue = MessageMiddlewareQueue(self.data_output_queue, self.connection)
         self.message_middlewares.append(data_output_queue)
-        not_saved_state = self.state_storage.get_data_from_request(message.request_id)
-        self.state_storage.load_state(message.request_id)
-        current_state = self.state_storage.get_data_from_request(message.request_id)
         
-        current = current_state["users_by_store"]
-        incoming = not_saved_state.get("users_by_store", {})
-
-        for store_id, users_dict in incoming.items():
-            if store_id not in current:
-            # Si la tienda no existe, copio todo el dict
-                current[store_id] = users_dict.copy()
-            else:
-                # Si la tienda existe, sumo por usuario
-                for user_id, count in users_dict.items():
-                    current[store_id][user_id] = current[store_id].get(user_id, 0) + count
-        
-        self._process_top_3_by_request(message.request_id, data_output_queue, current_state)
+        self._process_top_3_by_request(message.request_id, data_output_queue)
         self._send_eof(message, data_output_queue)
         self.state_storage.delete_state(message.request_id)
         
-    def _process_top_3_by_request(self, request_id, data_output_queue, current_state):
+    def _process_top_3_by_request(self, request_id, data_output_queue):
         """Send 1 message per store with top-3 users joined with birthdates."""
+        self.state_storage.load_state(request_id)
+        current_state = self.state_storage.get_data_from_request(request_id)
+        
         users_by_store_state = current_state.get("users_by_store", {})
         users_birthdates_state = current_state.get("users_birthdates", {})
         
