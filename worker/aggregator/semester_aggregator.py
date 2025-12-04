@@ -25,7 +25,7 @@ class SemesterAggregator(Worker):
         self.data_input_queue = data_input_queue
         self.data_output_queue = data_output_queue
         self.host = host
-        self.state_storage = SemesterAggregatorStateStorage(storage_dir, {'agg_by_period': {}, 'last_msg_by_sender': {}})
+        self.state_storage = SemesterAggregatorStateStorage(storage_dir, {'agg_by_period': {}, 'last_by_sender': {}})
         self.expected_eofs = expected_eofs
         self.eofs_by_request = {}
         
@@ -41,37 +41,11 @@ class SemesterAggregator(Worker):
         
         # Dedup / sequencing state per sender
         self._sender_lock = threading.Lock()
-        self._last_msg_by_sender = {}
-
-    def _should_process_and_update(self, message: Message) -> bool:
-        """
-        Decide if message should be processed based on per-sender last msg_num.
-        - If equal to last -> duplicate (skip)
-        - If greater than last -> accept and update
-        - If less than last -> out-of-order (skip)
-        """
-        sender_id = message.get_node_id_and_request_id()
-        with self._sender_lock:
-            last = self._last_msg_by_sender.get(sender_id, -1)
-            if message.msg_num == last:
-                logging.warning(f"action: DUPLICATE_FILTERED | sender:{sender_id} | msg:{message.msg_num} | last:{last}")
-                return False
-            if message.msg_num < last:
-                logging.warning(f"action: OUT_OF_ORDER_FILTERED | sender:{sender_id} | msg:{message.msg_num} < last:{last}")
-                return False
-            # message.msg_num > last → accept
-            self._last_msg_by_sender[sender_id] = message.msg_num
-            logging.debug(f"action: msg_accepted | sender:{sender_id} | msg_num:{message.msg_num}")
-            return True
 
     def start(self):
         # Load persisted state once on startup and hydrate last-msg map
         logging.info(f"action: startup | loading persisted state for recovery")
-        self.state_storage.load_state_all()
-        for _rid, st in self.state_storage.data_by_request.items():
-            for sid, num in st.get("last_msg_by_sender", {}).items():
-                self._last_msg_by_sender[sid] = max(self._last_msg_by_sender.get(sid, -1), num)
-                logging.info(f"action: recovery_state_loaded | request_id: {_rid} | sender: {sid} | last_msg_num: {num}")
+        self.state_storage.load_specific_state_all('last_by_sender')
         
         self.heartbeat_sender = start_heartbeat_sender()
 
@@ -92,22 +66,12 @@ class SemesterAggregator(Worker):
                     return self._process_on_eof_message__(message, data_output_queue)
                 
                 # Dedup/ordering check
-                sender_id = message.get_node_id_and_request_id()
-                with self._sender_lock:
-                    last = self._last_msg_by_sender.get(sender_id, -1)
-                    logging.debug(f"action: dedup_check | sender:{sender_id} | msg_num:{message.msg_num} | last_seen:{last}")
-                    if message.msg_num <= last:
-                        if message.msg_num == last:
-                            logging.warning(f"action: DUPLICATE_FILTERED | sender:{sender_id} | msg:{message.msg_num} | last:{last}")
-                        else:
-                            logging.warning(f"action: OUT_OF_ORDER_FILTERED | sender:{sender_id} | msg:{message.msg_num} < last:{last}")
-                        return
-                    self._last_msg_by_sender[sender_id] = message.msg_num
-                    logging.debug(f"action: msg_accepted | sender:{sender_id} | msg_num:{message.msg_num}")
+                if self.is_dupped(message, stream="data"):
+                    return
                 
                 items = message.process_message()
                 if items:
-                    self._accumulate_items(items, message.request_id, sender_id, message.msg_num)
+                    self._accumulate_items(items, message.request_id)
                     
             except Exception as e:
                 logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
@@ -122,6 +86,8 @@ class SemesterAggregator(Worker):
         if self.eofs_by_request[message.request_id] < self.expected_eofs:
             return  # Wait for more EOFs
         
+        self.state_storage.load_state(message.request_id)
+        
         # All EOFs received, send results and forward EOF
         logging.info(f"All EOFs received, sending results | request_id: {message.request_id}")
         self._send_all_results(message.request_id, data_output_queue)
@@ -132,43 +98,29 @@ class SemesterAggregator(Worker):
         del self.eofs_by_request[message.request_id]
         self.state_storage.delete_state(message.request_id)
 
-    def _accumulate_items(self, items, request_id, sender_id=None, msg_num=None):
+    def _accumulate_items(self, items, request_id):
         """
         Acumula cantidad por periodo y store, persistiendo estado incremental
         Similar a max_quantity_profit, mantenemos estado en memoria y persistimos en disco.
         """
-        with self.state_storage._lock:
-            state = self.state_storage.data_by_request.setdefault(request_id, {
-                "agg_by_period": {},
-                "last_msg_by_sender": {},
-            })
+        state = self.state_storage.get_data_from_request(request_id)
+        agg_by_period = state["agg_by_period"]
             
-            agg_by_period = state["agg_by_period"]
-            logging.info(f"action: accumulate_start | request_id: {request_id} | items_count: {len(items)} | sender: {sender_id} | msg_num: {msg_num}")
-            
-            for it in items:
-                year = it.get_year()
-                sem  = it.get_semester()
-                period = f"{year}-H{sem}"
-                store_id = it.store_id
-                amount = it.get_final_amount()
+        for it in items:
+            year = it.get_year()
+            sem  = it.get_semester()
+            period = f"{year}-H{sem}"
+            store_id = it.store_id
+            amount = it.get_final_amount()
                 
-                bucket = agg_by_period.setdefault(period, {})
-                old_val = bucket.get(store_id, 0.0)
-                bucket[store_id] = old_val + amount
+            bucket = agg_by_period.setdefault(period, {})
+            old_val = bucket.get(store_id, 0.0)
+            bucket[store_id] = old_val + amount
                 
-                logging.debug(f"action: agg_updated | period: {period} | store_id: {store_id} | amount: {amount} | old: {old_val} | new: {bucket[store_id]}")
+            logging.debug(f"action: agg_updated | period: {period} | store_id: {store_id} | amount: {amount} | old: {old_val} | new: {bucket[store_id]}")
             
-            # Persist last seen marker if provided
-            if sender_id is not None and msg_num is not None:
-                state["last_msg_by_sender"][sender_id] = msg_num
-            
-            # Log final state
-            total_amount = sum(store_total for period_dict in agg_by_period.values() for store_total in period_dict.values())
-            logging.info(f"action: accumulate_done | request_id: {request_id} | total_amount: {total_amount} | periods: {len(agg_by_period)}")
-        
         # Save to disk but keep data in memory (reset_state=False)
-        self.state_storage.save_state(request_id, reset_state=False)
+        self.state_storage.save_state(request_id)
         logging.info(f"action: state_persisted | request_id: {request_id}")
 
     def _send_all_results(self, request_id, data_output_queue):

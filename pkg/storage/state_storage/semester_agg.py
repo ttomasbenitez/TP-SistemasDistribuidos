@@ -18,7 +18,7 @@ class SemesterAggregatorStateStorage(StateStorage):
           S;sender_id;last_msg_num     # sender last-seen
         """
         agg_by_period = {}
-        last_msg_by_sender = {}
+        last_by_sender = {}
         
         loaded_items = 0
         loaded_senders = 0
@@ -52,12 +52,12 @@ class SemesterAggregatorStateStorage(StateStorage):
                         logging.warning(f"action: load_agg_error | request_id: {request_id} | line: {line} | error: {e}")
                         continue
                 
-                elif kind == "S" and len(parts) == 3 and (not has_specific_state or specific_state == "last_msg_by_sender"):
+                elif kind == "S" and len(parts) == 3 and (not has_specific_state or specific_state == "last_by_sender"):
                     # Sender: S;sender_id;last_msg_num
                     _, sender_id, last_str = parts
                     try:
                         last = int(last_str)
-                        last_msg_by_sender[sender_id] = max(last_msg_by_sender.get(sender_id, -1), last)
+                        last_by_sender[sender_id] = max(last_by_sender.get(sender_id, -1), last)
                         loaded_senders += 1
                         logging.debug(f"action: loaded_sender | request_id: {request_id} | sender: {sender_id} | last_msg: {last}")
                     except (ValueError, IndexError) as e:
@@ -71,7 +71,7 @@ class SemesterAggregatorStateStorage(StateStorage):
         # Store in data_by_request
         self.data_by_request.setdefault(request_id, {})
         self.data_by_request[request_id]["agg_by_period"] = agg_by_period
-        self.data_by_request[request_id]["last_msg_by_sender"] = last_msg_by_sender
+        self.data_by_request[request_id]["last_by_sender"] = last_by_sender
         
         logging.info(f"action: state_loaded | request_id: {request_id} | items: {loaded_items} | senders: {loaded_senders}")
         
@@ -87,7 +87,7 @@ class SemesterAggregatorStateStorage(StateStorage):
           A;period;store_id;amount
           S;sender_id;last_msg_num
         
-        The caller sets state["agg_by_period"] and state["last_msg_by_sender"]
+        The caller sets state["agg_by_period"] and state["last_by_sender"]
         during accumulation and we write them incrementally to disk.
         """
         state = self.data_by_request.get(request_id, {})
@@ -100,11 +100,11 @@ class SemesterAggregatorStateStorage(StateStorage):
                 file_handle.write(line + "\n")
         
         # Write sender last-msg markers
-        last_msg_by_sender = state.get("last_msg_by_sender", {})
-        for sender_id, last_msg in last_msg_by_sender.items():
+        last_by_sender = state.get("last_by_sender", {})
+        for sender_id, last_msg in last_by_sender.items():
             line = f"S;{sender_id};{last_msg}"
             file_handle.write(line + "\n")
         
-        logging.debug(f"action: state_written | request_id: {request_id} | periods: {len(agg_by_period)} | senders: {len(last_msg_by_sender)}")
+        logging.debug(f"action: state_written | request_id: {request_id} | periods: {len(agg_by_period)} | senders: {len(last_by_sender)}")
 
 
