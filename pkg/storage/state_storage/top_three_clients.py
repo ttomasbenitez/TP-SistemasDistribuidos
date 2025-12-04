@@ -1,114 +1,138 @@
 from pkg.storage.state_storage.base import StateStorage
+import logging
+import os
+
 
 class TopThreeClientsStateStorage(StateStorage):
+    """
+    Persist user transaction counts per store and user birthdates.
+    File format (one record per line):
+      - T;{store_id};{user_id};{count}   # Transaction count for user at store
+      - B;{user_id};{birthdate}          # User birthdate
+      - S;{sender_id};{last_msg_num}     # Last message number for dedup (unified senders)
     
+    Persistence strategy: NO incremental writes. Keep everything in memory during request
+    processing, then save atomically to disk only when EOF is received.
+    """
+
     def _load_state_from_file(self, file_handle, request_id):
         """
-        Carga el estado desde archivo para un request_id.
-
-        Formatos aceptados:
-            T;store_id;user_id;count           # acumulación de transacciones por tienda/usuario
-            B;user_id;birthdate                # catálogo de usuarios (birthdates)
-            SD;sender_id;last_msg_num          # último msg de stream de datos por emisor
-            SU;sender_id;last_msg_num          # último msg de stream de usuarios por emisor
-
-        Estructura de destino:
-            self.data_by_request[request_id] = {
-                "users_by_store": { store_id: { user_id: total_count } },
-                "users_birthdates": { user_id: birthdate },
-                "last_msg_by_sender_data": { sender_id: last_msg_num },
-                "last_msg_by_sender_users": { sender_id: last_msg_num }
-            }
+        Load persisted state from file.
+        Formats:
+          T;store_id;user_id;count       # transactions
+          B;user_id;birthdate             # birthdates
+          S;sender_id;last_msg_num        # sender last-seen (unified)
         """
-
-        state = self.data_by_request.setdefault(
-            request_id,
-            {
-                "users_by_store": {},
-                "users_birthdates": {},
-                "last_msg_by_sender_data": {},
-                "last_msg_by_sender_users": {},
-            },
-        )
-
-        users_by_store = state["users_by_store"]
-        users_birthdates = state["users_birthdates"]
-        last_data = state["last_msg_by_sender_data"]
-        last_users = state["last_msg_by_sender_users"]
+        users_by_store = {}
+        users_birthdates = {}
+        last_msg_by_sender = {}
+        
+        loaded_transactions = 0
+        loaded_birthdates = 0
+        loaded_senders = 0
 
         for line in file_handle:
             line = line.strip()
             if not line:
                 continue
-
-            parts = line.split(";")
-            kind = parts[0]
-
-            if kind == "T":
-                _k, store_id_str, user_id_str, count_str = parts
-                try:
-                    store_id = int(store_id_str)
-                    user_id = int(user_id_str)
-                    count = int(count_str)
-                except ValueError:
+            
+            try:
+                parts = line.split(";")
+                if len(parts) < 2:
                     continue
-                store_users = users_by_store.setdefault(store_id, {})
-                store_users[user_id] = store_users.get(user_id, 0) + count
+                    
+                kind = parts[0]
+                
+                if kind == "T" and len(parts) == 4:
+                    # Transaction: T;store_id;user_id;count
+                    _, store_id_str, user_id_str, count_str = parts
+                    try:
+                        store_id = int(store_id_str)
+                        user_id = int(user_id_str)
+                        count = int(count_str)
+                        
+                        store_users = users_by_store.setdefault(store_id, {})
+                        store_users[user_id] = store_users.get(user_id, 0) + count
+                        loaded_transactions += 1
+                        logging.debug(f"action: loaded_transaction | request_id: {request_id} | store_id: {store_id} | user_id: {user_id} | count: {count}")
+                    except (ValueError, IndexError) as e:
+                        logging.warning(f"action: load_transaction_error | request_id: {request_id} | line: {line} | error: {e}")
+                        continue
+                
+                elif kind == "B" and len(parts) == 3:
+                    # Birthdate: B;user_id;birthdate
+                    _, user_id_str, birthdate = parts
+                    try:
+                        user_id = int(user_id_str)
+                        users_birthdates[user_id] = birthdate
+                        loaded_birthdates += 1
+                        logging.debug(f"action: loaded_birthdate | request_id: {request_id} | user_id: {user_id}")
+                    except (ValueError, IndexError) as e:
+                        logging.warning(f"action: load_birthdate_error | request_id: {request_id} | line: {line} | error: {e}")
+                        continue
+                
+                elif kind == "S" and len(parts) == 3:
+                    # Sender: S;sender_id;last_msg_num (unified)
+                    _, sender_id, last_str = parts
+                    try:
+                        last = int(last_str)
+                        last_msg_by_sender[sender_id] = max(last_msg_by_sender.get(sender_id, -1), last)
+                        loaded_senders += 1
+                        logging.debug(f"action: loaded_sender | request_id: {request_id} | sender: {sender_id} | last_msg: {last}")
+                    except (ValueError, IndexError) as e:
+                        logging.warning(f"action: load_sender_error | request_id: {request_id} | line: {line} | error: {e}")
+                        continue
+                        
+            except Exception as e:
+                logging.warning(f"action: state_parse_error | request_id: {request_id} | line: {line} | error: {e}")
                 continue
+        
+        # Store in data_by_request
+        self.data_by_request.setdefault(request_id, {})
+        self.data_by_request[request_id]["users_by_store"] = users_by_store
+        self.data_by_request[request_id]["users_birthdates"] = users_birthdates
+        self.data_by_request[request_id]["last_msg_by_sender"] = last_msg_by_sender
+        
+        logging.info(f"action: state_loaded | request_id: {request_id} | transactions: {loaded_transactions} | birthdates: {loaded_birthdates} | senders: {loaded_senders}")
 
-            if kind == "B":
-                _k, user_id_str, birthdate = parts
-                try:
-                    user_id = int(user_id_str)
-                except ValueError:
-                    continue
-                users_birthdates[user_id] = birthdate
-                continue
-
-            if kind == "SD":
-                _k, sender_id, last_str = parts
-                try:
-                    last = int(last_str)
-                except ValueError:
-                    continue
-                last_data[sender_id] = max(last_data.get(sender_id, -1), last)
-                continue
-
-            if kind == "SU":
-                _k, sender_id, last_str = parts
-                try:
-                    last = int(last_str)
-                except ValueError:
-                    continue
-                last_users[sender_id] = max(last_users.get(sender_id, -1), last)
-                continue
-    
-    def _append_transaction(self, users_by_store, file_handle):
+    def _save_state_to_file(self, file_handle, request_id):
+        """
+        Writes to file using the following format per line:
+          T;store_id;user_id;count
+          B;user_id;birthdate
+          S;sender_id;last_msg_num
+        
+        The caller sets state["users_by_store"], state["users_birthdates"], and
+        state["last_msg_by_sender"] during accumulation and we write them
+        incrementally to disk.
+        """
+        state = self.data_by_request.get(request_id, {})
+        
+        # Write transaction counts
+        users_by_store = state.get("users_by_store", {})
         for store_id, users in users_by_store.items():
             for user_id, count in users.items():
                 line = f"T;{store_id};{user_id};{count}\n"
                 file_handle.write(line)
-                
-    def _append_birthdates(self, users_birthdates, file_handle):
+        
+        # Write birthdates
+        users_birthdates = state.get("users_birthdates", {})
         for user_id, birthdate in users_birthdates.items():
             line = f"B;{user_id};{birthdate}\n"
             file_handle.write(line)
-    
-    def _save_state_to_file(self, file_handle, request_id):
-        state = self.data_by_request.get(request_id)
-        if not state:
-            return
+        
+        # Write sender last-msg markers (unified)
+        last_msg_by_sender = state.get("last_msg_by_sender", {})
+        for sender_id, last_msg in last_msg_by_sender.items():
+            line = f"S;{sender_id};{last_msg}\n"
+            file_handle.write(line)
+        
+        logging.debug(f"action: state_written | request_id: {request_id} | stores: {len(users_by_store)} | birthdates: {len(users_birthdates)} | senders: {len(last_msg_by_sender)}")
 
-        users_by_store = state.get("users_by_store", {})
-        users_birthdates = state.get("users_birthdates", {})
-        last_data = state.get("last_msg_by_sender_data", {})
-        last_users = state.get("last_msg_by_sender_users", {})
-        
-        self._append_transaction(users_by_store, file_handle)
-        self._append_birthdates(users_birthdates, file_handle)
-        # persist marks of last seen message per sender
-        for sid, num in last_data.items():
-            file_handle.write(f"SD;{sid};{num}\n")
-        for sid, num in last_users.items():
-            file_handle.write(f"SU;{sid};{num}\n")
-        
+    def append_user_birthdates(self, request_id, user_birthdates_delta):
+        """DEPRECATED: Not used anymore. Kept for backwards compatibility."""
+        pass
+
+    def append_sender_marker(self, request_id, sender_id, last_msg_num):
+        """DEPRECATED: Not used anymore. Kept for backwards compatibility."""
+        pass

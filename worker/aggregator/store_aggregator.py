@@ -11,7 +11,7 @@ from pkg.dedup.sliding_window_dedup_strategy import SlidingWindowDedupStrategy
 from pkg.message.utils import calculate_sub_message_id
 from pkg.message.constants import SUB_MESSAGE_START_ID
 
-BATCH_SIZE = 1000
+BATCH_SIZE = 100000
 
 class StoreAggregator(Worker):
 

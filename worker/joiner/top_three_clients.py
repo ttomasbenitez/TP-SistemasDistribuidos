@@ -10,7 +10,7 @@ from pkg.message.q4_result import Q4IntermediateResult
 import threading
 
 EXPECTED_EOFS = 3 # 1 users, 2 store agg
-SNAPSHOT_COUNT = 1000
+SNAPSHOT_INTERVAL = 100  # Guardar snapshot cada N mensajes
 
 class TopThreeClientsJoiner(Joiner):
 
@@ -26,28 +26,31 @@ class TopThreeClientsJoiner(Joiner):
         self.data_input_queue = data_input_queue
         self.data_output_queue = data_output_queue
         self.state_storage = TopThreeClientsStateStorage(storage_dir)
-        # Sequencing / dedup state
+        # Sequencing / dedup state (unified)
         self._sender_lock = threading.Lock()
-        self._last_msg_by_sender_data = {}
-        self._last_msg_by_sender_users = {}
+        self._last_msg_by_sender = {}
         
         # Message numbering based on replica ID
         try:
-            replica_id = int(container_name.split('-')[-1]) if container_name else 1
+            self.node_id = int(container_name.split('-')[-1]) if container_name else 1
         except (ValueError, AttributeError, IndexError):
-            replica_id = 1
-            logging.error(f"Could not parse replica_id from {container_name}, defaulting to 1")
+            self.node_id = 1
+            logging.error(f"Could not parse node_id from {container_name}, defaulting to 1")
         
-        self.msg_num_counter = replica_id * 1000000
+        self.msg_num_counter = 0
+        
+        # Contador para snapshots
+        self.message_count_since_snapshot = {}
+        
+        # Track EOF sent per request_id to ensure only 1 EOF is sent per replica
+        self.eofs_sent = set()
 
     def start(self):
-        # Load persisted state once on startup and hydrate last-msg maps
+        # Load persisted state once on startup and hydrate last-msg map
         self.state_storage.load_state_all()
         for _rid, st in self.state_storage.data_by_request.items():
-            for sid, num in st.get("last_msg_by_sender_data", {}).items():
-                self._last_msg_by_sender_data[sid] = max(self._last_msg_by_sender_data.get(sid, -1), num)
-            for sid, num in st.get("last_msg_by_sender_users", {}).items():
-                self._last_msg_by_sender_users[sid] = max(self._last_msg_by_sender_users.get(sid, -1), num)
+            for sid, num in st.get("last_msg_by_sender", {}).items():
+                self._last_msg_by_sender[sid] = max(self._last_msg_by_sender.get(sid, -1), num)
         super().start()
 
     def _consume_data_queue(self):
@@ -64,102 +67,161 @@ class TopThreeClientsJoiner(Joiner):
             self._ensure_request(message.request_id)
             self._inc_inflight(message.request_id)
             try:
-                # Dedup/ordering for data stream (transactions)
+                # Solo procesar TRANSACTIONS aquí
+                # Los USERS llegan por el otro queue (_process_items_to_join)
+                if message.type != MESSAGE_TYPE_TRANSACTIONS:
+                    return
+                
+                # Dedup/ordering check
                 sender_id = message.get_node_id_and_request_id()
                 with self._sender_lock:
-                    last = self._last_msg_by_sender_data.get(sender_id, -1)
+                    last = self._last_msg_by_sender.get(sender_id, -1)
                     if message.msg_num <= last:
                         if message.msg_num == last:
-                            logging.info(f"action: duplicate_msg | stream:data | sender:{sender_id} | msg:{message.msg_num}")
+                            logging.info(f"action: duplicate_msg | sender:{sender_id} | msg:{message.msg_num}")
                         else:
-                            logging.warning(f"action: out_of_order_msg | stream:data | sender:{sender_id} | msg:{message.msg_num} < last:{last}")
+                            logging.warning(f"action: out_of_order_msg | sender:{sender_id} | msg:{message.msg_num} < last:{last}")
                         return
-                    self._last_msg_by_sender_data[sender_id] = message.msg_num
+                    self._last_msg_by_sender[sender_id] = message.msg_num
+                
                 items = message.process_message()
-                if message.type == MESSAGE_TYPE_TRANSACTIONS:
-                    self._accumulate_items(items, message.request_id, sender_id, message.msg_num)
+                self._accumulate_transactions(items, message.request_id, sender_id, message.msg_num)
             finally:
                 if message.type == MESSAGE_TYPE_TRANSACTIONS:
                     self._dec_inflight(message.request_id)
                 
         data_input_queue.start_consuming(__on_message__)
         
-    def _accumulate_items(self, items, request_id, sender_id=None, msg_num=None):
+    def _accumulate_transactions(self, items, request_id, sender_id=None, msg_num=None):
+        """Acumula transacciones por tienda y usuario (solo en memoria)."""
         with self.state_storage._lock:
             state = self.state_storage.data_by_request.setdefault(request_id, {
                 "users_by_store": {},
                 "users_birthdates": {},
-                "last_msg_by_sender_data": {},
-                "last_msg_by_sender_users": {},
+                "last_msg_by_sender": {},
             })
             users_by_store = state["users_by_store"]
-            store_id = None
 
             for item in items:
                 user_id = item.get_user()
                 if not user_id:
                     continue
 
-                store_id = store_id or item.get_store()
+                store_id = item.get_store()
+                if store_id is None:
+                    continue
+                
                 store_users = users_by_store.setdefault(store_id, {})
                 store_users[user_id] = store_users.get(user_id, 0) + 1
 
-            if store_id is None:
-                return
-            # persist last seen marker for data stream if provided
+            # Actualizar marcador de último mensaje
             if sender_id is not None and msg_num is not None:
-                state["last_msg_by_sender_data"][sender_id] = msg_num
-        self.state_storage.save_state(request_id)
-        logging.info(f"Snapshot guardado | request_id: {request_id}")
+                state["last_msg_by_sender"][sender_id] = msg_num
         
-    def _process_items_to_join(self, message):
-        with self.state_storage._lock:
-            # Dedup/ordering for users stream
-            sender_id = message.get_node_id_and_request_id()
-            with self._sender_lock:
-                last = self._last_msg_by_sender_users.get(sender_id, -1)
-                if message.msg_num <= last:
-                    if message.msg_num == last:
-                        logging.info(f"action: duplicate_msg | stream:users | sender:{sender_id} | msg:{message.msg_num}")
-                        return
-                    else:
-                        logging.warning(f"action: out_of_order_msg | stream:users | sender:{sender_id} | msg:{message.msg_num} < last:{last}")
-                        return
-                self._last_msg_by_sender_users[sender_id] = message.msg_num
+        # Incrementar contador y hacer snapshot cada SNAPSHOT_INTERVAL mensajes
+        self.message_count_since_snapshot[request_id] = self.message_count_since_snapshot.get(request_id, 0) + 1
+        if self.message_count_since_snapshot[request_id] >= SNAPSHOT_INTERVAL:
+            self.state_storage.save_state(request_id, reset_state=False)
+            self.message_count_since_snapshot[request_id] = 0
+            logging.info(f"action: snapshot_saved | request_id: {request_id} | type: transactions")
+        
+        logging.debug(f"action: transactions_accumulated | request_id: {request_id} | items: {len(items)}")
 
-            items = message.process_message()
-            state = self.state_storage.data_by_request.setdefault(message.request_id, {
+    def _accumulate_users(self, items, request_id, sender_id=None, msg_num=None):
+        """Acumula información de usuarios (birthdates - solo en memoria)."""
+        with self.state_storage._lock:
+            state = self.state_storage.data_by_request.setdefault(request_id, {
                 "users_by_store": {},
                 "users_birthdates": {},
-                "last_msg_by_sender_data": {},
-                "last_msg_by_sender_users": {},
+                "last_msg_by_sender": {},
             })
             users_birthdates = state["users_birthdates"]
 
             for item in items:
                 user_id = item.get_user_id()
                 birthdate = item.get_birthdate()
-                users_birthdates[user_id] = birthdate
-            state["last_msg_by_sender_users"][sender_id] = message.msg_num
+                if user_id and birthdate:
+                    users_birthdates[user_id] = birthdate
 
-        self.state_storage.save_state(message.request_id)
+            # Actualizar marcador de último mensaje
+            if sender_id is not None and msg_num is not None:
+                state["last_msg_by_sender"][sender_id] = msg_num
+        
+        # Incrementar contador y hacer snapshot cada SNAPSHOT_INTERVAL mensajes
+        self.message_count_since_snapshot[request_id] = self.message_count_since_snapshot.get(request_id, 0) + 1
+        if self.message_count_since_snapshot[request_id] >= SNAPSHOT_INTERVAL:
+            self.state_storage.save_state(request_id, reset_state=False)
+            self.message_count_since_snapshot[request_id] = 0
+            logging.info(f"action: snapshot_saved | request_id: {request_id} | type: users")
+        
+        logging.debug(f"action: users_accumulated | request_id: {request_id} | items: {len(items)}")
+
+    def _process_items_to_join(self, message):
+        """Process user items from the users queue (abstract method implementation)."""
+        # This is called by the base Joiner class when processing the users_input_queue
+        sender_id = message.get_node_id_and_request_id()
+        with self._sender_lock:
+            last = self._last_msg_by_sender.get(sender_id, -1)
+            if message.msg_num <= last:
+                if message.msg_num == last:
+                    logging.info(f"action: duplicate_msg | stream:users | sender:{sender_id} | msg:{message.msg_num}")
+                else:
+                    logging.warning(f"action: out_of_order_msg | stream:users | sender:{sender_id} | msg:{message.msg_num} < last:{last}")
+                return
+            self._last_msg_by_sender[sender_id] = message.msg_num
+        
+        items = message.process_message()
+        # Acumular usuarios directamente sin pasar por _consume_data_queue
+        with self.state_storage._lock:
+            state = self.state_storage.data_by_request.setdefault(message.request_id, {
+                "users_by_store": {},
+                "users_birthdates": {},
+                "last_msg_by_sender": {},
+            })
+            users_birthdates = state["users_birthdates"]
+
+            for item in items:
+                user_id = item.get_user_id()
+                birthdate = item.get_birthdate()
+                if user_id and birthdate:
+                    users_birthdates[user_id] = birthdate
+
+            # Actualizar marcador de último mensaje
+            state["last_msg_by_sender"][sender_id] = message.msg_num
+        
+        # Incrementar contador y hacer snapshot cada SNAPSHOT_INTERVAL mensajes
+        self.message_count_since_snapshot[message.request_id] = self.message_count_since_snapshot.get(message.request_id, 0) + 1
+        if self.message_count_since_snapshot[message.request_id] >= SNAPSHOT_INTERVAL:
+            self.state_storage.save_state(message.request_id, reset_state=False)
+            self.message_count_since_snapshot[message.request_id] = 0
+            logging.info(f"action: snapshot_saved | request_id: {message.request_id}")
+        
+        logging.debug(f"action: users_accumulated | request_id: {message.request_id} | items: {len(items)}")
+
+    def _process_on_eof_message__(self, message):
+        """Handle EOF message: delegates to parent's method which calls _send_results."""
+        return super()._process_on_eof_message__(message)
         
     def _send_results(self, message):
         data_output_queue = MessageMiddlewareQueue(self.data_output_queue, self.connection)
         self.message_middlewares.append(data_output_queue)
         self._process_top_3_by_request(message.request_id, data_output_queue)
         self._send_eof(message, data_output_queue)
+        
+        # Persist state to disk ONLY at the end (atomically)
+        self.state_storage.save_state(message.request_id)
         self.state_storage.delete_state(message.request_id)
         
     def _process_top_3_by_request(self, request_id, data_output_queue):
+        """Send 1 message per store with top-3 users joined with birthdates."""
         saved_state = self.state_storage.data_by_request.get(request_id, {})
         users_by_store_state = saved_state.get("users_by_store", {})
         users_birthdates_state = saved_state.get("users_birthdates", {})
         
-        chunk = ''
+        stores_sent = 0
 
-        for store, users in users_by_store_state.items():
-            if store is None:
+        for store_id, users in users_by_store_state.items():
+            if store_id is None:
                 continue
 
             # users: dict user_id -> count
@@ -174,22 +236,35 @@ class TopThreeClientsJoiner(Joiner):
 
             top_3_users = [user for user in sorted_users if user[1] in unique_values]
 
+            # Construir un SOLO chunk/mensaje para este store con todos sus top-3 usuarios
+            chunk = ""
             for user_id, transaction_count in top_3_users:
                 birthdate = users_birthdates_state.get(user_id)
                 if birthdate:
-                    chunk += Q4IntermediateResult(store, birthdate, transaction_count).serialize()
+                    res = Q4IntermediateResult(store_id, birthdate, transaction_count)
+                    chunk += res.serialize()
+            
+            # Enviar UN SOLO mensaje por store con todos sus top-3 usuarios
+            if chunk:
+                new_msg_num = self.msg_num_counter
+                self.msg_num_counter += 1
+                new_message = Message(request_id, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT, new_msg_num, chunk)
+                new_message.add_node_id(self.node_id)
+                data_output_queue.send(new_message.serialize())
+                stores_sent += 1
+                logging.debug(f"action: store_result_sent | request_id: {request_id} | store_id: {store_id} | top_3_count: {len(top_3_users)}")
         
-        if chunk:
-            new_msg_num = self.msg_num_counter
-            self.msg_num_counter += 1
-            msg = Message(request_id, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT, new_msg_num, chunk)
-            data_output_queue.send(msg.serialize())
-            logging.info(f"Results sent | request_id: {request_id} | msg_num: {new_msg_num}")
-        
+        logging.info(f"action: send_results_done | request_id: {request_id} | stores_sent: {stores_sent}")
         
     def _send_eof(self, message, data_output_queue):
+        """Forward EOF downstream - ensure only 1 EOF per request_id."""
+        if message.request_id in self.eofs_sent:
+            logging.warning(f"action: eof_already_sent | request_id: {message.request_id} | node_id: {self.node_id}")
+            return
+        
+        self.eofs_sent.add(message.request_id)
         data_output_queue.send(message.serialize())
-        logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")
+        logging.info(f"action: eof_forwarded | request_id: {message.request_id} | node_id: {self.node_id}")
 
 
 def initialize_config():
