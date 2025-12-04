@@ -19,7 +19,8 @@ class TopThreeClientsJoiner(Joiner):
                  data_output_queue: str,
                  users_input_queue: str,
                  host: str,
-                 storage_dir: str):
+                 storage_dir: str,
+                 container_name: str = None):
         
         super().__init_client_handler__(users_input_queue, host, EXPECTED_EOFS)
         self.data_input_queue = data_input_queue
@@ -29,6 +30,15 @@ class TopThreeClientsJoiner(Joiner):
         self._sender_lock = threading.Lock()
         self._last_msg_by_sender_data = {}
         self._last_msg_by_sender_users = {}
+        
+        # Message numbering based on replica ID
+        try:
+            replica_id = int(container_name.split('-')[-1]) if container_name else 1
+        except (ValueError, AttributeError, IndexError):
+            replica_id = 1
+            logging.error(f"Could not parse replica_id from {container_name}, defaulting to 1")
+        
+        self.msg_num_counter = replica_id * 1000000
 
     def start(self):
         # Load persisted state once on startup and hydrate last-msg maps
@@ -168,10 +178,13 @@ class TopThreeClientsJoiner(Joiner):
                 birthdate = users_birthdates_state.get(user_id)
                 if birthdate:
                     chunk += Q4IntermediateResult(store, birthdate, transaction_count).serialize()
-        # TODO: numero de mensaje
+        
         if chunk:
-            msg = Message(request_id, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT, 1, chunk)
+            new_msg_num = self.msg_num_counter
+            self.msg_num_counter += 1
+            msg = Message(request_id, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT, new_msg_num, chunk)
             data_output_queue.send(msg.serialize())
+            logging.info(f"Results sent | request_id: {request_id} | msg_num: {new_msg_num}")
         
         
     def _send_eof(self, message, data_output_queue):
@@ -187,6 +200,7 @@ def initialize_config():
     config_params["output_queue"] = os.getenv('OUTPUT_QUEUE_1')
     config_params["logging_level"] = os.getenv('LOG_LEVEL', 'INFO')
     config_params["storage_dir"] = os.getenv('STORAGE_DIR', './data')
+    config_params["container_name"] = os.getenv('CONTAINER_NAME', 'top-three-clients')
 
     if None in [config_params["rabbitmq_host"], config_params["input_queue_1"],
                 config_params["input_queue_2"], config_params["output_queue"]]:
@@ -204,7 +218,8 @@ def main():
                                    config_params["output_queue"], 
                                    config_params["input_queue_2"], 
                                    config_params["rabbitmq_host"],
-                                   config_params["storage_dir"])
+                                   config_params["storage_dir"],
+                                   config_params["container_name"])
     joiner.start()
 
 

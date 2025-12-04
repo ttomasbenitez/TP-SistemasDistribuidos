@@ -7,12 +7,13 @@ MAX_PENDING_SIZE = 5000
 
 class SlidingWindowDedupStrategy(DedupStrategy):
     
-    def __init__(self, total_shards: int, storage_dir: str):
+    def __init__(self, total_shards: int, storage_dir: str, start_msg_num: int = 0):
         self.total_shards = total_shards
         self.last_contiguous_msg_num = {}
         self.pending_messages = {}
         self.current_msg_num = {}
         self.state_storage = FilterAmountStateStorage(storage_dir)
+        self.start_msg_num = start_msg_num
     
     def is_duplicate(self, message: Message):
         last_cont = self.last_contiguous_msg_num[message.request_id]
@@ -30,7 +31,7 @@ class SlidingWindowDedupStrategy(DedupStrategy):
     def load_dedup_state(self):
         self.state_storage.load_state_all()
         for request_id, state in self.state_storage.data_by_request.items():
-            self.last_contiguous_msg_num[request_id] = state.get('last_contiguous_msg_num', -1)
+            self.last_contiguous_msg_num[request_id] = state.get('last_contiguous_msg_num', self.start_msg_num - 1)
             self.pending_messages[request_id] = state.get('pending_messages', set())
             self.current_msg_num[request_id] = state.get('current_msg_num', 0)
             logging.info(f"Estado recuperado para request_id {request_id}: last_contiguous={self.last_contiguous_msg_num[request_id]}, pending_count={len(self.pending_messages[request_id])}, current_msg_num={self.current_msg_num[request_id]}")
@@ -39,7 +40,7 @@ class SlidingWindowDedupStrategy(DedupStrategy):
         request_id = message.request_id
         
         if request_id not in self.last_contiguous_msg_num:
-            self.last_contiguous_msg_num[request_id] = -1
+            self.last_contiguous_msg_num[request_id] = self.start_msg_num - 1
             self.pending_messages[request_id] = set()
         
         if self.is_duplicate(message):
@@ -57,9 +58,6 @@ class SlidingWindowDedupStrategy(DedupStrategy):
     def update_contiguous_sequence(self, message: Message):
         last_cont = self.last_contiguous_msg_num[message.request_id]
         prev_expected = message.msg_num - self.total_shards
-        
-        if last_cont == -1:
-            last_cont = message.msg_num
         
         if prev_expected <= last_cont:
             self.last_contiguous_msg_num[message.request_id] = message.msg_num

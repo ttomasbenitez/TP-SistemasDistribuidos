@@ -12,7 +12,7 @@ import hashlib
 from pkg.message.utils import calculate_sub_message_id
 from pkg.message.constants import SUB_MESSAGE_START_ID
 
-BATCH_SIZE = 100
+BATCH_SIZE = 1000
 
 
 class AggregatorMonth(Worker):
@@ -24,7 +24,8 @@ class AggregatorMonth(Worker):
                  eof_output_queues: dict,
                  eof_self_queue: str,
                  eof_service_queue: str,
-                 host: str):
+                 host: str,
+                 container_name: str):
         self.__init_manager__()
         self.__init_middlewares_handler__()
         self.data_input_queue = data_input_queue
@@ -34,6 +35,16 @@ class AggregatorMonth(Worker):
         self.connection = PikaConnection(host)
         self.eof_self_queue= eof_self_queue
         self.eof_service_queue = eof_service_queue
+        
+        # Initialize msg_num_counter starting at 0, incremental
+        # Extract node_id from container name (e.g., "aggregator-month-1" -> 1)
+        try:
+            self.node_id = int(container_name.split('-')[-1])
+        except (ValueError, AttributeError, IndexError):
+            self.node_id = 1  # Default to 1 if parsing fails
+            logging.error(f"Could not parse node_id from {container_name}, defaulting to 1")
+        
+        self.msg_num_counter = 0
     
     def start(self):
         
@@ -97,8 +108,8 @@ class AggregatorMonth(Worker):
                     return
 
                 logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
-                self._ensure_request(message.request_id)
-                self._inc_inflight(message.request_id)
+                #self._ensure_request(message.request_id)
+                #self._inc_inflight(message.request_id)
 
                 self.last_message[message.request_id] = message
                 if message.request_id not in self.buffers:
@@ -118,9 +129,9 @@ class AggregatorMonth(Worker):
 
             except Exception as e:
                 logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
-            finally:
-                if message.type != MESSAGE_TYPE_EOF:
-                    self._dec_inflight(message.request_id)
+            #finally:
+            #    if message.type != MESSAGE_TYPE_EOF:
+            #        self._dec_inflight(message.request_id)
             
         data_input_queue.start_consuming(__on_message__)
 
@@ -134,7 +145,6 @@ class AggregatorMonth(Worker):
         return groups
     
     def _send_groups_sharded(self, original_message: Message, groups: dict, output_queues: list):
-        sub_msg_id = SUB_MESSAGE_START_ID
         for key, items in groups.items():
             # key is "YYYY-MM"
             # Use hash to select queue
@@ -142,12 +152,17 @@ class AggregatorMonth(Worker):
             queue_index = hash_val % len(output_queues)
             target_queue = output_queues[queue_index]
             new_chunk = ''.join(item.serialize() for item in items)
-            new_msg_num = calculate_sub_message_id(original_message.msg_num, sub_msg_id)
+            
+            # Use incremental msg_num_counter starting at 0
+            new_msg_num = self.msg_num_counter
+            self.msg_num_counter += 1
+            
             new_message = original_message.new_from_original(new_chunk, msg_num=new_msg_num)
-            logging.info(f"action: sending group | key: {key} | to_queue_index: {queue_index} | request_id: {new_message.request_id} | type: {new_message.type}")
+            # Add node_id to message for dedup tracking per source
+            new_message.add_node_id(self.node_id)
+            logging.info(f"action: sending group | key: {key} | to_queue_index: {queue_index} | request_id: {new_message.request_id} | type: {new_message.type} | msg_num: {new_msg_num} | node_id: {self.node_id}")
             serialized = new_message.serialize()
             target_queue.send(serialized)
-            sub_msg_id += 1
 
     def close(self):
         try:
@@ -218,7 +233,8 @@ def main():
                                 eof_output_queues,
                                 config_params["eof_self_queue"],
                                 config_params["eof_service_queue"],
-                                config_params["rabbitmq_host"])
+                                config_params["rabbitmq_host"],
+                                config_params["logger_name"])
     aggregator.start()
 
 if __name__ == "__main__":
