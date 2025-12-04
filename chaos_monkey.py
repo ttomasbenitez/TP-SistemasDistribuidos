@@ -5,7 +5,7 @@ import random
 import sys
 import threading
 
-EXCLUDED_CONTAINERS = ['rabbitmq', 'gateway','filter-year-eof-service', 'client_1', 'client_2', 'aggregator-users-eof-service', 'aggregator-batches-eof-service']
+EXCLUDED_CONTAINERS = ['rabbitmq', 'health-monitor-1', 'gateway','filter-year-eof-service', 'client_1', 'client_2', 'aggregator-users-eof-service', 'aggregator-batches-eof-service']
 
 def get_running_containers():
     """Returns a list of running container names for the current project."""
@@ -103,7 +103,7 @@ def main():
     parser.add_argument('--random', action='store_true', help='Enable random killing mode')
     parser.add_argument('--top-three', action='store_true', help='Enable top-three killing mode')
     parser.add_argument('--combined', action='store_true', help='Enable both random and top-three modes simultaneously')
-    parser.add_argument('--interval', type=float, default=0.2, help='Interval in seconds for random mode (default: 0.2)')
+    parser.add_argument('--interval', type=float, default=1, help='Interval in seconds for random mode (default: 1)')
     parser.add_argument('--top-three-interval', type=float, default=15, help='Interval in seconds for top-three mode (default: 5)')
     parser.add_argument('--node', type=str, help='Specific node (service name) to kill')
     
