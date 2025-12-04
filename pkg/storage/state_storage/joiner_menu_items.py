@@ -67,7 +67,7 @@ class JoinerMenuItemsStateStorage(StateStorage):
             
     def _append_sender_data(self, last_by_sender, file_handle):
         for sender_id, last_num in last_by_sender.items():
-            line = f"ST;{sender_id};{last_num}\n"
+            line = f"SE;{sender_id};{last_num}\n"
             file_handle.write(line)
                 
     def _append_menu_items(self, menu_items, file_handle):

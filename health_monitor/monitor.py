@@ -67,7 +67,7 @@ class HealthMonitor:
                 if service_name and timestamp:
                     with self.lock:
                         self.last_heartbeats[service_name] = time.time()
-                        logging.debug(f"Received heartbeat from {service_name}")
+                        #logging.debug(f"Received heartbeat from {service_name}")
                         
             except Exception as e:
                 logging.error(f"Error receiving heartbeat: {e}")
@@ -104,7 +104,7 @@ class HealthMonitor:
                     dead_nodes.append(service)
         
         active_monitors = self._get_active_monitors()
-        logging.debug(f"Active monitors: {active_monitors}")
+        #logging.debug(f"Active monitors: {active_monitors}")
 
         for node in dead_nodes:
             if self._am_i_responsible(node, active_monitors):

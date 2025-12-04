@@ -9,7 +9,7 @@ import os
 from pkg.storage.state_storage.joiner_menu_items import JoinerMenuItemsStateStorage
 from pkg.message.utils import parse_int
 
-EXPECTED_EOFS = 2
+
 
 class JoinerMenuItems(Joiner):
     
@@ -18,8 +18,9 @@ class JoinerMenuItems(Joiner):
                  data_output_exchange: str,
                  menu_items_input_queue: str,
                  host: str, 
+                 expected_eofs: int,
                  storage_dir: str = None):
-        super().__init_client_handler__(menu_items_input_queue, host, EXPECTED_EOFS, JoinerMenuItemsStateStorage(storage_dir, {
+        super().__init_client_handler__(menu_items_input_queue, host, expected_eofs, JoinerMenuItemsStateStorage(storage_dir, {
             "menu_items": {},
             "last_by_sender": {},
             "pending_results": []
@@ -131,6 +132,7 @@ def initialize_config():
     config_params["input_queue_1"] = os.getenv('INPUT_QUEUE_1')
     config_params["input_queue_2"] = os.getenv('INPUT_QUEUE_2')
     config_params["output_exchange_q2"] = os.getenv('OUTPUT_EXCHANGE')
+    config_params["expected_eofs"] = int(os.getenv('EXPECTED_EOFS', '3'))
     config_params["logging_level"] = os.getenv('LOG_LEVEL', 'INFO')
     config_params["storage_dir"] = os.getenv('STORAGE_DIR', './data')
 
@@ -148,6 +150,7 @@ def main():
                                  config_params["output_exchange_q2"],
                                  config_params["input_queue_2"],
                                  config_params["rabbitmq_host"],
+                                 config_params["expected_eofs"],
                                  config_params["storage_dir"])
     joiner.start()
 

@@ -11,6 +11,8 @@ from pkg.dedup.sliding_window_dedup_strategy import SlidingWindowDedupStrategy
 from pkg.message.utils import calculate_sub_message_id
 from pkg.message.constants import SUB_MESSAGE_START_ID
 
+BATCH_SIZE = 1000
+
 class StoreAggregator(Worker):
 
     def __init__(self, 
@@ -47,6 +49,30 @@ class StoreAggregator(Worker):
         self.message_middlewares.extend([data_input_queue, data_output_exchange])
         
         self.dedup_strategy.load_dedup_state()
+        self.buffers = {}
+        self.last_message = {}
+        
+        def _flush_buffer(request_id, store, data_output_exchange):
+            if request_id not in self.buffers or store not in self.buffers[request_id]:
+                return
+            
+            items = self.buffers[request_id][store]
+            if not items:
+                return
+
+            # Use the last message as a template
+            original_message = self.last_message.get(request_id)
+            if not original_message:
+                logging.error(f"action: flush_buffer | error: no original message found for request_id: {request_id}")
+                return
+
+            single_group = {store: items}
+            
+            current_msg_num = self.dedup_strategy.current_msg_num.get(request_id, 0)
+            self._send_groups(original_message, single_group, data_output_exchange, current_msg_num)
+            
+            # Clear the buffer
+            self.buffers[request_id][store] = []
         
         def __on_message__(message):
             try:
@@ -54,6 +80,16 @@ class StoreAggregator(Worker):
 
                 if message.type == MESSAGE_TYPE_EOF:
                     logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
+                    
+                    # Flush all remaining buffers for this request_id
+                    if message.request_id in self.buffers:
+                        for store in list(self.buffers[message.request_id].keys()):
+                            _flush_buffer(message.request_id, store, data_output_exchange)
+                        del self.buffers[message.request_id]
+                    
+                    if message.request_id in self.last_message:
+                        del self.last_message[message.request_id]
+                    
                     data_output_exchange.send(message.serialize(), str(message.type))
                     self.dedup_strategy.update_state_on_eof(message)
                     return
@@ -62,9 +98,23 @@ class StoreAggregator(Worker):
                 
                 if self.dedup_strategy.check_state_before_processing(message) is False:
                     return
+                
+                self.last_message[message.request_id] = message
+                if message.request_id not in self.buffers:
+                    self.buffers[message.request_id] = {}
+                
                 items = message.process_message()
                 groups = self._group_items_by_store(items)
-                self._send_groups(message, groups, data_output_exchange)
+                
+                for store, group_items in groups.items():
+                    if store not in self.buffers[message.request_id]:
+                        self.buffers[message.request_id][store] = []
+                    
+                    self.buffers[message.request_id][store].extend(group_items)
+                    
+                    if len(self.buffers[message.request_id][store]) >= BATCH_SIZE:
+                        _flush_buffer(message.request_id, store, data_output_exchange)
+                
                 self.dedup_strategy.update_contiguous_sequence(message)
             except Exception as e:
                 logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
@@ -78,10 +128,12 @@ class StoreAggregator(Worker):
             groups.setdefault(store, []).append(item)
         return groups
     
-    def _send_groups(self, original_message: Message, groups: dict, data_output_exchange: MessageMiddlewareExchange):
-        current_msg_num = self.dedup_strategy.current_msg_num.get(original_message.request_id, 0)
+    def _send_groups(self, original_message: Message, groups: dict, data_output_exchange: MessageMiddlewareExchange, current_msg_num: int = None):
+        if current_msg_num is None:
+            current_msg_num = self.dedup_strategy.current_msg_num.get(original_message.request_id, 0)
+        
         for key, items in groups.items():
-            logging.info(f"action: sending grouped items | request_id: {original_message.request_id} | node: {self.node_id} | starting_msg_num: {current_msg_num}")
+            logging.info(f"action: sending grouped items | request_id: {original_message.request_id} | store: {key} | node: {self.node_id} | msg_num: {current_msg_num} | items: {len(items)}")
             new_chunk = ''.join(item.serialize() for item in items)
             new_message = Message(original_message.request_id, original_message.type, current_msg_num, new_chunk)
             new_message.add_node_id(self.node_id)

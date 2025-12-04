@@ -2,6 +2,8 @@ import os
 import logging
 from abc import ABC, abstractmethod
 import threading
+import tempfile
+import shutil
 
 class StateStorage(ABC):
     
@@ -45,14 +47,19 @@ class StateStorage(ABC):
         try:
             for filename in os.listdir(self.storage_dir):
                 if filename.endswith(".txt"):
-                    request_id = filename[:-4]  # Remover la extensión .txt
-                filepath = os.path.join(self.storage_dir, filename)
+                    request_id_str = filename[:-4]  # Remover la extensión .txt
+                    try:
+                        request_id = int(request_id_str)
+                    except ValueError:
+                        request_id = request_id_str
                     
-                with self._lock:
-                    with open(filepath, "r") as f:
+                    filepath = os.path.join(self.storage_dir, filename)
+                    
+                    with self._lock:
+                        with open(filepath, "r") as f:
                             self._load_state_from_file(f, request_id)
-                    
-                    logging.info(f"Estado cargado para request_id: {request_id}")
+                        
+                        logging.info(f"Estado cargado para request_id: {request_id}")
                     
         except Exception as e:
             logging.error(f"Error al cargar estados desde {self.storage_dir}: {e}")
@@ -63,8 +70,8 @@ class StateStorage(ABC):
     
     def save_state(self, request_id, reset_state=True):
         """
-        Guarda en disco el estado NUEVO de un request_id agregando
-        al archivo existente, y luego limpia el buffer en RAM.
+        Guarda en disco el estado COMPLETO de un request_id de forma ATÓMICA.
+        Escribe a un archivo temporal y luego lo renombra (atomic rename).
         """
         if request_id not in self.data_by_request:
             logging.error(f"No hay estado en memoria para request_id {request_id}, nada que guardar.")
@@ -76,14 +83,33 @@ class StateStorage(ABC):
             os.makedirs(self.storage_dir, exist_ok=True)
 
             with self._lock:
-                with open(final_filepath, "a") as f:
-                    self._save_state_to_file(f, request_id)
-                    f.flush()
-                    os.fsync(f.fileno())
+                # Write to a temporary file first
+                temp_fd, temp_filepath = tempfile.mkstemp(
+                    dir=self.storage_dir,
+                    prefix=f".{request_id}.",
+                    suffix=".tmp"
+                )
+                try:
+                    with os.fdopen(temp_fd, 'w') as f:
+                        self._save_state_to_file(f, request_id)
+                        f.flush()
+                        os.fsync(f.fileno())
+                    
+                    # Atomic rename: replaces existing file atomically on all systems
+                    # On Windows, this removes the destination first; on POSIX it's truly atomic
+                    shutil.move(temp_filepath, final_filepath)
+                    logging.info(f"Estado guardado ATÓMICAMENTE para request_id: {request_id}")
+                except Exception as e:
+                    # Clean up temp file if something went wrong
+                    if os.path.exists(temp_filepath):
+                        try:
+                            os.remove(temp_filepath)
+                        except Exception:
+                            pass
+                    raise
+
                 if reset_state:
                     self.cleanup_state(request_id)
-
-            logging.debug(f"Estado (append) guardado para request_id: {request_id}")
             
         except Exception as e:
             logging.error(f"Error al guardar estado para request_id {request_id}: {e.args}")

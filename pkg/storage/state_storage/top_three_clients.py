@@ -34,7 +34,6 @@ class TopThreeClientsStateStorage(StateStorage):
                 continue
 
             parts = line.split(";")
-
             kind = parts[0]
 
             if kind == "TR":
@@ -43,16 +42,14 @@ class TopThreeClientsStateStorage(StateStorage):
                     store_id = int(store_id_str)
                     user_id = int(user_id_str)
                     count = int(count_str)
-                except ValueError as e:
+                except ValueError:
                     continue
-
                 store_users = users_by_store.setdefault(store_id, {})
                 store_users[user_id] = store_users.get(user_id, 0) + count
                 continue
 
             if kind == "UB":
                 _k, user_id_str, birthdate = parts
-
                 try:
                     user_id = int(user_id_str)
                 except ValueError as e:
@@ -87,15 +84,23 @@ class TopThreeClientsStateStorage(StateStorage):
         for user_id, birthdate in users_birthdates.items():
             line = f"UB;{user_id};{birthdate}\n"
             file_handle.write(line)
+            
+    def _append_sender_data(self, last_by_sender, file_handle):
+        for sender_id, last_num in last_by_sender.items():
+            line = f"SE;{sender_id};{last_num}\n"
+            file_handle.write(line)
+                
     
     def _save_state_to_file(self, file_handle, request_id):
         state = self.data_by_request.get(request_id)
         if not state:
             return
 
-        users_by_store = state["users_by_store"]
-        users_birthdates = state["users_birthdates"]
+        users_by_store = state.get("users_by_store", {})
+        users_birthdates = state.get("users_birthdates", {})
+        last_data = state.get("last_by_sender", {})
         
         self._append_transaction(users_by_store, file_handle)
         self._append_birthdates(users_birthdates, file_handle)
+        self._append_sender_data(last_data, file_handle)
         

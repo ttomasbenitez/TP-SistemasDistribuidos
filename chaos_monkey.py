@@ -4,7 +4,7 @@ import time
 import random
 import sys
 
-EXCLUDED_CONTAINERS = ['rabbitmq', 'gateway']
+EXCLUDED_CONTAINERS = ['rabbitmq', 'gateway', 'filter-year-1', 'filter-year-2', 'filter-year-eof-service', 'client_1', 'client_2', 'joiner-menu-items', 'aggregator-month-1', 'aggregator-month-2', 'aggregator-month-eof-service', 'joiner-stores-q2', 'joiner-stores-q3', 'joiner-stores-q4', 'aggregator-store-q1', 'aggregator-store-q2', 'aggregator-store-q3', 'aggregator-store-q4', 'aggregator-store-eof-service', 'joiner-users-1', 'joiner-users-2', 'aggregator-users-1', 'aggregator-users-2', 'aggregator-users-eof-service', 'joiner-batches-1', 'joiner-batches-2', 'aggregator-batches-1', 'aggregator-batches-2', 'aggregator-batches-eof-service', 'health-monitor-1', 'health-monitor-2', 'health-monitor-3']
 
 def get_running_containers():
     """Returns a list of running container names for the current project."""
@@ -58,7 +58,7 @@ def run_random_chaos(interval):
 def main():
     parser = argparse.ArgumentParser(description='Chaos Monkey for Docker Compose')
     parser.add_argument('--random', action='store_true', help='Enable random killing mode')
-    parser.add_argument('--interval', type=int, default=10, help='Interval in seconds for random mode (default: 10)')
+    parser.add_argument('--interval', type=int, default=2, help='Interval in seconds for random mode (default: 10)')
     parser.add_argument('--node', type=str, help='Specific node (service name) to kill')
     
     args = parser.parse_args()

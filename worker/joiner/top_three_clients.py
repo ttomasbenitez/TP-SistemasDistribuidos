@@ -29,14 +29,10 @@ class TopThreeClientsJoiner(Joiner):
         }))
         self.data_input_queue = data_input_queue
         self.data_output_queue = data_output_queue
-<<<<<<< Updated upstream
         # Incremental top-3 per store_id: { store_id: [(user_id, count), ...] sorted desc by (count, -user_id) }
         self._top3_by_store = {}
-
-=======
         self.node_id = node_id
         
->>>>>>> Stashed changes
     def _consume_data_queue(self):
         data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
         self.message_middlewares.append(data_input_queue)
@@ -53,7 +49,7 @@ class TopThreeClientsJoiner(Joiner):
             try:
                 items = message.process_message()
                 if message.type == MESSAGE_TYPE_TRANSACTIONS:
-                    self._accumulate_items(items, message.request_id)
+                    self._accumulate_items(items, message.request_id, sender_id, message.msg_num)
             finally:
                 self.state_storage.save_state(message.request_id)
                 self.state_storage.cleanup_data(message.request_id)
@@ -120,7 +116,6 @@ class TopThreeClientsJoiner(Joiner):
         self.state_storage.data_by_request[message.request_id] = state
         
     def _send_results(self, message):
-        self.state_storage.load_state(message.request_id)
         data_output_queue = MessageMiddlewareQueue(self.data_output_queue, self.connection)
         self.message_middlewares.append(data_output_queue)
         self._process_top_3_by_request(message.request_id, data_output_queue)
@@ -149,14 +144,17 @@ class TopThreeClientsJoiner(Joiner):
                 if birthdate:
                     chunk += Q4IntermediateResult(store, birthdate, transaction_count).serialize()
         
+        
         if chunk:
             msg = Message(request_id, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT, 0, chunk)
             msg.add_node_id(self.node_id)
             data_output_queue.send(msg.serialize())
+            logging.info(f"Results sent | request_id: {request_id} | msg_num: {new_msg_num}")
         
     def _send_eof(self, message, data_output_queue):
         data_output_queue.send(message.serialize())
         logging.info(f"EOF enviado | request_id: {message.request_id} | type: {message.type}")
+
 
 def initialize_config():
     config_params = {}
@@ -173,6 +171,7 @@ def initialize_config():
         raise ValueError("Expected value not found. Aborting.")
 
     return config_params
+
 
 
 def main():
