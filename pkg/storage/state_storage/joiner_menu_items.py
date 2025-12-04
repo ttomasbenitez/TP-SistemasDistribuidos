@@ -24,6 +24,7 @@ class JoinerMenuItemsStateStorage(StateStorage):
             "menu_items": {},
             "last_by_sender": {},
             "pending_results": [],
+            "last_eof_count": 0,
         })
 
         menu_items = state["menu_items"]
@@ -66,6 +67,17 @@ class JoinerMenuItemsStateStorage(StateStorage):
             if kind == "PC" and (not has_specific_state or specific_state == "pending_results"):
                 _k, year_month_created_at, item_data, value, result_type = parts
                 pending_results.append(Q2Result(year_month_created_at, item_data, value, result_type))
+                
+            if kind == "LE":
+                _k, last_eof_str = parts
+                try:
+                    last_eof = int(last_eof_str)
+                except ValueError as e:
+                    continue
+                last_eof_count = max(state["last_eof_count"], last_eof)
+                continue
+        
+        self.data_by_request[request_id]["last_eof_count"] = last_eof_count
             
     def _append_sender_data(self, last_by_sender, file_handle):
         for sender_id, last_num in last_by_sender.items():

@@ -1,7 +1,7 @@
 from pkg.message.message import Message
 from pkg.dedup.base import DedupStrategy
 import logging
-from pkg.storage.state_storage.filter_amount import DedupStorage
+from pkg.storage.state_storage.dedup_storage import DedupStorage
 
 MAX_PENDING_SIZE = 5000
 

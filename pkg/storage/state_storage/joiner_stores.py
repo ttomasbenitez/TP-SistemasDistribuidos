@@ -27,13 +27,15 @@ class JoinerStoresStateStorage(StateStorage, ABC):
         state = self.data_by_request.setdefault(request_id, {
             "stores": {},
             "last_by_sender": {},
-            "pending_results": []
+            "pending_results": [],
+            "last_eof_count": 0,
         })
 
         stores = state["stores"]
         last_by_sender = state["last_by_sender"]
         pending_results = state["pending_results"]
-
+        last_eof_count = state["last_eof_count"]
+        
         for line in file_handle:
             line = line.strip()
             if not line:
@@ -66,10 +68,20 @@ class JoinerStoresStateStorage(StateStorage, ABC):
             
             if kind == "PC":
                pending_results.append(self._load_pending_clients(parts))
+               
+            if kind == "LE":
+                _k, last_eof_str = parts
+                try:
+                    last_eof = int(last_eof_str)
+                except ValueError as e:
+                    continue
+                last_eof_count = max(state["last_eof_count"], last_eof)
+                continue
                 
         self.data_by_request[request_id]["stores"] = stores
         self.data_by_request[request_id]["last_by_sender"] = last_by_sender
         self.data_by_request[request_id]["pending_results"] = pending_results
+        self.data_by_request[request_id]["last_eof_count"] = last_eof_count
                 
             
     def _append_sender_data(self, last_by_sender, file_handle):
@@ -87,6 +99,11 @@ class JoinerStoresStateStorage(StateStorage, ABC):
             serialialized = q4_intermediate_result.serialize()
             line = f"PC;{serialialized}"
             file_handle.write(line)
+            
+    def _append_last_eofs(self, last_eofs_by_node, file_handle):
+        for node_id, last_eof in last_eofs_by_node.items():
+            line = f"LE;{node_id};{last_eof}\n"
+            file_handle.write(line)
     
     def _save_state_to_file(self, file_handle, request_id):
         state = self.data_by_request.get(request_id)
@@ -96,6 +113,7 @@ class JoinerStoresStateStorage(StateStorage, ABC):
         self._append_sender_data(state["last_by_sender"], file_handle)
         self._append_stores(state["stores"], file_handle)
         self._append_pending_results(state["pending_results"], file_handle)
+        self._append_last_eofs(state["last_eofs_by_node"], file_handle)
             
     @abstractmethod
     def _load_pending_clients(self, parts):
@@ -111,7 +129,6 @@ class JoinerStoresQ4StateStorage(JoinerStoresStateStorage):
         except ValueError as e:
             return None
         return Q4IntermediateResult(store_id, birthdate, purchases_qty)
-            
 
 class JoinerStoresQ3StateStorage(JoinerStoresStateStorage):
     

@@ -116,9 +116,9 @@ class Worker(ABC):
         (based on last seen msg_num for its sender+request). Updates last seen on accept.
         """
         key = self._sender_key(message, stream)
-        state = self.state_storage.get_data_from_request(message.request_id)
-        last_msg_by_sender = state.get("last_by_sender", {})
-        last = last_msg_by_sender.get(key, -1)
+        state = self.state_storage.get_state(message.request_id)
+        last_by_sender = state.get("last_by_sender", {})
+        last = last_by_sender.get(key, -1)
         if message.msg_num <= last:
             if message.msg_num == last:
                 logging.info(f"action: duplicate_msg | stream:{stream} | sender:{key} | msg:{message.msg_num}")

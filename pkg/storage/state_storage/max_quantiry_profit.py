@@ -17,12 +17,12 @@ class QuantityAndProfitStateStorage(StateStorage):
             request_id,
             {
                 "items_by_ym": {},
-                "last_msg_by_sender": {},
+                "last_by_sender": {},
             },
         )
         
         items_by_ym = state["items_by_ym"]
-        last_msg_by_sender = state["last_msg_by_sender"]
+        last_by_sender = state["last_by_sender"]
         
         loaded_items = 0
         loaded_senders = 0
@@ -73,7 +73,7 @@ class QuantityAndProfitStateStorage(StateStorage):
                         continue
                     sender_id, last_str = rest_parts
                     last = int(last_str)
-                    last_msg_by_sender[sender_id] = max(last_msg_by_sender.get(sender_id, -1), last)
+                    last_by_sender[sender_id] = max(last_by_sender.get(sender_id, -1), last)
                     logging.info(f"action: loaded_sender_dedup | request_id: {request_id} | sender: {sender_id} | last_msg: {last}")
                     loaded_senders += 1
                 except (IndexError, ValueError) as e:
@@ -116,7 +116,7 @@ class QuantityAndProfitStateStorage(StateStorage):
             return
         
         items_by_ym = state.get("items_by_ym", {})
-        last_msg_by_sender = state.get("last_msg_by_sender", {})
+        last_by_sender = state.get("last_by_sender", {})
         
         saved_items = 0
         saved_senders = 0
@@ -130,7 +130,7 @@ class QuantityAndProfitStateStorage(StateStorage):
                 logging.info(f"action: saved_item | request_id: {request_id} | ym: {ym} | item_id: {item.item_id} | qty: {item.quantity} | sub: {item.subtotal}")
         
         # Save dedup markers
-        for sender_id, last_msg_num in last_msg_by_sender.items():
+        for sender_id, last_msg_num in last_by_sender.items():
             file_handle.write(f"S;{sender_id};{last_msg_num}\n")
             saved_senders += 1
             logging.info(f"action: saved_sender_dedup | request_id: {request_id} | sender: {sender_id} | last_msg: {last_msg_num}")
