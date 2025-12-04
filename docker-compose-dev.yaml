@@ -387,6 +387,7 @@ services:
       INPUT_QUEUE_1: products-results-queue
       INPUT_QUEUE_2: menu-items-queue
       OUTPUT_EXCHANGE: results-exchange
+      STORAGE_DIR: ./data/join_menu_items
       LOG_LEVEL: INFO
     networks:
     - testing_net
@@ -441,8 +442,6 @@ services:
       OUTPUT_EXCHANGE: aggregated-store-q3-exchange
       OUTPUT_QUEUE_1: aggregated-store-q3-queue-1
       OUTPUT_QUEUE_2: aggregated-store-q3-queue-2
-      # OUTPUT_QUEUE_1: aggregated-store-q3-queue
-      # EOF_SERVICE_QUEUE: eof-service-aggregator-store-q3
       NODE_NUMBER: 1
       TOTAL_SHARDS: 2
       LOG_LEVEL: INFO
@@ -464,7 +463,6 @@ services:
       OUTPUT_EXCHANGE: aggregated-store-q3-exchange
       OUTPUT_QUEUE_1: aggregated-store-q3-queue-1
       OUTPUT_QUEUE_2: aggregated-store-q3-queue-2
-      # EOF_SERVICE_QUEUE: eof-service-aggregator-store-q3
       NODE_NUMBER: 2
       TOTAL_SHARDS: 2
       LOG_LEVEL: INFO
@@ -473,23 +471,6 @@ services:
     - testing_net
     depends_on:
     - gateway
-
-  # aggregator-store-q3-eof-service:
-  #   container_name: aggregator-store-q3-eof-service
-  #   image: worker:latest
-  #   command: "/worker/eof/eof_service_aggregator_store.py"
-  #   environment:
-  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #     CONTAINER_NAME: aggregator-store-q3-eof-service
-  #     RABBITMQ_HOST: rabbitmq
-  #     INPUT_QUEUE: eof-service-aggregator-store-q3
-  #     OUTPUT_QUEUE: aggregated-store-q3-queue
-  #     LOG_LEVEL: INFO
-  #     EXPECTED_ACKS: 2
-  #   networks:
-  #   - testing_net
-  #   depends_on:
-  #   - gateway
 
   join-stores-q3:
     container_name: joiner-stores-q3
@@ -502,12 +483,15 @@ services:
       INPUT_QUEUE_1: aggregated-semester-queue
       INPUT_QUEUE_2: stores-queue-1
       OUTPUT_EXCHANGE_NAME: results-exchange
+      STORAGE_DIR: ./data/join_stores_q3
       LOG_LEVEL: INFO
       EXPECTED_ACKS: 2
     networks:
     - testing_net
     depends_on:
     - gateway
+    volumes:
+      - ./data/join_stores_q3:/data/join_stores_q3
 
   aggregator-store-q4-1:
     container_name: aggregator-store-q4-1
@@ -588,7 +572,7 @@ services:
     depends_on:
     - gateway
     volumes:
-      - ./data/top-three-clients:/data/top-three-clients
+      - ./data/top-three-clients:/data/top-three-clients-1
 
   top-three-clients-2:
     container_name: top-three-clients-2
@@ -608,7 +592,7 @@ services:
     depends_on:
     - gateway
     volumes:
-      - ./data/top-three-clients:/data/top-three-clients
+      - ./data/top-three-clients:/data/top-three-clients-2
 
   join-stores-q4:
     container_name: join-stores-q4
@@ -621,11 +605,14 @@ services:
       INPUT_QUEUE_1: top-clients-queue
       INPUT_QUEUE_2: stores-queue-2
       OUTPUT_EXCHANGE_NAME: results-exchange
+      STORAGE_DIR: ./data/join_stores_q4
       LOG_LEVEL: INFO
     networks:
     - testing_net
     depends_on:
     - gateway
+    volumes:
+      - ./data/join_stores_q4:/data/join_stores_q4
 
   client_1:
     container_name: client_1

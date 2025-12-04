@@ -12,7 +12,11 @@ class SlidingWindowDedupStrategy(DedupStrategy):
         self.last_contiguous_msg_num = {}
         self.pending_messages = {}
         self.current_msg_num = {}
-        self.state_storage = FilterAmountStateStorage(storage_dir)
+        self.state_storage = FilterAmountStateStorage(storage_dir, {
+            'msg_num': -1,
+            'last_contiguous_msg_num': -1, 
+            'current_msg_num': -1
+        })
     
     def is_duplicate(self, message: Message):
         last_cont = self.last_contiguous_msg_num[message.request_id]

@@ -6,6 +6,7 @@ from pkg.message.message import Message
 from worker.joiner.joiner import Joiner 
 from Middleware.middleware import MessageMiddlewareExchange, MessageMiddlewareQueue
 import os
+from pkg.storage.state_storage.joiner_menu_items import JoinerMenuItemsStateStorage
 from pkg.message.utils import parse_int
 
 EXPECTED_EOFS = 2
@@ -16,49 +17,55 @@ class JoinerMenuItems(Joiner):
                  data_input_queue: str, 
                  data_output_exchange: str,
                  menu_items_input_queue: str,
-                 host: str):
-        super().__init_client_handler__(menu_items_input_queue, host, EXPECTED_EOFS)
+                 host: str, 
+                 storage_dir: str = None):
+        super().__init_client_handler__(menu_items_input_queue, host, EXPECTED_EOFS, JoinerMenuItemsStateStorage(storage_dir, {
+            "menu_items": {},
+            "last_by_sender": {},
+            "pending_results": []
+        }))
         self.data_input_queue = data_input_queue
         self.data_output_exchange = data_output_exchange
-        self.pending_items = []
 
     def _process_items_to_join(self, message):
         items = message.process_message()
+        state = self.state_storage.get_data_from_request(message.request_id)
+        menu_items_state = state.setdefault("menu_items", {})
         
         if message.type == MESSAGE_TYPE_MENU_ITEMS:
             for item in items:
-                if message.request_id not in self.items_to_join:
-                    self.items_to_join[message.request_id] = {}
-                self.items_to_join[message.request_id][item.get_id()] = item.get_name()
+                menu_items_state[item.get_id()] = item.get_name()
         
+        self.state_storage.data_by_request[message.request_id] = state
         logging.info(f"action: Menu Items updated | request_id: {message.request_id}")
         
     def _send_results(self, message):
         data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, {}, self.connection)
         self.message_middlewares.append(data_output_exchange)
-        self._send_processed_clients(message, data_output_exchange)
+        self._send_pending_clients(message, data_output_exchange)
         self._send_eof(message, data_output_exchange)
-        
     
-    def _send_processed_clients(self, message, data_output_exchange):
-        
+    def _send_pending_clients(self, message, data_output_exchange):
         request_id = message.request_id
         ready_to_send = ''
         
-        for (item, req_id) in list(self.pending_items):
-            if req_id != request_id:
-                continue
-            name = self.items_to_join.get(parse_int(item.item_data))
+        self.state_storage.load_state(request_id)
+        state = self.state_storage.get_data_from_request(request_id)
+        pending_results = state.get("pending_results", [])
+        
+        for item in pending_results:
+            name = item.get(parse_int(item.item_data))
             if name:
                 item.join_item_name(name)
                 ready_to_send += item.serialize()
-                self.pending_items.remove((item, req_id))
 
+        # TODO: numero mensaje
         if ready_to_send:
             serialized = Message(request_id, MESSAGE_TYPE_QUERY_2_RESULT, 0, ready_to_send).serialize()
             data_output_exchange.send(serialized, str(request_id))
+            
+        self.state_storage.delete_state(request_id)
         
-
     def _consume_data_queue(self):
         data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
         data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, {}, self.connection)
@@ -75,34 +82,37 @@ class JoinerMenuItems(Joiner):
             if self.is_dupped(message, stream="data"):
                 return
 
-            self._ensure_request(message.request_id)
-            self._inc_inflight(message.request_id)
             try:
                 items = message.process_message()
                 if message.type == MESSAGE_TYPE_QUERY_2_RESULT:
                     ready_to_send = ''
+                    state = self.state_storage.get_data_from_request(message.request_id)
+                    menu_items = state.setdefault("menu_items", {})
+                    pending_results = state.setdefault("pending_results", [])
                     for item in items:
-                        name = self.items_to_join.get(message.request_id, {}).get(parse_int(item.item_data))
+                        name = menu_items.get(parse_int(item.item_data))
                         if name:
                             item.join_item_name(name)
                             ready_to_send += item.serialize()
                         else:
-                            self.pending_items.append((item, message.request_id))
+                            pending_results.append(item)
 
                     if ready_to_send:
                         message.update_content(ready_to_send)
                         serialized = message.serialize()
                         data_output_exchange.send(serialized, str(message.request_id))
+                        
+                    if len(pending_results) > 0:                
+                        self.state_storage.data_by_request[message.request_id] = state
             finally:
-                if message.type != MESSAGE_TYPE_EOF:
-                    self._dec_inflight(message.request_id)
+                self.state_storage.save_state(message.request_id)
+                self.state_storage.cleanup_data(message.request_id)
                     
         data_input_queue.start_consuming(__on_message__)
         
     def _send_eof(self, message, data_output_exchange):
         data_output_exchange.send(message.serialize(), str(message.request_id))
         logging.info(f"action: EOF sent | request_id: {message.request_id} | type: {message.type}")
-
 
                        
 def initialize_config():
@@ -122,6 +132,7 @@ def initialize_config():
     config_params["input_queue_2"] = os.getenv('INPUT_QUEUE_2')
     config_params["output_exchange_q2"] = os.getenv('OUTPUT_EXCHANGE')
     config_params["logging_level"] = os.getenv('LOG_LEVEL', 'INFO')
+    config_params["storage_dir"] = os.getenv('STORAGE_DIR', './data')
 
     if None in (config_params["rabbitmq_host"], config_params["input_queue_1"],
                 config_params["input_queue_2"], config_params["output_exchange_q2"]):
@@ -136,7 +147,8 @@ def main():
     joiner = JoinerMenuItems(config_params["input_queue_1"],
                                  config_params["output_exchange_q2"],
                                  config_params["input_queue_2"],
-                                 config_params["rabbitmq_host"])
+                                 config_params["rabbitmq_host"],
+                                 config_params["storage_dir"])
     joiner.start()
 
 if __name__ == "__main__":

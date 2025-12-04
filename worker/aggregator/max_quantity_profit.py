@@ -22,7 +22,9 @@ class QuantityAndProfit(Worker):
         self.data_output_queue = data_output_queue
         self.eof_service_queue = eof_service_queue
         self.connection = PikaConnection(host)
-        self.state_storage = QuantityAndProfitStateStorage(storage_dir)
+        self.state_storage = QuantityAndProfitStateStorage(storage_dir, {
+            'data_by_request': {}
+        })
         
     def start(self):
         

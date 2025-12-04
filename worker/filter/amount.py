@@ -78,14 +78,14 @@ class FilterAmountNode(Worker):
         
         # Procesar mensaje
         logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type} | msg_num: {message.msg_num}")
-        self._ensure_request(message.request_id)
-        self._inc_inflight(message.request_id)
+        # self._ensure_request(message.request_id)
+        # self._inc_inflight(message.request_id)
 
         self._process_and_send_items(message, data_output_exchange)
         
         self.dedup_strategy.update_contiguous_sequence(message)
 
-        self._dec_inflight(message.request_id)
+        # self._dec_inflight(message.request_id)
 
     def _process_and_send_items(self, message, data_output_exchange):
         items = message.process_message()

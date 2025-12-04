@@ -7,7 +7,6 @@ class Q3IntermediateResult:
         self.year_half_created_at = year_half_created_at
         self.store_id = store_id
         self.intermediate_tpv = tpv
-        self.query = QUERY_3
         
     def deserialize(data: bytes):
         """ 

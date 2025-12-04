@@ -7,7 +7,6 @@ class Q4IntermediateResult:
         self.store_id = store_id
         self.birthdate = birthdate
         self.purchases_qty = purchases_qty
-        self.query = QUERY_4
         
     def deserialize(data: bytes):
         """ 

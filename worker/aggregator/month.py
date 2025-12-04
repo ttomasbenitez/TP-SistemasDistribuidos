@@ -97,8 +97,8 @@ class AggregatorMonth(Worker):
                     return
 
                 logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
-                self._ensure_request(message.request_id)
-                self._inc_inflight(message.request_id)
+                # self._ensure_request(message.request_id)
+                # self._inc_inflight(message.request_id)
 
                 self.last_message[message.request_id] = message
                 if message.request_id not in self.buffers:
@@ -118,9 +118,9 @@ class AggregatorMonth(Worker):
 
             except Exception as e:
                 logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
-            finally:
-                if message.type != MESSAGE_TYPE_EOF:
-                    self._dec_inflight(message.request_id)
+            # finally:
+            #     if message.type != MESSAGE_TYPE_EOF:
+            #         self._dec_inflight(message.request_id)
             
         data_input_queue.start_consuming(__on_message__)
 
@@ -143,7 +143,7 @@ class AggregatorMonth(Worker):
             target_queue = output_queues[queue_index]
             new_chunk = ''.join(item.serialize() for item in items)
             new_msg_num = calculate_sub_message_id(original_message.msg_num, sub_msg_id)
-            new_message = original_message.new_from_original(new_chunk, msg_num=new_msg_num)
+            new_message = Message(original_message.request_id, original_message.type, new_msg_num, new_chunk)
             logging.info(f"action: sending group | key: {key} | to_queue_index: {queue_index} | request_id: {new_message.request_id} | type: {new_message.type}")
             serialized = new_message.serialize()
             target_queue.send(serialized)

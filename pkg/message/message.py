@@ -56,7 +56,7 @@ class Message:
         Serializa el mensaje en bytes.
         :return: Mensaje serializado en bytes.
         """
-        node = self.node_id if self.node_id is not None else ''
+        node = self.node_id if self.node_id is not None else 'unknown'
         msg = f"{self.type};{self.request_id};{self.msg_num};{node};{self.content}".encode('utf-8')
         return msg
     
@@ -139,17 +139,6 @@ class Message:
         :param new_content: Nuevo contenido del mensaje.
         """
         self.content = new_content
-
-    def new_from_original(self, new_content, msg_num=None):
-        """
-        Crea un nuevo mensaje basado en este, pero con contenido actualizado.
-        :param new_content: Contenido del nuevo mensaje.
-        :param msg_num: Número de mensaje opcional. Si no se provee, se usa el del mensaje original.
-        :return: Nuevo objeto Message independiente.
-        """
-        if msg_num is None:
-            msg_num = self.msg_num
-        return Message(self.request_id, self.type, msg_num, new_content)
     
     def get_node_id_and_request_id(self):
         """

@@ -33,7 +33,10 @@ class SemesterAggregator(Worker):
         self._agg_by_request = {}
         # Persistent storage
         storage_dir = os.getenv('SEMESTER_STORAGE_DIR', './data/semester_agg')
-        self.state_storage = SemesterAggregatorStateStorage(storage_dir)
+        self.state_storage = SemesterAggregatorStateStorage(storage_dir, {
+            "agg": True,
+            "last_msg_by_sender": True
+        })
         # EOF accounting per request
         self._eof_acks_by_request = {}
         self._eof_lock = threading.Lock()
@@ -96,8 +99,8 @@ class SemesterAggregator(Worker):
                     return
                 
                 logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
-                self._ensure_request(message.request_id)
-                self._inc_inflight(message.request_id) 
+                # self._ensure_request(message.request_id)
+                # self._inc_inflight(message.request_id) 
 
                 # Per-sender sequencing check
                 if not self._should_process_and_update(message):
@@ -130,9 +133,9 @@ class SemesterAggregator(Worker):
 
             except Exception as e:
                 logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
-            finally:
-                if message.type != MESSAGE_TYPE_EOF:
-                    self._dec_inflight(message.request_id)
+            # finally:
+            #     if message.type != MESSAGE_TYPE_EOF:
+            #         self._dec_inflight(message.request_id)
         
         data_input_queue.start_consuming(__on_message__)
 

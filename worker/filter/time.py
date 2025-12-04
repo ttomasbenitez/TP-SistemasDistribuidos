@@ -66,8 +66,8 @@ class FilterTimeNode(Worker):
 
                 logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
                 
-                self._ensure_request(message.request_id)
-                self._inc_inflight(message.request_id)
+                # self._ensure_request(message.request_id)
+                # self._inc_inflight(message.request_id)
 
                 items = message.process_message()
 
@@ -94,9 +94,9 @@ class FilterTimeNode(Worker):
                     
             except Exception as e:
                 logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
-            finally:
-                if message.type != MESSAGE_TYPE_EOF:
-                    self._dec_inflight(message.request_id)
+            # finally:
+            #     if message.type != MESSAGE_TYPE_EOF:
+            #         self._dec_inflight(message.request_id)
 
         data_in_queue.start_consuming(__on_message__)
 

@@ -50,9 +50,10 @@ class ClientHandler(threading.Thread):
             items = message.process_message_from_csv()
             serialized = ''.join(i.serialize() for i in items)
             message.update_content(serialized)
+            message.add_node_id(f"gateway-{self._request_id}")
 
             self._exchange.send(message.serialize(), str(message.type))
-            logging.info(f"action: send_to_exchange | result: success | type: {message.type}")
+            logging.info(f"action: send_to_exchange | result: success | type: {message.type} | node id: {message.node_id} | request_id: {message.request_id}")
 
     def _start_results_consumer(self):
     

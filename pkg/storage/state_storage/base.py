@@ -5,13 +5,19 @@ import threading
 
 class StateStorage(ABC):
     
-    def __init__(self, storage_dir: str):
+    def __init__(self, storage_dir: str, default_state: dict):
         self.data_by_request = dict()
         self.storage_dir = storage_dir
         self._lock = threading.Lock()
+        self.default_state = default_state
         
         if not os.path.exists(self.storage_dir):
             os.makedirs(self.storage_dir)
+            
+    def get_data_from_request(self, request_id):
+        """Obtiene el estado en memoria para un request_id específico."""
+        with self._lock:
+            return self.data_by_request.get(request_id, self.default_state)
         
     def load_state(self, request_id):
         """Carga el estado desde los archivos en el directorio de almacenamiento."""
@@ -82,9 +88,41 @@ class StateStorage(ABC):
         except Exception as e:
             logging.error(f"Error al guardar estado para request_id {request_id}: {e.args}")
             
+    
+    def save_specific_state(self, request_id, key, reset_state=False):
+        """
+        Guarda en disco el estado NUEVO de un request_id agregando
+        al archivo existente, y luego limpia el buffer en RAM.
+        """
+        if request_id not in self.data_by_request:
+            logging.error(f"No hay estado en memoria para request_id {request_id}, nada que guardar.")
+            return
+
+        final_filepath = os.path.join(self.storage_dir, f"{request_id}.txt")
+
+        try:
+            os.makedirs(self.storage_dir, exist_ok=True)
+
+            with self._lock:
+                with open(final_filepath, "a") as f:
+                    self._save_specific_state_to_file(f, key, request_id)
+                    f.flush()
+                    os.fsync(f.fileno())
+                if reset_state:
+                    self.cleanup_state(request_id)
+
+            logging.debug(f"Estado (append) guardado para request_id: {request_id}")
+            
+        except Exception as e:
+            logging.error(f"Error al guardar estado para request_id {request_id}: {e.args}")
+            
+    
     @abstractmethod
     def _save_state_to_file(self, file_handle, request_id):
         raise NotImplementedError("Este método debe ser implementado por subclases.")
+    
+    def _save_specific_state_to_file(self, file_handle, key, request_id):
+        pass
     
     def delete_state(self, request_id):
         """Borra el estado de un request_id de memoria y disco."""
@@ -105,3 +143,11 @@ class StateStorage(ABC):
         if request_id in self.data_by_request:
             del self.data_by_request[request_id]
             logging.debug(f"Estado en memoria limpiado para request_id: {request_id}")
+            
+    def cleanup_data(self, request_id):
+        """Limpia una clave específica del estado en memoria para un request_id."""
+        if request_id in self.data_by_request:
+            for (key, data) in self.data_by_request[request_id]:
+                if key is not 'last_by_sender':
+                    del self.data_by_request[request_id][key]
+                    logging.debug(f"Clave '{key}' limpiada del estado en memoria para request_id: {request_id}")

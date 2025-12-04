@@ -7,23 +7,26 @@ class TopThreeClientsStateStorage(StateStorage):
         Carga el estado desde archivo para un request_id.
 
         Formatos aceptados:
-            T;store_id;user_id;count
-            U;user_id;birthdate
+            TR;store_id;user_id;count
+            UB;user_id;birthdate
 
         Estructura de destino:
             self.data_by_request[request_id] = {
                 "users_by_store": { store_id: { user_id: total_count } },
-                "users_birthdates": { user_id: birthdate }
+                "users_birthdates": { user_id: birthdate },
+                "last_by_sender": { `sender_id:steam` : last_num_sent }
             }
         """
 
         state = self.data_by_request.setdefault(request_id, {
             "users_by_store": {},
-            "users_birthdates": {}
+            "users_birthdates": {},
+            "last_by_sender": {}
         })
 
         users_by_store = state["users_by_store"]
         users_birthdates = state["users_birthdates"]
+        last_by_sender = state["last_by_sender"]
 
         for line in file_handle:
             line = line.strip()
@@ -34,7 +37,7 @@ class TopThreeClientsStateStorage(StateStorage):
 
             kind = parts[0]
 
-            if kind == "T":
+            if kind == "TR":
                 _k, store_id_str, user_id_str, count_str = parts
                 try:
                     store_id = int(store_id_str)
@@ -47,7 +50,7 @@ class TopThreeClientsStateStorage(StateStorage):
                 store_users[user_id] = store_users.get(user_id, 0) + count
                 continue
 
-            if kind == "B":
+            if kind == "UB":
                 _k, user_id_str, birthdate = parts
 
                 try:
@@ -58,15 +61,31 @@ class TopThreeClientsStateStorage(StateStorage):
                 users_birthdates[user_id] = birthdate
                 continue
             
+            if kind == "SE":
+                _k, sender_key, last_str = parts
+
+                try:
+                    last_num = int(last_str)
+                except ValueError as e:
+                    continue
+
+                last_by_sender[sender_key] = max(last_by_sender.get(sender_key, -1), last_num)
+                continue
+            
+        self.data_by_request[request_id]["users_by_store"] = users_by_store 
+        self.data_by_request[request_id]["users_birthdates"] = users_birthdates
+        self.data_by_request[request_id]["last_by_sender"] = last_by_sender
+        
+            
     def _append_transaction(self, users_by_store, file_handle):
         for store_id, users in users_by_store.items():
             for user_id, count in users.items():
-                line = f"T;{store_id};{user_id};{count}\n"
+                line = f"TR;{store_id};{user_id};{count}\n"
                 file_handle.write(line)
                 
     def _append_birthdates(self, users_birthdates, file_handle):
         for user_id, birthdate in users_birthdates.items():
-            line = f"B;{user_id};{birthdate}\n"
+            line = f"UB;{user_id};{birthdate}\n"
             file_handle.write(line)
     
     def _save_state_to_file(self, file_handle, request_id):
