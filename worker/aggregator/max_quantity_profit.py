@@ -25,10 +25,10 @@ class QuantityAndProfit(Worker):
         self.connection = PikaConnection(host)
         self.node_id = node_id
         self.expected_eofs = expected_eofs
-        self.eofs_by_request = {}
         self.state_storage = QuantityAndProfitStateStorage(storage_dir, {
             'items_by_ym': {},
-            'last_by_sender': {}
+            'last_by_sender': {},
+            'eofs_by_request': {}
         })
         self.msg_num_counter = 0
         
@@ -54,10 +54,7 @@ class QuantityAndProfit(Worker):
                 
                 if message.type == MESSAGE_TYPE_EOF:
                     return self._process_on_eof_message__(message, data_output_queue)
-                
-                #self._ensure_request(message.request_id)
-                #self._inc_inflight(message.request_id)
-                
+
                 # Dedup/ordering check
                 sender_id = message.get_node_id_and_request_id()
                 state = self.state_storage.get_data_from_request(message.request_id)
@@ -87,10 +84,10 @@ class QuantityAndProfit(Worker):
     def _process_on_eof_message__(self, message, data_output_queue):
         """Handle EOF message: track, send results when all EOFs received, cleanup."""
         
-        self.eofs_by_request[message.request_id] = self.eofs_by_request.get(message.request_id, 0) + 1
-        logging.info(f"EOF received | request_id: {message.request_id} | count: {self.eofs_by_request[message.request_id]}/{self.expected_eofs}")
+        self.state_storage.eofs_by_request[message.request_id] = self.state_storage.eofs_by_request.get(message.request_id, 0) + 1
+        logging.info(f"EOF received | request_id: {message.request_id} | count: {self.state_storage.eofs_by_request[message.request_id]}/{self.expected_eofs}")
         
-        if self.eofs_by_request[message.request_id] < self.expected_eofs:
+        if self.state_storage.eofs_by_request[message.request_id] < self.expected_eofs:
             return  # Wait for more EOFs
         
         self.state_storage.load_state(message.request_id)
@@ -102,7 +99,7 @@ class QuantityAndProfit(Worker):
         logging.info(f"EOF forwarded downstream | request_id: {message.request_id}")
         
         # Clean up
-        del self.eofs_by_request[message.request_id]
+        del self.state_storage.eofs_by_request[message.request_id]
         self.state_storage.delete_state(message.request_id)
             
     def _accumulate_items(self, items, request_id, sender_id=None, msg_num=None):
