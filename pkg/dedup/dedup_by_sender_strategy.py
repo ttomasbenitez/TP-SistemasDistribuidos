@@ -31,6 +31,9 @@ class DedupBySenderStrategy(DedupStrategy):
         state["last_by_sender"][key] = message.msg_num
         self.state_storage.data_by_request[message.request_id] = state
         
+        return False
+    
+    def mark_as_processed(self, message: Message):
         self.snapshot_interval.setdefault(message.request_id, 0)
         self.snapshot_interval[message.request_id] += 1
         
@@ -40,8 +43,6 @@ class DedupBySenderStrategy(DedupStrategy):
             self.state_storage.save_state(message.request_id)
         else:
             self.state_storage.append_state(message.request_id)
-        
-        return False
     
     def save_dedup_state(self, message: Message):
         self.state_storage.save_state(message.request_id)

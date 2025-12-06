@@ -125,6 +125,37 @@ def run_q1_chaos(interval):
         print(f"⏳ Sleeping for {interval}s...\n")
         time.sleep(interval)
         
+def run_q2_chaos(interval):
+    """Kills 5 random target containers every `interval` seconds."""
+    print(f"😈 Starting Chaos Monkey (Q1 Mode). Interval: {interval}s")
+    print(f"🎯 Target services: 5 random from filter/time/year family")
+
+    possible_targets = [
+        'aggregator-month-1', 'aggregator-month-2',
+        'aggregator-quantity-profit-1', 'aggregator-quantity-profit-2', 'aggregator-quantity-profit-1-3',
+    ]
+
+    while True:
+        containers = get_running_containers()
+
+        # Intersect running containers ∩ targets
+        targets = [c for c in containers if c in possible_targets]
+
+        if not targets:
+            print("⚠️ No target containers found.")
+        else:
+            # Elegir hasta 5 contenedores al azar
+            kill_count = min(6, len(targets))
+            chosen = random.sample(targets, kill_count)
+
+            print(f"🔥 Selected {kill_count} container(s) to KILL: {chosen}")
+
+            for target in chosen:
+                kill_container(target)
+
+        print(f"⏳ Sleeping for {interval}s...\n")
+        time.sleep(interval)
+
 def run_combined_chaos(random_interval, top_three_interval):
     """Runs both random and top-three chaos simultaneously in separate threads."""
     print(f"😈 Starting Chaos Monkey (Combined Mode)")
@@ -156,7 +187,9 @@ def main():
     parser.add_argument('--top-three-interval', type=float, default=15, help='Interval in seconds for top-three mode (default: 5)')
     parser.add_argument('--node', type=str, help='Specific node (service name) to kill')
     parser.add_argument('--q1', type=str, help='Specific q1 kill')
-    parser.add_argument('--q1-interval', type=float, default=15, help='Interval in seconds for top-three mode (default: 5)')
+    parser.add_argument('--q1-interval', type=float, default=5, help='Interval in seconds for top-three mode (default: 5)')
+    parser.add_argument('--q2', type=str, help='Specific q2 kill')
+    parser.add_argument('--q2-interval', type=float, default=5, help='Interval in seconds for top-three mode (default: 5)')
     
     args = parser.parse_args()
 
@@ -180,6 +213,11 @@ def main():
     elif args.q1:
         try:
             run_q1_chaos(args.q1_interval)
+        except KeyboardInterrupt:
+            print("\n😇 Chaos Monkey stopped.")
+    elif args.q2:
+        try:
+            run_q2_chaos(args.q2_interval)
         except KeyboardInterrupt:
             print("\n😇 Chaos Monkey stopped.")
     else:

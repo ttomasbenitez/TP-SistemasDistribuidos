@@ -77,7 +77,6 @@ class FilterAmountNode(Worker):
             return
         
         self._process_and_send_items(message, data_output_exchange)
-        
         self.dedup_strategy.save_dedup_state(message)
         
     def _process_and_send_items(self, message, data_output_exchange):

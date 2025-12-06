@@ -57,7 +57,7 @@ class QuantityAndProfit(Worker):
                         logging.info(f"action: all_eofs_received | request_id: {message.request_id} | sending results")
                         self._send_results_by_date(message.request_id, data_output_queue)
                         self.eof_storage.delete_state(message.request_id)
-                        
+                        self.dedup_strategy.clean_dedup_state(message.request_id)
                     return
                 
                 if self.dedup_strategy.is_duplicate(message):
@@ -67,6 +67,8 @@ class QuantityAndProfit(Worker):
                 items = message.process_message()
                 if items:
                     self._accumulate_items(items, message.request_id)
+                    
+                self.dedup_strategy.mark_as_processed(message)
             
             except Exception as e:
                 logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
