@@ -117,7 +117,6 @@ class Q4StoresJoiner(Joiner):
     def _send_eof(self, message, data_output_exchange):
         message.update_content("4")
         data_output_exchange.send(message.serialize(), str(message.request_id))
-        last_eof_count += 1
         logging.info(f"action: EOF sent | request_id: {message.request_id} | type: {message.type}")
         self.state_storage.delete_state(message.request_id)
 

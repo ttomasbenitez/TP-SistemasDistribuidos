@@ -110,10 +110,12 @@ class JoinerStoresStateStorage(StateStorage, ABC):
         if not state:
             return
 
-        self._append_sender_data(state["last_by_sender"], file_handle)
-        self._append_stores(state["stores"], file_handle)
-        self._append_pending_results(state["pending_results"], file_handle)
-        self._append_last_eofs(state["last_eofs_by_node"], file_handle)
+        self._append_sender_data(state.get("last_by_sender", {}), file_handle)
+        self._append_stores(state.get("stores", {}), file_handle)
+        self._append_pending_results(state.get("pending_results", []), file_handle)
+        # Persist a single last_eof_count line (format: LE;{count})
+        last_eof_count = state.get("last_eof_count", 0)
+        file_handle.write(f"LE;{last_eof_count}\n")
             
     @abstractmethod
     def _load_pending_clients(self, parts):

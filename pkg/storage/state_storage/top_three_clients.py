@@ -1,6 +1,7 @@
 from pkg.storage.state_storage.base import StateStorage
 import logging
 import os
+import threading
 
 
 class TopThreeClientsStateStorage(StateStorage):
@@ -15,6 +16,36 @@ class TopThreeClientsStateStorage(StateStorage):
     processing, then save atomically to disk only when EOF is received.
     """
 
+    def __init__(self, default_state):
+        """
+        In-memory only storage for TopThreeClients. No disk I/O.
+        """
+        # Do NOT call super().__init__ to avoid creating directories
+        self.data_by_request = {}
+        self._data_lock = threading.Lock()
+        self.default_state = default_state
+        # storage_dir intentionally omitted (no persistence)
+
+    # ---- Disable disk I/O entirely (no-ops) ----
+    def load_state_all(self):
+        return
+
+    def load_state(self, request_id):
+        return
+
+    def save_state(self, request_id):
+        return
+
+    def append_state(self, request_id):
+        return
+
+    def delete_state(self, request_id):
+        # Only clear in-memory state
+        with self._data_lock:
+            if request_id in self.data_by_request:
+                del self.data_by_request[request_id]
+
+    # ---- Legacy file handlers kept for compatibility but unused ----
     def _load_state_from_file(self, file_handle, request_id):
         """
         Load persisted state from file.

@@ -19,10 +19,9 @@ class TopThreeClientsJoiner(Joiner):
                  data_output_queue: str,
                  users_input_queue: str,
                  host: str,
-                 storage_dir: str,
                  node_id: str = None):
         
-        super().__init_client_handler__(users_input_queue, host, EXPECTED_EOFS, TopThreeClientsStateStorage(storage_dir, {
+        super().__init_client_handler__(users_input_queue, host, EXPECTED_EOFS, TopThreeClientsStateStorage({
             "users_by_store": {},
             "users_birthdates": {},
             "last_by_sender": {},
@@ -32,6 +31,8 @@ class TopThreeClientsJoiner(Joiner):
         self.data_input_queue = data_input_queue
         self.data_output_queue = data_output_queue
         self.node_id = node_id
+        self.msg_num_counter = 0
+        self.eofs_sent = set()
      
 
     def _consume_data_queue(self):
@@ -76,9 +77,7 @@ class TopThreeClientsJoiner(Joiner):
                 
             store_users = users_by_store.setdefault(store_id, {})
             store_users[user_id] = store_users.get(user_id, 0) + 1
-        
-        self.state_storage.save_state(request_id)
-        logging.info(f"action: snapshot_saved | request_id: {request_id} | type: transactions")
+        logging.info(f"action: snapshot_in_mem | request_id: {request_id} | type: transactions")
         
         logging.debug(f"action: transactions_accumulated | request_id: {request_id} | items: {len(items)}")
 
@@ -97,8 +96,7 @@ class TopThreeClientsJoiner(Joiner):
             if user_id and birthdate:
                 users_birthdates[user_id] = birthdate
 
-        self.state_storage.save_state(message.request_id)
-        logging.info(f"action: snapshot_saved | request_id: {message.request_id}")
+        logging.info(f"action: snapshot_in_mem | request_id: {message.request_id}")
         
         logging.debug(f"action: users_accumulated | request_id: {message.request_id} | items: {len(items)}")
         
@@ -108,11 +106,9 @@ class TopThreeClientsJoiner(Joiner):
         
         self._process_top_3_by_request(message.request_id, data_output_queue)
         self._send_eof(message, data_output_queue)
-        self.state_storage.delete_state(message.request_id)
         
     def _process_top_3_by_request(self, request_id, data_output_queue):
         """Send 1 message per store with top-3 users joined with birthdates."""
-        self.state_storage.load_state(request_id)
         current_state = self.state_storage.get_state(request_id)
         
         users_by_store_state = current_state.get("users_by_store", {})
@@ -160,7 +156,6 @@ class TopThreeClientsJoiner(Joiner):
         self.eofs_sent.add(message.request_id)
         data_output_queue.send(message.serialize())
         logging.info(f"action: eof_forwarded | request_id: {message.request_id} | node_id: {self.node_id}")
-        self.state_storage.delete_state(message.request_id)
 
 
 def initialize_config():
@@ -170,7 +165,6 @@ def initialize_config():
     config_params["input_queue_2"] = os.getenv('INPUT_QUEUE_2')
     config_params["output_queue"] = os.getenv('OUTPUT_QUEUE_1')
     config_params["logging_level"] = os.getenv('LOG_LEVEL', 'INFO')
-    config_params["storage_dir"] = os.getenv('STORAGE_DIR', './data')
     config_params["node_id"] = os.getenv('NODE_ID', '1')
 
     if None in [config_params["rabbitmq_host"], config_params["input_queue_1"],
@@ -189,7 +183,6 @@ def main():
                                    config_params["output_queue"], 
                                    config_params["input_queue_2"], 
                                    config_params["rabbitmq_host"],
-                                   config_params["storage_dir"],
                                    config_params["node_id"])
     joiner.start()
 
