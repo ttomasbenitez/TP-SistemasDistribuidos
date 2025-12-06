@@ -8,8 +8,6 @@ from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_TRANSACTIONS
 from Middleware.connection import PikaConnection
 from utils.heartbeat import start_heartbeat_sender
 from pkg.dedup.sliding_window_dedup_strategy import SlidingWindowDedupStrategy
-from pkg.message.utils import calculate_sub_message_id
-from pkg.message.constants import SUB_MESSAGE_START_ID
 
 BATCH_SIZE = 100000
 
@@ -39,6 +37,7 @@ class StoreAggregator(Worker):
     def start(self):    
         self.heartbeat_sender = start_heartbeat_sender()
         self.connection.start()
+        self.dedup_strategy.load_dedup_state()
         self._consume_data_queue()
         self.connection.start_consuming()
         self.heartbeat_sender.stop()
@@ -47,75 +46,31 @@ class StoreAggregator(Worker):
         data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
         data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, self.output_exchange_queues, self.connection)
         self.message_middlewares.extend([data_input_queue, data_output_exchange])
-        
-        self.dedup_strategy.load_dedup_state()
-        self.buffers = {}
-        self.last_message = {}
-        
-        def _flush_buffer(request_id, store, data_output_exchange):
-            if request_id not in self.buffers or store not in self.buffers[request_id]:
-                return
-            
-            items = self.buffers[request_id][store]
-            if not items:
-                return
-
-            # Use the last message as a template
-            original_message = self.last_message.get(request_id)
-            if not original_message:
-                logging.error(f"action: flush_buffer | error: no original message found for request_id: {request_id}")
-                return
-
-            single_group = {store: items}
-            
-            current_msg_num = self.dedup_strategy.current_msg_num.get(request_id, 0)
-            self._send_groups(original_message, single_group, data_output_exchange, current_msg_num)
-            
-            # Clear the buffer
-            self.buffers[request_id][store] = []
-        
+      
         def __on_message__(message):
             try:
                 message = Message.deserialize(message)
 
                 if message.type == MESSAGE_TYPE_EOF:
                     logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
-                    
-                    # Flush all remaining buffers for this request_id
-                    if message.request_id in self.buffers:
-                        for store in list(self.buffers[message.request_id].keys()):
-                            _flush_buffer(message.request_id, store, data_output_exchange)
-                        del self.buffers[message.request_id]
-                    
-                    if message.request_id in self.last_message:
-                        del self.last_message[message.request_id]
-                    
-                    data_output_exchange.send(message.serialize(), str(message.type))
-                    self.dedup_strategy.update_state_on_eof(message)
+                    new_msg_count = self.get_msg_count(message.request_id)
+                    new_eof_message = Message(message.request_id, MESSAGE_TYPE_EOF, new_msg_count, '', self.node_id)
+                    data_output_exchange.send(new_eof_message.serialize(), str(MESSAGE_TYPE_EOF))
+                    self.dedup_strategy.save_dedup_state(message)
                     return
                 
                 logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
                 
-                if self.dedup_strategy.check_state_before_processing(message) is False:
+                if self.dedup_strategy.is_duplicate(message):
+                    logging.info(f"action: duplicate message detected and skipped | request_id: {message.request_id} | msg_type: {message.type} | msg_num: {message.msg_num}")
                     return
-                
-                self.last_message[message.request_id] = message
-                if message.request_id not in self.buffers:
-                    self.buffers[message.request_id] = {}
                 
                 items = message.process_message()
                 groups = self._group_items_by_store(items)
                 
-                for store, group_items in groups.items():
-                    if store not in self.buffers[message.request_id]:
-                        self.buffers[message.request_id][store] = []
-                    
-                    self.buffers[message.request_id][store].extend(group_items)
-                    
-                    if len(self.buffers[message.request_id][store]) >= BATCH_SIZE:
-                        _flush_buffer(message.request_id, store, data_output_exchange)
+                self._send_groups(message, groups, data_output_exchange)
                 
-                self.dedup_strategy.update_contiguous_sequence(message)
+                self.dedup_strategy.save_dedup_state(message)
             except Exception as e:
                 logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
         
@@ -128,22 +83,28 @@ class StoreAggregator(Worker):
             groups.setdefault(store, []).append(item)
         return groups
     
-    def _send_groups(self, original_message: Message, groups: dict, data_output_exchange: MessageMiddlewareExchange, current_msg_num: int = None):
-        if current_msg_num is None:
-            current_msg_num = self.dedup_strategy.current_msg_num.get(original_message.request_id, 0)
+    def _send_groups(self, original_message: Message, groups: dict, data_output_exchange: MessageMiddlewareExchange):
         
         for key, items in groups.items():
-            logging.info(f"action: sending grouped items | request_id: {original_message.request_id} | store: {key} | node: {self.node_id} | msg_num: {current_msg_num} | items: {len(items)}")
+            logging.info(f"action: sending grouped items | request_id: {original_message.request_id} | store: {key} | node: {self.node_id} | items: {len(items)}")
             new_chunk = ''.join(item.serialize() for item in items)
-            new_message = Message(original_message.request_id, original_message.type, current_msg_num, new_chunk, self.node_id)
+            new_msg_count = self.get_msg_count(original_message.request_id)
+            new_message = Message(original_message.request_id, original_message.type, new_msg_count, new_chunk, self.node_id)
             serialized = new_message.serialize()
             first_item = items[0]
             sharding_key_value = first_item.get_sharding_key(self.sharding_key)
             sharding_key = sharding_key_value % self.total_shards
             data_output_exchange.send(serialized, f"{str(new_message.type)}.{sharding_key}")
-            current_msg_num += 1
         
-        self.dedup_strategy.current_msg_num[original_message.request_id] = current_msg_num
+        
+    def get_msg_count(self, request_id: int) -> int:
+        # Leo el valor actual (o -1 si no existe)…
+        current = self.dedup_strategy.current_msg_num.get(request_id, -1)
+        # …y genero el siguiente
+        new_val = current + 1
+        # Lo guardo asociado a ese request_id
+        self.dedup_strategy.current_msg_num[request_id] = new_val
+        return new_val
                
 def initialize_config():
     """ Parse env variables to find program config params

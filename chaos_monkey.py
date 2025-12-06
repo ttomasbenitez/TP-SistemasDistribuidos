@@ -178,48 +178,74 @@ def run_combined_chaos(random_interval, top_three_interval):
     except KeyboardInterrupt:
         print("\n😇 Chaos Monkey stopped.")
 
+
 def main():
     parser = argparse.ArgumentParser(description='Chaos Monkey for Docker Compose')
-    parser.add_argument('--random', action='store_true', help='Enable random killing mode')
-    parser.add_argument('--top-three', action='store_true', help='Enable top-three killing mode')
-    parser.add_argument('--combined', action='store_true', help='Enable both random and top-three modes simultaneously')
-    parser.add_argument('--interval', type=float, default=1, help='Interval in seconds for random mode (default: 1)')
-    parser.add_argument('--top-three-interval', type=float, default=15, help='Interval in seconds for top-three mode (default: 5)')
-    parser.add_argument('--node', type=str, help='Specific node (service name) to kill')
-    parser.add_argument('--q1', type=str, help='Specific q1 kill')
-    parser.add_argument('--q1-interval', type=float, default=10, help='Interval in seconds for top-three mode (default: 5)')
-    parser.add_argument('--q2', type=str, help='Specific q2 kill')
-    parser.add_argument('--q2-interval', type=float, default=10, help='Interval in seconds for top-three mode (default: 5)')
+    
+    # Modos generales
+    parser.add_argument('--random', action='store_true',
+                        help='Enable random killing mode')
+    parser.add_argument('--top-three', action='store_true',
+                        help='Enable top-three killing mode')
+    parser.add_argument('--combined', action='store_true',
+                        help='Enable both random and top-three modes simultaneously')
+    
+    # Intervalos
+    parser.add_argument('--interval', type=float, default=1,
+                        help='Interval in seconds for random mode (default: 1)')
+    parser.add_argument('--top-three-interval', type=float, default=15,
+                        help='Interval in seconds for top-three mode (default: 15)')
+    
+    # Kill de un nodo puntual
+    parser.add_argument('--node', type=str,
+                        help='Specific node (service name) to kill once and exit')
+    
+    # Modos Q1 / Q2 (ARREGLADOS)
+    parser.add_argument('--q1', action='store_true',
+                        help='Enable q1 killing mode')
+    parser.add_argument('--q1-interval', type=float, default=5,
+                        help='Interval in seconds for q1 mode (default: 5)')
+    
+    parser.add_argument('--q2', action='store_true',
+                        help='Enable q2 killing mode')
+    parser.add_argument('--q2-interval', type=float, default=5,
+                        help='Interval in seconds for q2 mode (default: 5)')
     
     args = parser.parse_args()
 
     if args.node:
         kill_container(args.node)
+
     elif args.combined:
         try:
             run_combined_chaos(args.interval, args.top_three_interval)
         except KeyboardInterrupt:
             print("\n😇 Chaos Monkey stopped.")
+
     elif args.top_three:
         try:
             run_top_three_chaos(args.top_three_interval)
         except KeyboardInterrupt:
             print("\n😇 Chaos Monkey stopped.")
+
     elif args.random:
         try:
             run_random_chaos(args.interval)
         except KeyboardInterrupt:
             print("\n😇 Chaos Monkey stopped.")
+
     elif args.q1:
         try:
             run_q1_chaos(args.q1_interval)
         except KeyboardInterrupt:
             print("\n😇 Chaos Monkey stopped.")
+
     elif args.q2:
         try:
             run_q2_chaos(args.q2_interval)
         except KeyboardInterrupt:
             print("\n😇 Chaos Monkey stopped.")
+
     else:
         parser.print_help()
 
