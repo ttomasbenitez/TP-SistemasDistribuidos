@@ -11,14 +11,13 @@ from pkg.dedup.dedup_by_sender_strategy import DedupBySenderStrategy
 from pkg.storage.state_storage.eof_storage import EofStorage
 class EofService(Worker, ABC):
   
-    def __init__(self, eof_input_queque: str, eof_output_middleware: str, expected_acks: int, host: str, storege_dir: str = "./data/eof_service_storage"):
+    def __init__(self, eof_input_queque: str, eof_output_middleware: str, expected_acks: int, host: str, storage_dir: str = "./data/eof_service_storage"):
         self.connection = PikaConnection(host)
         self.eof_input_queque = eof_input_queque
         self.eof_output_middleware = eof_output_middleware
         self.expected_acks = expected_acks
-        self.acks_by_client = dict()
-        self.dedup_strategy = DedupBySenderStrategy(storege_dir)
-        self.eof_storage = EofStorage(storege_dir)
+        self.dedup_strategy = DedupBySenderStrategy(storage_dir)
+        self.eof_storage = EofStorage(storage_dir)
         
         signal.signal(signal.SIGTERM, self.__handle_shutdown)
         signal.signal(signal.SIGINT, self.__handle_shutdown)
@@ -41,16 +40,11 @@ class EofService(Worker, ABC):
             try:
                 message = Message.deserialize(message)
                 if message.type == MESSAGE_TYPE_EOF:
-                    if self.dedup_strategy.is_duplicate(message):
-                        logging.info(f"Mensaje EOF duplicado ignorado | request_id: {message.request_id}")
-                        return
-                    logging.info(f"EOF recibido en service queue | request_id: {message.request_id}")
-                    state = self.eof_storage.get_state(message.request_id)
-                    state["eofs_count"] = state.get('eofs_count') + 1  
-                    if state["eofs_count"] == self.expected_acks:
-                        logging.info(f"Enviando final EOF del cliente {message.request_id}")
+                    if self.on_eof_message(message, self.dedup_strategy, self.eof_storage, self.expected_acks):
+                        logging.info(f"action: all_eofs_received | request_id: {message.request_id} | sending EOF ack")
                         self.send_message(message)
                         self.eof_storage.delete_state(message.request_id)
+                        self.dedup_strategy.clean_dedup_state(message.request_id)
             except Exception as e:
                 logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
                 

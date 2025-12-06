@@ -1,12 +1,15 @@
-from abc import ABC, abstractmethod
+from pkg.dedup.base import DedupStrategy
 from pkg.message.message import Message
 import logging
 from pkg.storage.state_storage.dedup_by_sender_storage import DedupBySenderStorage
 
-class DedupBySenderStrategy(ABC):
+SNAPSHOT_INTERVAL = 1000
+
+class DedupBySenderStrategy(DedupStrategy):
     
     def __init__(self, storege_dir: str):
         self.state_storage = DedupBySenderStorage(storege_dir)
+        self.snapshot_interval = {}
     
     def is_duplicate(self, message: Message):
         """
@@ -28,9 +31,18 @@ class DedupBySenderStrategy(ABC):
         state["last_by_sender"][key] = message.msg_num
         self.state_storage.data_by_request[message.request_id] = state
         
+        self.snapshot_interval.setdefault(message.request_id, 0)
+        self.snapshot_interval[message.request_id] += 1
+        
+        if self.snapshot_interval[message.request_id] >= SNAPSHOT_INTERVAL:
+            logging.info(f"action: saving dedup state snapshot | request_id: {message.request_id} | msg_num: {message.msg_num} | last_contiguous: {self.last_contiguous_msg_num[message.request_id]} | pending_size: {len(self.pending_messages[message.request_id])}")
+            self.snapshot_interval[message.request_id] = 0
+            self.state_storage.save_state(message.request_id)
+        else:
+            self.state_storage.append_state(message.request_id)
+        
         return False
     
-    @abstractmethod
     def save_dedup_state(self, message: Message):
         self.state_storage.save_state(message.request_id)
         

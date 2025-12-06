@@ -59,10 +59,13 @@ class StateStorage(ABC):
                     
                     filepath = os.path.join(self.storage_dir, filename)
                     
+                    if not os.path.exists(filepath):
+                        logging.info(f"No hay estado persistido para request_id {request_id} en {filepath}")
+                        return
+                    
                     with self._file_lock:
                         with open(filepath, "r") as f:
                             self._load_state_from_file(f, request_id)
-                        
                         logging.info(f"Estado cargado para request_id: {request_id}")
                     
         except Exception as e:

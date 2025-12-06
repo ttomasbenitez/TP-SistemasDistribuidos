@@ -5,6 +5,7 @@ from pkg.message.message import Message
 import signal
 import logging
 from multiprocessing import Manager
+from pkg.storage.state_storage.eof_storage import EofStorage
 
 class Worker(ABC):
     
@@ -57,7 +58,7 @@ class Worker(ABC):
         eof_self_queue = MessageMiddlewareQueue(self.eof_self_queue, self.connection)
         self.message_middlewares.extend([eof_service_queue, eof_self_queue])
         
-        def on_eof_message(message):
+        def _on_eof_message(message):
             try:
                 message = Message.deserialize(message)
                 if message.type == MESSAGE_TYPE_EOF:
@@ -69,7 +70,7 @@ class Worker(ABC):
             except Exception as e:
                 logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
         
-        eof_self_queue.start_consuming(on_eof_message)
+        eof_self_queue.start_consuming(_on_eof_message)
     
     def stop(self):
         try:
@@ -129,3 +130,19 @@ class Worker(ABC):
         state["last_by_sender"][key] = message.msg_num
         self.state_storage.data_by_request[message.request_id] = state
         return False
+    
+    def on_eof_message(self, message: Message, dedup_strategy, eof_storage: EofStorage, expected_acks: int):
+        if dedup_strategy.is_duplicate(message):
+            logging.info(f"Mensaje EOF duplicado ignorado | request_id: {message.request_id}")
+            return
+        
+        logging.info(f"EOF recibido en service queue | request_id: {message.request_id}")
+        state = eof_storage.get_state(message.request_id)
+        state["eofs_count"] = state.get('eofs_count') + 1  
+        if state["eofs_count"] == expected_acks:
+            logging.info(f"Enviando final EOF del cliente {message.request_id}")
+            return True
+        else:
+            eof_storage.data_by_request[message.request_id] = state
+            eof_storage.save_state(message)
+            return False

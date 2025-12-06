@@ -6,6 +6,8 @@ from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExcha
 from pkg.message.constants import MESSAGE_TYPE_EOF
 from Middleware.connection import PikaConnection
 import signal
+from pkg.dedup.dedup_by_sender_strategy import DedupBySenderStrategy
+from pkg.storage.state_storage.eof_storage import EofStorage
 
 class EofServiceMonth(EofService):
     
@@ -13,13 +15,15 @@ class EofServiceMonth(EofService):
                  eof_input_queque: str, 
                  output_queues: list,
                  expected_acks: int,
-                 host: str):
+                 host: str,
+                 storage_dir: str):
         
         self.connection = PikaConnection(host)
         self.eof_input_queque = eof_input_queque
         self.eof_output_queues = output_queues
         self.expected_acks = expected_acks
-        self.acks_by_client = dict()
+        self.dedup_strategy = DedupBySenderStrategy(storage_dir)
+        self.eof_storage = EofStorage(storage_dir)
         
         signal.signal(signal.SIGTERM, self.__handle_shutdown)
         signal.signal(signal.SIGINT, self.__handle_shutdown)
@@ -58,6 +62,7 @@ def initialize_config():
         "input_queue": os.getenv('INPUT_QUEUE'),
         "expected_acks": int(os.getenv('EXPECTED_ACKS')),
         "logging_level": os.getenv('LOG_LEVEL', 'INFO'),
+        "storage_dir": os.getenv('STORAGE_DIR'),
     }
 
     # Read multiple output queues
@@ -100,7 +105,8 @@ def main():
         config_params["input_queue"],
         config_params["output_queues"],
         config_params["expected_acks"],
-        config_params["rabbitmq_host"]
+        config_params["rabbitmq_host"],
+        config_params["storage_dir"]
     )
     eof_service.start()
     

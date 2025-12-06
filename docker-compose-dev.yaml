@@ -109,10 +109,13 @@ services:
       OUTPUT_QUEUE: eof-final-filter-year
       LOG_LEVEL: INFO
       EXPECTED_ACKS: 2
+      STORAGE_DIR: ./data/filter-year-eof-service
     networks:
     - testing_net
     depends_on:
     - gateway
+    volumes:
+      - ./data:/data
 
   filter-time-1:
     container_name: filter-time-1
@@ -183,6 +186,7 @@ services:
       EXCHANGE_NAME: time-filtered-exchange-eof
       LOG_LEVEL: INFO
       EXPECTED_ACKS: 2
+      STORAGE_DIR: ./data/filter-time-eof-service
     networks:
     - testing_net
     depends_on:
@@ -239,70 +243,45 @@ services:
     depends_on:
     - gateway
 
-  # aggregator-month-1:
-  #   container_name: aggregator-month-1
-  #   image: worker:latest
-  #   command: "/worker/aggregator/month.py"
-  #   environment:
-  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #     CONTAINER_NAME: aggregator-month-1
-  #     RABBITMQ_HOST: rabbitmq
-  #     INPUT_QUEUE_1: aggregated-month-input-queue-1
-  #     EOF_SELF_QUEUE: EOF-aggregator-month-1
-  #     OUTPUT_QUEUE_1: aggregated-month-queue-1
-  #     OUTPUT_QUEUE_2: aggregated-month-queue-2
-  #     OUTPUT_QUEUE_3: aggregated-month-queue-3
-  #     EOF_EXCHANGE_NAME: eof-exchange-aggregator-month
-  #     EOF_QUEUE_1: EOF-aggregator-month-1
-  #     EOF_QUEUE_2: EOF-aggregator-month-2
-  #     EOF_SERVICE_QUEUE: eof-service-aggregator-month
-  #     LOG_LEVEL: INFO
-  #   networks:
-  #   - testing_net
-  #   depends_on:
-  #   - gateway
+  aggregator-month-1:
+    container_name: aggregator-month-1
+    image: worker:latest
+    command: "/worker/aggregator/month.py"
+    environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: aggregator-month-1
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: aggregated-month-input-queue-1
+      OUTPUT_QUEUE_1: aggregated-month-queue-1
+      OUTPUT_QUEUE_2: aggregated-month-queue-2
+      OUTPUT_QUEUE_3: aggregated-month-queue-3
+      EXCHANGE_NAME: aggregated-month-exchange
+      STORAGE_DIR: ./data/aggregator-month-1
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
 
-  # aggregator-month-2:
-  #   container_name: aggregator-month-2
-  #   image: worker:latest
-  #   command: "/worker/aggregator/month.py"
-  #   environment:
-  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #     CONTAINER_NAME: aggregator-month-2
-  #     RABBITMQ_HOST: rabbitmq
-  #     INPUT_QUEUE_1: aggregated-month-input-queue-2
-  #     EOF_SELF_QUEUE: EOF-aggregator-month-2
-  #     OUTPUT_QUEUE_1: aggregated-month-queue-1
-  #     OUTPUT_QUEUE_2: aggregated-month-queue-2
-  #     OUTPUT_QUEUE_3: aggregated-month-queue-3
-  #     EOF_EXCHANGE_NAME: eof-exchange-aggregator-month
-  #     EOF_QUEUE_1: EOF-aggregator-month-1
-  #     EOF_QUEUE_2: EOF-aggregator-month-2
-  #     EOF_SERVICE_QUEUE: eof-service-aggregator-month
-  #     LOG_LEVEL: INFO
-  #   networks:
-  #   - testing_net
-  #   depends_on:
-  #   - gateway
-
-  # aggregator-month-eof-service:
-  #   container_name: aggregator-month-eof-service
-  #   image: worker:latest
-  #   command: "/worker/eof/eof_service_month.py"
-  #   environment:
-  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #     CONTAINER_NAME: aggregator-month-eof-service
-  #     RABBITMQ_HOST: rabbitmq
-  #     INPUT_QUEUE: eof-service-aggregator-month
-  #     OUTPUT_QUEUE_1: aggregated-month-queue-1
-  #     OUTPUT_QUEUE_2: aggregated-month-queue-2
-  #     OUTPUT_QUEUE_3: aggregated-month-queue-3
-  #     EXPECTED_ACKS: 2
-  #     LOG_LEVEL: INFO
-  #   networks:
-  #   - testing_net
-  #   depends_on:
-  #   - gateway
+  aggregator-month-2:
+    container_name: aggregator-month-2
+    image: worker:latest
+    command: "/worker/aggregator/month.py"
+    environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: aggregator-month-2
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: aggregated-month-input-queue-2
+      OUTPUT_QUEUE_1: aggregated-month-queue-1
+      OUTPUT_QUEUE_2: aggregated-month-queue-2
+      OUTPUT_QUEUE_3: aggregated-month-queue-3
+      EXCHANGE_NAME: aggregated-month-exchange
+      STORAGE_DIR: ./data/aggregator-month-2
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
 
   aggregator-quantity-profit-1:
     container_name: aggregator-quantity-profit-1
@@ -321,8 +300,6 @@ services:
     - testing_net
     depends_on:
     - gateway
-    volumes:
-      - ./data/aggregator-quantity-profit-1:/data/aggregator-quantity-profit-1
 
   aggregator-quantity-profit-2:
     container_name: aggregator-quantity-profit-2
@@ -341,8 +318,6 @@ services:
     - testing_net
     depends_on:
     - gateway
-    volumes:
-      - ./data/aggregator-quantity-profit-2:/data/aggregator-quantity-profit-2
 
   aggregator-quantity-profit-3:
     container_name: aggregator-quantity-profit-3
@@ -361,8 +336,6 @@ services:
     - testing_net
     depends_on:
     - gateway
-    volumes:
-      - ./data/aggregator-quantity-profit-3:/data/aggregator-quantity-profit-3
 
   joiner-menu-items:
     container_name: joiner-menu-items
@@ -383,41 +356,42 @@ services:
     - aggregator-quantity-profit-1
     - aggregator-quantity-profit-2
     - aggregator-quantity-profit-3
-  aggregator-semester-1:
-    container_name: aggregator-semester-1
-    image: worker:latest
-    command: "/worker/aggregator/semester_aggregator.py"
-    environment:
-      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-      CONTAINER_NAME: aggregator-semester-1
-      RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE_1: aggregated-store-q3-queue-1
-      OUTPUT_QUEUE_1: aggregated-semester-queue
-      STORAGE_DIR: ./data/aggregator-semester-1
-      LOG_LEVEL: INFO
-      EXPECTED_ACKS: 2
-    networks:
-    - testing_net
-    depends_on:
-    - gateway
+  
+  # aggregator-semester-1:
+  #   container_name: aggregator-semester-1
+  #   image: worker:latest
+  #   command: "/worker/aggregator/semester_aggregator.py"
+  #   environment:
+  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+  #     CONTAINER_NAME: aggregator-semester-1
+  #     RABBITMQ_HOST: rabbitmq
+  #     INPUT_QUEUE_1: aggregated-store-q3-queue-1
+  #     OUTPUT_QUEUE_1: aggregated-semester-queue
+  #     STORAGE_DIR: ./data/aggregator-semester-1
+  #     LOG_LEVEL: INFO
+  #     EXPECTED_ACKS: 2
+  #   networks:
+  #   - testing_net
+  #   depends_on:
+  #   - gateway
 
-  aggregator-semester-2:
-    container_name: aggregator-semester-2
-    image: worker:latest
-    command: "/worker/aggregator/semester_aggregator.py"
-    environment:
-      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-      CONTAINER_NAME: aggregator-semester-2
-      RABBITMQ_HOST: rabbitmq
-      INPUT_QUEUE_1: aggregated-store-q3-queue-2
-      OUTPUT_QUEUE_1: aggregated-semester-queue
-      STORAGE_DIR: ./data/aggregator-semester-2
-      LOG_LEVEL: INFO
-      EXPECTED_ACKS: 2
-    networks:
-    - testing_net
-    depends_on:
-    - gateway
+  # aggregator-semester-2:
+  #   container_name: aggregator-semester-2
+  #   image: worker:latest
+  #   command: "/worker/aggregator/semester_aggregator.py"
+  #   environment:
+  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+  #     CONTAINER_NAME: aggregator-semester-2
+  #     RABBITMQ_HOST: rabbitmq
+  #     INPUT_QUEUE_1: aggregated-store-q3-queue-2
+  #     OUTPUT_QUEUE_1: aggregated-semester-queue
+  #     STORAGE_DIR: ./data/aggregator-semester-2
+  #     LOG_LEVEL: INFO
+  #     EXPECTED_ACKS: 2
+  #   networks:
+  #   - testing_net
+  #   depends_on:
+  #   - gateway
 
   # aggregator-store-q3-1:
   #   container_name: aggregator-store-q3-1
@@ -499,8 +473,6 @@ services:
     - testing_net
     depends_on:
     - gateway
-    volumes:
-      - ./data/join_stores_q3:/data/join_stores_q3
 
   # aggregator-store-q4-1:
   #   container_name: aggregator-store-q4-1
