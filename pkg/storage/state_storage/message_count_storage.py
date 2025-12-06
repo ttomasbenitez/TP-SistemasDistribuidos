@@ -33,8 +33,9 @@ class MessageCountStorage(StateStorage):
             parts = [p.strip() for p in line.split(";") if p.strip() != ""]
             if not parts:
                 continue
-
+            logging.info(f"action: parsing_message_counts | request_id: {request_id} | parts: {parts}")
             line_max = max(int(p) for p in parts)
+            
             current_msg_num = max(current_msg_num, line_max)
 
         state["current_msg_num"] = current_msg_num

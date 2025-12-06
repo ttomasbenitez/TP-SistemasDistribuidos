@@ -64,6 +64,9 @@ class AggregatorMonth(Worker):
                 groups = self._group_items_by_month(items)
                 self._send_groups_sharded(message, groups, data_output_exchange)
                 
+                self.snapshot_interval.setdefault(message.request_id, 0)
+                self.snapshot_interval[message.request_id] += 1
+        
                 if self.snapshot_interval.get(message.request_id, 0) >= SNAPSHOT_INTERVAL:
                     self.msg_num_storage.save_state(message.request_id)
                     self.snapshot_interval[message.request_id] = 0
@@ -91,12 +94,10 @@ class AggregatorMonth(Worker):
             new_chunk = ''.join(item.serialize() for item in items)
             new_msg_count = self.get_msg_count(original_message.request_id)
             new_message =  Message(original_message.request_id, original_message.type, new_msg_count, new_chunk, self.node_id)
-            logging.info(f"action: sending group | key: {key} | to_queue_index: {queue_index} | request_id: {new_message.request_id} | type: {new_message.type} | msg_num: {new_msg_num} | node_id: {self.node_id}")
+            logging.info(f"action: sending group | key: {key} | to_queue_index: {queue_index} | request_id: {new_message.request_id} | type: {new_message.type} | msg_num: {new_msg_count} | node_id: {self.node_id}")
             serialized = new_message.serialize()
             output_exchange.send(serialized, f"{MESSAGE_TYPE_TRANSACTION_ITEMS}.q2.{queue_index}")
         
-        self.snapshot_interval.setdefault(original_message.request_id, 0)
-        self.snapshot_interval[original_message.request_id] += 1
 
     def get_msg_count(self, request_id):
         state = self.msg_num_storage.get_state(request_id)

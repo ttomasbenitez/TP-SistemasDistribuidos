@@ -79,7 +79,7 @@ class QuantityAndProfit(Worker):
         items_by_ym = state.setdefault("items_by_ym", {})
         
         for it in items:
-            ym = str(it.year_month_created_at)
+            ym = it.get_year()
             item_id = it.item_id
             
             if ym not in items_by_ym:
