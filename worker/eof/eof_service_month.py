@@ -8,6 +8,7 @@ from Middleware.connection import PikaConnection
 import signal
 from pkg.dedup.dedup_by_sender_strategy import DedupBySenderStrategy
 from pkg.storage.state_storage.eof_storage import EofStorage
+from pkg.storage.state_storage.dedup_by_sender_storage import DedupBySenderStorage
 
 class EofServiceMonth(EofService):
     
@@ -22,7 +23,8 @@ class EofServiceMonth(EofService):
         self.eof_input_queque = eof_input_queque
         self.eof_output_queues = output_queues
         self.expected_acks = expected_acks
-        self.dedup_strategy = DedupBySenderStrategy(storage_dir)
+        storage = DedupBySenderStorage(storage_dir)
+        self.dedup_strategy = DedupBySenderStrategy(storage)
         self.eof_storage = EofStorage(storage_dir)
         
         signal.signal(signal.SIGTERM, self.__handle_shutdown)

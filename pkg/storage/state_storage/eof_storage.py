@@ -20,9 +20,7 @@ class EofStorage(StateStorage):
            
         """
         
-        state = self.data_by_request.setdefault(request_id, {
-            "eofs_count": None,
-        })
+        state = self.get_state(request_id)
 
         eofs_count = 0
         
@@ -38,10 +36,11 @@ class EofStorage(StateStorage):
     def _save_state_to_file(self, file_handle, request_id):
         """
         Guarda el estado en formato compacto:
-            sender_id;last_num_sent
+            eofs_count
         """
-        
-        eofs_count = self.get_state(request_id)
+        state = self.get_state(request_id)
+        eofs_count = state.get("eofs_count", 0)
+
         line = f"{eofs_count}\n"
         file_handle.write(line)
         

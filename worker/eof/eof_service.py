@@ -9,6 +9,7 @@ from utils.heartbeat import start_heartbeat_sender
 from Middleware.connection import PikaConnection 
 from pkg.dedup.dedup_by_sender_strategy import DedupBySenderStrategy
 from pkg.storage.state_storage.eof_storage import EofStorage
+from pkg.storage.state_storage.dedup_by_sender_storage import DedupBySenderStorage
 class EofService(Worker, ABC):
   
     def __init__(self, eof_input_queque: str, eof_output_middleware: str, expected_acks: int, host: str, storage_dir: str = "./data/eof_service_storage"):
@@ -16,7 +17,8 @@ class EofService(Worker, ABC):
         self.eof_input_queque = eof_input_queque
         self.eof_output_middleware = eof_output_middleware
         self.expected_acks = expected_acks
-        self.dedup_strategy = DedupBySenderStrategy(storage_dir)
+        storage = DedupBySenderStorage(storage_dir)
+        self.dedup_strategy = DedupBySenderStrategy(storage)
         self.eof_storage = EofStorage(storage_dir)
         
         signal.signal(signal.SIGTERM, self.__handle_shutdown)

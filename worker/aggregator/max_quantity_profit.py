@@ -26,7 +26,7 @@ class QuantityAndProfit(Worker):
         self.data_output_queue = data_output_queue
         self.connection = PikaConnection(host)
         self.state_storage = QuantityAndProfitStateStorage(storage_dir)
-        self.dedup_strategy = DedupBySenderStrategy(storage_dir)
+        self.dedup_strategy = DedupBySenderStrategy(self.state_storage)
         self.eof_storage = EofStorage(storage_dir)
         self.expected_acks = expected_acks
         self.node_id = container_name
@@ -35,7 +35,6 @@ class QuantityAndProfit(Worker):
         logging.info(f"action: startup | loading persisted state for recovery")
         
         self.state_storage.load_state_all()
-        self.dedup_strategy.load_dedup_state()
         self.eof_storage.load_state_all()
         self.heartbeat_sender = start_heartbeat_sender()
         
@@ -66,9 +65,7 @@ class QuantityAndProfit(Worker):
                 
                 items = message.process_message()
                 if items:
-                    self._accumulate_items(items, message.request_id)
-                    
-                self.dedup_strategy.mark_as_processed(message)
+                    self._accumulate_items(items, message.request_id)   
             
             except Exception as e:
                 logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
@@ -193,7 +190,6 @@ class QuantityAndProfit(Worker):
 
   
         self.state_storage.delete_state(request_id_of_eof)
-        self.dedup_strategy.clean_dedup_state(request_id_of_eof)
 
     def close(self):
         try:

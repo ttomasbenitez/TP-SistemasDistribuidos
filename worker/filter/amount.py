@@ -54,7 +54,6 @@ class FilterAmountNode(Worker):
                 if message.type == MESSAGE_TYPE_EOF:
                     logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
                     self._send_eof(message, data_output_exchange)
-                    self.dedup_strategy.clean_dedup_state(message.request_id)
                     return
 
                 self._handle_message(message, data_output_exchange)

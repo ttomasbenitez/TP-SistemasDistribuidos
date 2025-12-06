@@ -138,7 +138,7 @@ class Worker(ABC):
         
         logging.info(f"EOF recibido | request_id: {message.request_id}")
         state = eof_storage.get_state(message.request_id)
-        state["eofs_count"] = state.get('eofs_count') + 1  
+        state["eofs_count"] = state.get('eofs_count', 0) + 1  
         if state["eofs_count"] == expected_acks:
             logging.info(f"Enviando final EOF del cliente {message.request_id}")
             return True

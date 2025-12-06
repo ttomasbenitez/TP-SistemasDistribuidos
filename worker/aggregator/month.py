@@ -10,8 +10,9 @@ import os
 from utils.heartbeat import start_heartbeat_sender
 import hashlib
 from pkg.storage.state_storage.message_count_storage import MessageCountStorage
+from pkg.dedup.sliding_window_dedup_strategy import SlidingWindowDedupStrategy
 
-SNAPSHOT_INTERVAL = 1000
+SNAPSHOT_INTERVAL = 100
 
 class AggregatorMonth(Worker):
     
@@ -30,13 +31,13 @@ class AggregatorMonth(Worker):
         self.sharding_q2_amount = sharding_q2_amount
         self.connection = PikaConnection(host)
         self.node_id = container_name 
-        self.msg_num_storage = MessageCountStorage(storage_dir)
+        self.dedup_strategy = SlidingWindowDedupStrategy(2, storage_dir)
         self.snapshot_interval = {}
     
     def start(self):
         
         self.heartbeat_sender = start_heartbeat_sender()
-        self.msg_num_storage.load_state_all()
+        self.dedup_strategy.load_dedup_state()
         self.connection.start()
         self._consume_data_queue()
         self.connection.start_consuming()
@@ -55,24 +56,20 @@ class AggregatorMonth(Worker):
                     new_msg_count = self.get_msg_count(message.request_id)
                     new_eof_message = Message(message.request_id, MESSAGE_TYPE_EOF, new_msg_count, '', self.node_id)
                     data_output_exchange.send(new_eof_message.serialize(), str(MESSAGE_TYPE_EOF))
-                    self.msg_num_storage.save_state(message.request_id)
+                    self.dedup_strategy.save_dedup_state(message)
                     return
 
                 logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
-
+                if self.dedup_strategy.is_duplicate(message):
+                    logging.info(f"action: duplicate message detected and skipped | request_id: {message.request_id} | msg_type: {message.type} | msg_num: {message.msg_num}")
+                    return
+        
                 items = message.process_message()
                 groups = self._group_items_by_month(items)
                 self._send_groups_sharded(message, groups, data_output_exchange)
-                
-                self.snapshot_interval.setdefault(message.request_id, 0)
-                self.snapshot_interval[message.request_id] += 1
-        
-                if self.snapshot_interval.get(message.request_id, 0) >= SNAPSHOT_INTERVAL:
-                    self.msg_num_storage.save_state(message.request_id)
-                    self.snapshot_interval[message.request_id] = 0
-                else:
-                    self.msg_num_storage.append_state(message.request_id)
-                
+
+                self.dedup_strategy.save_dedup_state(message)
+                   
             except Exception as e:
                 logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
 
@@ -97,13 +94,17 @@ class AggregatorMonth(Worker):
             logging.info(f"action: sending group | key: {key} | to_queue_index: {queue_index} | request_id: {new_message.request_id} | type: {new_message.type} | msg_num: {new_msg_count} | node_id: {self.node_id}")
             serialized = new_message.serialize()
             output_exchange.send(serialized, f"{MESSAGE_TYPE_QUERY_2_INTERMEDIATE_RESULT}.q2.{queue_index}")
-        
+            
 
-    def get_msg_count(self, request_id):
-        state = self.msg_num_storage.get_state(request_id)
-        msg_num_counter = state.get('current_msg_num', -1)
-        state['current_msg_num'] = msg_num_counter + 1
-        return state['current_msg_num']
+    def get_msg_count(self, request_id: int) -> int:
+        # Leo el valor actual (o -1 si no existe)…
+        current = self.dedup_strategy.current_msg_num.get(request_id, -1)
+        # …y genero el siguiente
+        new_val = current + 1
+        # Lo guardo asociado a ese request_id
+        self.dedup_strategy.current_msg_num[request_id] = new_val
+        return new_val
+
     
     def close(self):
         try:

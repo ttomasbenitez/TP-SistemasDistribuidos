@@ -114,8 +114,6 @@ services:
     - testing_net
     depends_on:
     - gateway
-    volumes:
-      - ./data/filter-year-eof-service:/data/filter-year-eof-service
 
   filter-time-1:
     container_name: filter-time-1
@@ -191,8 +189,6 @@ services:
     - testing_net
     depends_on:
     - gateway
-    volumes:
-      - ./data/filter-time-eof-service:/data/filter-time-eof-service
 
   filter-amount-1:
     container_name: filter-amount-1
@@ -264,8 +260,6 @@ services:
     - testing_net
     depends_on:
     - gateway
-    volumes:
-      - ./data/aggregator-month-1:/data/aggregator-month-1
 
   aggregator-month-2:
     container_name: aggregator-month-2
@@ -286,8 +280,6 @@ services:
     - testing_net
     depends_on:
     - gateway
-    volumes:
-      - ./data/aggregator-month-2:/data/aggregator-month-2
 
   aggregator-quantity-profit-1:
     container_name: aggregator-quantity-profit-1
@@ -306,8 +298,6 @@ services:
     - testing_net
     depends_on:
     - gateway
-    volumes:
-      - ./data/aggregator-quantity-profit-1:/data/aggregator-quantity-profit-1
 
   aggregator-quantity-profit-2:
     container_name: aggregator-quantity-profit-2
@@ -326,8 +316,6 @@ services:
     - testing_net
     depends_on:
     - gateway
-    volumes:
-      - ./data/aggregator-quantity-profit-2:/data/aggregator-quantity-profit-2
 
   aggregator-quantity-profit-3:
     container_name: aggregator-quantity-profit-3
@@ -346,8 +334,6 @@ services:
     - testing_net
     depends_on:
     - gateway
-    volumes:
-      - ./data/aggregator-quantity-profit-3:/data/aggregator-quantity-profit-3
 
   joiner-menu-items:
     container_name: joiner-menu-items
@@ -485,8 +471,6 @@ services:
     - testing_net
     depends_on:
     - gateway
-    volumes:
-      - ./data/join_stores_q3:/data/join_stores_q3
 
   # aggregator-store-q4-1:
   #   container_name: aggregator-store-q4-1
@@ -567,8 +551,6 @@ services:
     - testing_net
     depends_on:
     - gateway
-    volumes:
-      - ./data/top-three-clients-1:/data/top-three-clients-1
 
   top-three-clients-2:
     container_name: top-three-clients-2
@@ -588,8 +570,6 @@ services:
     - testing_net
     depends_on:
     - gateway
-    volumes:
-      - ./data/top-three-clients-2:/data/top-three-clients-2
 
   top-three-clients-3:
     container_name: top-three-clients-3
@@ -609,8 +589,6 @@ services:
     - testing_net
     depends_on:
     - gateway
-    volumes:
-      - ./data/top-three-clients-3:/data/top-three-clients-3
 
   join-stores-q4:
     container_name: join-stores-q4

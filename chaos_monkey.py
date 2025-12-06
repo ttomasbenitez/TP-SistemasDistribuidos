@@ -132,7 +132,7 @@ def run_q2_chaos(interval):
 
     possible_targets = [
         'aggregator-month-1', 'aggregator-month-2',
-        'aggregator-quantity-profit-1', 'aggregator-quantity-profit-2', 'aggregator-quantity-profit-1-3',
+        'aggregator-quantity-profit-1', 'aggregator-quantity-profit-2', 'aggregator-quantity-profit-3',
     ]
 
     while True:
@@ -187,9 +187,9 @@ def main():
     parser.add_argument('--top-three-interval', type=float, default=15, help='Interval in seconds for top-three mode (default: 5)')
     parser.add_argument('--node', type=str, help='Specific node (service name) to kill')
     parser.add_argument('--q1', type=str, help='Specific q1 kill')
-    parser.add_argument('--q1-interval', type=float, default=5, help='Interval in seconds for top-three mode (default: 5)')
+    parser.add_argument('--q1-interval', type=float, default=10, help='Interval in seconds for top-three mode (default: 5)')
     parser.add_argument('--q2', type=str, help='Specific q2 kill')
-    parser.add_argument('--q2-interval', type=float, default=5, help='Interval in seconds for top-three mode (default: 5)')
+    parser.add_argument('--q2-interval', type=float, default=10, help='Interval in seconds for top-three mode (default: 5)')
     
     args = parser.parse_args()
 
