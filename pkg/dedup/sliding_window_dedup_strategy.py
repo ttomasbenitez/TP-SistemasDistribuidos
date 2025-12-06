@@ -4,6 +4,7 @@ import logging
 from pkg.storage.state_storage.dedup_storage import DedupStorage
 
 MAX_PENDING_SIZE = 5000
+SNAPSHOT_INTERVAL = 1000
 
 class SlidingWindowDedupStrategy(DedupStrategy):
     
@@ -14,8 +15,15 @@ class SlidingWindowDedupStrategy(DedupStrategy):
         self.current_msg_num = {}
         self.state_storage = DedupStorage(storage_dir)
         self.start_msg_num = start_msg_num
+        self.snapshot_interval = {}
     
     def is_duplicate(self, message: Message):
+        request_id = message.request_id
+        
+        if request_id not in self.last_contiguous_msg_num:
+            self.last_contiguous_msg_num[request_id] = self.start_msg_num - 1
+            self.pending_messages[request_id] = set()
+            
         last_cont = self.last_contiguous_msg_num[message.request_id]
         
         if message.msg_num <= last_cont:
@@ -25,37 +33,29 @@ class SlidingWindowDedupStrategy(DedupStrategy):
         if message.msg_num in self.pending_messages[message.request_id]:
              logging.info(f"action: Duplicate pending message received | request_id: {message.request_id} | msg_num: {message.msg_num}")
              return True
+         
+        self.pending_messages[message.request_id].add(message.msg_num)
+        logging.info(f"action: Added message to pending | request_id: {message.request_id} | msg_num: {message.msg_num} | pending_size: {len(self.pending_messages[message.request_id])}")
+        self._clean_window_if_needed(message.request_id)
              
         return False
     
     def load_dedup_state(self):
         self.state_storage.load_state_all()
+       
         for request_id, state in self.state_storage.data_by_request.items():
             self.last_contiguous_msg_num[request_id] = state.get('last_contiguous_msg_num', self.start_msg_num - 1)
             self.pending_messages[request_id] = state.get('pending_messages', set())
             self.current_msg_num[request_id] = state.get('current_msg_num', 0)
             logging.info(f"Estado recuperado para request_id {request_id}: last_contiguous={self.last_contiguous_msg_num[request_id]}, pending_count={len(self.pending_messages[request_id])}, current_msg_num={self.current_msg_num[request_id]}")
     
-    def check_state_before_processing(self, message):
-        request_id = message.request_id
-        
-        if request_id not in self.last_contiguous_msg_num:
-            self.last_contiguous_msg_num[request_id] = self.start_msg_num - 1
-            self.pending_messages[request_id] = set()
-        
-        if self.is_duplicate(message):
-            return False
-    
-        self.pending_messages[message.request_id].add(message.msg_num)
-        logging.info(f"action: Added message to pending | request_id: {message.request_id} | msg_num: {message.msg_num} | pending_size: {len(self.pending_messages[message.request_id])}")
-        self._clean_window_if_needed(message.request_id)
-        
+
     def _clean_window_if_needed(self, request_id):
         if len(self.pending_messages[request_id]) > MAX_PENDING_SIZE:
             logging.info(f"action: Clearing pending messages window | request_id: {request_id} | size: {len(self.pending_messages[request_id])}")
-            self.pending_messages[request_id].clear()
+            self.state_storage.delete_state(request_id)
             
-    def update_contiguous_sequence(self, message: Message):
+    def save_dedup_state(self, message: Message):
         last_cont = self.last_contiguous_msg_num[message.request_id]
         prev_expected = message.msg_num - self.total_shards
         
@@ -75,9 +75,17 @@ class SlidingWindowDedupStrategy(DedupStrategy):
             'current_msg_num': self.current_msg_num.get(message.request_id, 0)
         }
         
-        self.state_storage.save_state(message.request_id, False)
+        self.snapshot_interval.setdefault(message.request_id, 0)
+        self.snapshot_interval[message.request_id] += 1
         
-    def update_state_on_eof(self, message: Message):
+        if self.snapshot_interval[message.request_id] >= SNAPSHOT_INTERVAL:
+            logging.info(f"action: saving dedup state snapshot | request_id: {message.request_id} | msg_num: {message.msg_num} | last_contiguous: {self.last_contiguous_msg_num[message.request_id]} | pending_size: {len(self.pending_messages[message.request_id])}")
+            self.snapshot_interval[message.request_id] = 0
+            self.state_storage.save_state(message.request_id)
+        else:
+            self.state_storage.append_state(message.request_id)
+        
+    def clean_dedup_state(self, message: Message):
         if message.request_id in self.last_contiguous_msg_num:
             del self.last_contiguous_msg_num[message.request_id]
         if message.request_id in self.pending_messages:

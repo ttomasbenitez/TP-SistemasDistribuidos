@@ -12,6 +12,8 @@ import hashlib
 from pkg.message.utils import calculate_sub_message_id
 from pkg.message.constants import SUB_MESSAGE_START_ID
 
+BATCH_SIZE = 1000
+
 
 class AggregatorMonth(Worker):
     
@@ -106,9 +108,7 @@ class AggregatorMonth(Worker):
                     return
 
                 logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
-                #self._ensure_request(message.request_id)
-                #self._inc_inflight(message.request_id)
-
+            
                 self.last_message[message.request_id] = message
                 if message.request_id not in self.buffers:
                     self.buffers[message.request_id] = {}
@@ -121,14 +121,13 @@ class AggregatorMonth(Worker):
                         self.buffers[message.request_id][month] = []
                     
                     self.buffers[message.request_id][month].extend(group_items)
-                    _flush_buffer(message.request_id, month, data_output_queues)
+                    
+                    if len(self.buffers[message.request_id][month]) >= BATCH_SIZE:
+                        _flush_buffer(message.request_id, month, data_output_queues)
 
             except Exception as e:
                 logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
-            #finally:
-            #    if message.type != MESSAGE_TYPE_EOF:
-            #        self._dec_inflight(message.request_id)
-            
+
         data_input_queue.start_consuming(__on_message__)
 
     def _group_items_by_month(self, items):
@@ -153,9 +152,7 @@ class AggregatorMonth(Worker):
             new_msg_num = self.msg_num_counter
             self.msg_num_counter += 1
             
-            new_message = original_message.new_from_original(new_chunk, msg_num=new_msg_num)
-            # Add node_id to message for dedup tracking per source
-            new_message.add_node_id(self.node_id)
+            new_message =  Message(original_message.request_id, original_message.type, new_msg_num, new_chunk, self.node_id)
             logging.info(f"action: sending group | key: {key} | to_queue_index: {queue_index} | request_id: {new_message.request_id} | type: {new_message.type} | msg_num: {new_msg_num} | node_id: {self.node_id}")
             serialized = new_message.serialize()
             target_queue.send(serialized)

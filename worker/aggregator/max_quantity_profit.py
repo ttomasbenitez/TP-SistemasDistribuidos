@@ -119,7 +119,7 @@ class QuantityAndProfit(Worker):
         """
         Acumula cantidad y subtotal por año, mes y producto
         """
-        with self.state_storage._lock:
+        with self.state_storage._data_lock:
             state = self.state_storage.data_by_request.setdefault(request_id, {
                 "items_by_ym": {},
                 "last_by_sender": {},
@@ -156,7 +156,7 @@ class QuantityAndProfit(Worker):
             logging.info(f"action: accumulate_done | request_id: {request_id} | total_qty: {total_qty} | total_sub: {total_sub} | yms: {len(items_by_ym)}")
         
         # Save to disk but keep data in memory (reset_state=False)
-        self.state_storage.save_state(request_id, reset_state=False)
+        self.state_storage.save_state(request_id)
         logging.info(f"action: state_persisted | request_id: {request_id}")
     
     def _send_results_by_date(self, request_id_of_eof, data_output_queue):
@@ -194,9 +194,7 @@ class QuantityAndProfit(Worker):
             logging.info(f"action: send_results_done | request_id: {request_id_of_eof} | results_count: {results_count} | CHUNK: {chunk}")
             new_msg_num = self.msg_num_counter
             self.msg_num_counter += 1
-            message = Message(request_id_of_eof, MESSAGE_TYPE_QUERY_2_RESULT, new_msg_num, chunk)
-            # Add node_id to message for dedup tracking per source
-            message.add_node_id(self.node_id)
+            message = Message(request_id_of_eof, MESSAGE_TYPE_QUERY_2_RESULT, new_msg_num, chunk, self.node_id)
             serialized_message = message.serialize()
             data_output_queue.send(serialized_message)
             logging.info(f"action: results_sent | msg_num: {new_msg_num} | node_id: {self.node_id} | request_id: {request_id_of_eof}")

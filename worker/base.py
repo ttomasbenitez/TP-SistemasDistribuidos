@@ -64,7 +64,8 @@ class Worker(ABC):
                     logging.info(f"EOF recibido en nodo | request_id: {message.request_id} | type: {message.type}")
                     self._ensure_request(message.request_id)
                     self.drained[message.request_id].wait()
-                    eof_service_queue.send(message.serialize())
+                    eof_message = Message(message.request_id, MESSAGE_TYPE_EOF, message.msg_num, '', self.node_id)
+                    eof_service_queue.send(eof_message.serialize())
             except Exception as e:
                 logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
         

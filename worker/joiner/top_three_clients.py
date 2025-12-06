@@ -148,8 +148,7 @@ class TopThreeClientsJoiner(Joiner):
             if chunk:
                 new_msg_num = self.msg_num_counter
                 self.msg_num_counter += 1
-                new_message = Message(request_id, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT, new_msg_num, chunk)
-                new_message.add_node_id(self.node_id)
+                new_message = Message(request_id, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT, new_msg_num, chunk, self.node_id)
                 data_output_queue.send(new_message.serialize())
                 stores_sent += 1
                 logging.debug(f"action: store_result_sent | request_id: {request_id} | store_id: {store_id} | top_3_count: {len(top_3_users)}")

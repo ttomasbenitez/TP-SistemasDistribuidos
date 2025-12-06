@@ -137,7 +137,7 @@ class SemesterAggregator(Worker):
         Acumula cantidad por periodo y store, persistiendo estado incremental
         Similar a max_quantity_profit, mantenemos estado en memoria y persistimos en disco.
         """
-        with self.state_storage._lock:
+        with self.state_storage._data_lock:
             state = self.state_storage.data_by_request.setdefault(request_id, {
                 "agg_by_period": {},
                 "last_by_sender": {},
@@ -168,7 +168,7 @@ class SemesterAggregator(Worker):
             logging.info(f"action: accumulate_done | request_id: {request_id} | total_amount: {total_amount} | periods: {len(agg_by_period)}")
         
         # Save to disk but keep data in memory (reset_state=False)
-        self.state_storage.save_state(request_id, reset_state=False)
+        self.state_storage.save_state(request_id)
         logging.info(f"action: state_persisted | request_id: {request_id}")
 
     def _send_all_results(self, request_id, data_output_queue):
@@ -198,9 +198,7 @@ class SemesterAggregator(Worker):
         new_chunk = item.serialize()
         new_msg_num = self.msg_num_counter
         self.msg_num_counter += 1
-        new_message = Message(request_id, MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT, new_msg_num, new_chunk)
-        # Add node_id to message for dedup tracking per source
-        new_message.add_node_id(self.node_id)
+        new_message = Message(request_id, MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT, new_msg_num, new_chunk, self.node_id)
         data_output_queue.send(new_message.serialize())
 
     def close(self):

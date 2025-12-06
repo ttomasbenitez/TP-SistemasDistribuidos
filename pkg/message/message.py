@@ -10,7 +10,8 @@ from pkg.message.constants import (
     MESSAGE_TYPE_QUERY_2_RESULT,
     MESSAGE_TYPE_QUERY_2_INTERMEDIATE_RESULT,
     MESSAGE_TYPE_QUERY_4_RESULT,
-    MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT
+    MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT,
+    MESSAGE_TYPE_EOF
 )         
 from pkg.message.menu_item import MenuItem
 from pkg.message.store import Store
@@ -30,7 +31,7 @@ class Message:
     Clase para manejar mensajes entre el cliente y el gateway.
     """
 
-    def __init__(self, request_id, type, msg_num, content):
+    def __init__(self, request_id, type, msg_num, content, node_id='unknown'):
         """
         Inicializa el mensaje.
         :param request_id: ID de la solicitud.
@@ -41,15 +42,8 @@ class Message:
         self.request_id = request_id
         self.type = type
         self.msg_num = msg_num
-        self.node_id = None
-        self.content = content
-        
-    def add_node_id(self, node_id):
-        """
-        Agrega el ID del nodo al mensaje.
-        :param node_id: ID del nodo.
-        """
         self.node_id = node_id
+        self.content = content
 
     def serialize(self):
         """
@@ -70,11 +64,10 @@ class Message:
         type = int(parts[0])
         request_id = int(parts[1])
         msg_num = int(parts[2])
-        node_id = parse_int(parts[3])
+        node_id = parts[3]
         content = parts[4]
         
-        message = Message(request_id, type, msg_num, content)
-        message.add_node_id(node_id)
+        message = Message(request_id, type, msg_num, content, node_id)
         return message
 
     def process_message_from_csv(self):
@@ -151,9 +144,17 @@ class Message:
             msg_num = self.msg_num
         return Message(self.request_id, self.type, msg_num, new_content)
     
+    def get_node_id(self):
+        """
+        Obtiene el ID del nodo del mensaje.
+        :return: ID del nodo.
+        """
+        return self.node_id
+    
     def get_node_id_and_request_id(self):
         """
         Obtiene el ID del nodo del mensaje.
         :return: ID del nodo.
         """
         return f"{self.node_id}.{self.request_id}"
+    

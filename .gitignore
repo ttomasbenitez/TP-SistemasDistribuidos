@@ -1,4 +1,5 @@
 data/
+client/data_completo
 data_test_case/
 .pytest_cache
 */__pycache__/

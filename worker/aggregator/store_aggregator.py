@@ -135,8 +135,7 @@ class StoreAggregator(Worker):
         for key, items in groups.items():
             logging.info(f"action: sending grouped items | request_id: {original_message.request_id} | store: {key} | node: {self.node_id} | msg_num: {current_msg_num} | items: {len(items)}")
             new_chunk = ''.join(item.serialize() for item in items)
-            new_message = Message(original_message.request_id, original_message.type, current_msg_num, new_chunk)
-            new_message.add_node_id(self.node_id)
+            new_message = Message(original_message.request_id, original_message.type, current_msg_num, new_chunk, self.node_id)
             serialized = new_message.serialize()
             first_item = items[0]
             sharding_key_value = first_item.get_sharding_key(self.sharding_key)

@@ -13,33 +13,33 @@ from Middleware.connection import PikaConnection
 
 MAX_PENDING_SIZE = 1000
 AMOUNT_THRESHOLD = 75
+SNAPSHOT_INTERVAL = 250
 
 class FilterAmountNode(Worker):
     
     def __init__(self, 
                  data_input_queue: str, 
                  data_output_exchange: str,
-                 host: str, 
-                 amount_to_filter: int,
+                 storage_dir: str,
                  total_shards: int,
-                 storage_dir: str):
+                 amount_to_filter: int,
+                 host: str):
         
-        self.__init_manager__()
         self.__init_middlewares_handler__()
         self.connection = PikaConnection(host)
         self.data_input_queue = data_input_queue
         self.data_output_exchange = data_output_exchange
-        self.clients = []
         self.amount_to_filter = amount_to_filter
         self.dedup_strategy = SlidingWindowDedupStrategy(total_shards, storage_dir)
+        self.curr_snapshot_interval = {}
         
     def start(self):
        
         self.heartbeat_sender = start_heartbeat_sender()
+        self.dedup_strategy.load_dedup_state()
         
         self.connection.start()
         self._consume_data_queue()
-        # self._consume_eof_final()
         self.connection.start_consuming()
 
     def _consume_data_queue(self):
@@ -47,14 +47,14 @@ class FilterAmountNode(Worker):
         data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, {}, self.connection)
         self.message_middlewares.extend([data_input_queue, data_output_exchange])
         
-        self.dedup_strategy.load_dedup_state()
-        
         def __on_message__(message_body):
             try:
                 message = Message.deserialize(message_body)
 
                 if message.type == MESSAGE_TYPE_EOF:
-                    self._handle_eof(message, data_output_exchange)
+                    logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
+                    self._send_eof(message, data_output_exchange)
+                    self.dedup_strategy.clean_dedup_state(message.request_id)
                     return
 
                 self._handle_message(message, data_output_exchange)
@@ -64,30 +64,22 @@ class FilterAmountNode(Worker):
 
         data_input_queue.start_consuming(__on_message__, manual_ack=False)
 
-    def _handle_eof(self, message, data_output_exchange):
-        logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
-        
+    def _send_eof(self, message: Message, data_output_exchange):
         message.update_content("1")
         data_output_exchange.send(message.serialize(), str(message.type))
-        self.dedup_strategy.update_state_on_eof(message)
-        
-        logging.info(f"action: ACK EOF")
+        logging.info(f"action: EOF message sent to output exchange | request_id: {message.request_id}")
 
     def _handle_message(self, message, data_output_exchange):
-        if self.dedup_strategy.check_state_before_processing(message) is False:
+        logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type} | msg_num: {message.msg_num}")
+        
+        if self.dedup_strategy.is_duplicate(message):
+            logging.info(f"action: duplicate message detected and skipped | request_id: {message.request_id} | msg_type: {message.type} | msg_num: {message.msg_num}")
             return
         
-        # Procesar mensaje
-        logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type} | msg_num: {message.msg_num}")
-        self._ensure_request(message.request_id)
-        self._inc_inflight(message.request_id)
-
         self._process_and_send_items(message, data_output_exchange)
         
-        self.dedup_strategy.update_contiguous_sequence(message)
-
-        self._dec_inflight(message.request_id)
-
+        self.dedup_strategy.save_dedup_state(message)
+        
     def _process_and_send_items(self, message, data_output_exchange):
         items = message.process_message()
         if items:
@@ -116,14 +108,15 @@ def initialize_config():
         "input_queue": os.getenv('INPUT_QUEUE_1'),
         "exchange": os.getenv('EXCHANGE_NAME'),
         "logging_level": os.getenv('LOG_LEVEL', 'INFO'),
-        "total_shards": int(os.getenv('TOTAL_SHARDS', 3)),
         "storage_dir": os.getenv('STORAGE_DIR', './data'),
+        "total_shards": int(os.getenv('TOTAL_SHARDS')),
     }
     
     required_keys = [
         "rabbitmq_host",
         "input_queue",
         "exchange",
+        "total_shards",
     ]
 
     missing_keys = [key for key in required_keys if config_params[key] is None]
@@ -139,10 +132,10 @@ def main():
 
     filter = FilterAmountNode(config_params["input_queue"], 
                             config_params["exchange"], 
-                            config_params["rabbitmq_host"],  
-                            AMOUNT_THRESHOLD,
+                            config_params["storage_dir"],
                             config_params["total_shards"],
-                            config_params["storage_dir"])
+                            AMOUNT_THRESHOLD,
+                            config_params["rabbitmq_host"])
     filter.start()
 
 if __name__ == "__main__":
