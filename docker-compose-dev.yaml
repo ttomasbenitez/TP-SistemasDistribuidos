@@ -391,67 +391,49 @@ services:
   #   depends_on:
   #   - gateway
 
-  # aggregator-store-q3-1:
-  #   container_name: aggregator-store-q3-1
-  #   image: worker:latest
-  #   command: "/worker/aggregator/store_aggregator.py"
-  #   environment:
-  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #     CONTAINER_NAME: aggregator-store-q3-1
-  #     RABBITMQ_HOST: rabbitmq
-  #     INPUT_QUEUE_1: time-filtered-queue-q3-1
-  #     OUTPUT_EXCHANGE: aggregated-store-q3-exchange
-  #     OUTPUT_QUEUE_1: aggregated-store-q3-queue-1
-  #     OUTPUT_QUEUE_2: aggregated-store-q3-queue-2
-  #     # OUTPUT_QUEUE_1: aggregated-store-q3-queue
-  #     # EOF_SERVICE_QUEUE: eof-service-aggregator-store-q3
-  #     NODE_NUMBER: 1
-  #     TOTAL_SHARDS: 2
-  #     LOG_LEVEL: INFO
-  #     SHARDING_KEY: store
-  #   networks:
-  #   - testing_net
-  #   depends_on:
-  #   - gateway   
+  aggregator-store-q3-1:
+    container_name: aggregator-store-q3-1
+    image: worker:latest
+    command: "/worker/aggregator/store_aggregator.py"
+    environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: aggregator-store-q3-1
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: time-filtered-queue-q3-1
+      OUTPUT_EXCHANGE: aggregated-store-q3-exchange
+      OUTPUT_QUEUE_1: aggregated-store-q3-queue-1
+      OUTPUT_QUEUE_2: aggregated-store-q3-queue-2
+      # OUTPUT_QUEUE_1: aggregated-store-q3-queue
+      # EOF_SERVICE_QUEUE: eof-service-aggregator-store-q3
+      NODE_NUMBER: 1
+      TOTAL_SHARDS: 2
+      LOG_LEVEL: INFO
+      SHARDING_KEY: store
+    networks:
+    - testing_net
+    depends_on:
+    - gateway   
 
-  # aggregator-store-q3-2:
-  #   container_name: aggregator-store-q3-2
-  #   image: worker:latest
-  #   command: "/worker/aggregator/store_aggregator.py"
-  #   environment:
-  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #     CONTAINER_NAME: aggregator-store-q3-2
-  #     RABBITMQ_HOST: rabbitmq
-  #     INPUT_QUEUE_1: time-filtered-queue-q3-2
-  #     OUTPUT_EXCHANGE: aggregated-store-q3-exchange
-  #     OUTPUT_QUEUE_1: aggregated-store-q3-queue-1
-  #     OUTPUT_QUEUE_2: aggregated-store-q3-queue-2
-  #     # EOF_SERVICE_QUEUE: eof-service-aggregator-store-q3
-  #     NODE_NUMBER: 2
-  #     TOTAL_SHARDS: 2
-  #     LOG_LEVEL: INFO
-  #     SHARDING_KEY: store
-  #   networks:
-  #   - testing_net
-  #   depends_on:
-  #   - gateway
-    
-  # aggregator-store-q3-eof-service:
-  #    container_name: aggregator-store-q3-eof-service
-  #    image: worker:latest
-  #    command: "/worker/eof/eof_service_aggregator_store.py"
-  #    environment:
-  #      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #      CONTAINER_NAME: aggregator-store-q3-eof-service
-  #      RABBITMQ_HOST: rabbitmq
-  #      INPUT_QUEUE: eof-service-aggregator-store-q3
-  #      OUTPUT_QUEUE: aggregated-store-q3-queue
-  #      LOG_LEVEL: INFO
-  #      EXPECTED_ACKS: 2
-  #    networks:
-  #    - testing_net
-  #    depends_on:
-  #    - gateway
+  aggregator-store-q3-2:
+    container_name: aggregator-store-q3-2
+    image: worker:latest
+    command: "/worker/aggregator/store_aggregator.py"
+    environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      CONTAINER_NAME: aggregator-store-q3-2
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: time-filtered-queue-q3-2
+      OUTPUT_EXCHANGE: aggregated-store-q3-exchange
+      OUTPUT_QUEUE_1: aggregated-store-q3-queue-1
+      OUTPUT_QUEUE_2: aggregated-store-q3-queue-2
+      NODE_NUMBER: 2
+      TOTAL_SHARDS: 2
+      LOG_LEVEL: INFO
+      SHARDING_KEY: store
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
   
   # joiner-stores-q3:
   #   container_name: joiner-stores-q3

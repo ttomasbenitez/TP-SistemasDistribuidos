@@ -12,11 +12,11 @@ from pkg.storage.state_storage.eof_storage import EofStorage
 from pkg.storage.state_storage.dedup_by_sender_storage import DedupBySenderStorage
 class EofService(Worker, ABC):
   
-    def __init__(self, eof_input_queque: str, eof_output_middleware: str, expected_acks: int, host: str, storage_dir: str = "./data/eof_service_storage"):
+    def __init__(self, eof_input_queque: str, eof_output_middleware: str, expected_eofs: int, host: str, storage_dir: str = "./data/eof_service_storage"):
         self.connection = PikaConnection(host)
         self.eof_input_queque = eof_input_queque
         self.eof_output_middleware = eof_output_middleware
-        self.expected_acks = expected_acks
+        self.expected_eofs = expected_eofs
         storage = DedupBySenderStorage(storage_dir)
         self.dedup_strategy = DedupBySenderStrategy(storage)
         self.eof_storage = EofStorage(storage_dir)
@@ -42,7 +42,7 @@ class EofService(Worker, ABC):
             try:
                 message = Message.deserialize(message)
                 if message.type == MESSAGE_TYPE_EOF:
-                    if self.on_eof_message(message, self.dedup_strategy, self.eof_storage, self.expected_acks):
+                    if self.on_eof_message(message, self.dedup_strategy, self.eof_storage, self.expected_eofs):
                         logging.info(f"action: all_eofs_received | request_id: {message.request_id} | sending EOF ack")
                         self.send_message(message)
                         self.eof_storage.delete_state(message.request_id)

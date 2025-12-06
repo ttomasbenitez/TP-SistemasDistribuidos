@@ -19,7 +19,7 @@ class QuantityAndProfit(Worker):
                  data_output_queue: str, 
                  storage_dir: str,
                  host: str,
-                 expected_acks: int = 2,
+                 expected_eofs: int = 2,
                  container_name: str = 'unknown-quantity-profit-node'):
         
         self.data_input_queue = data_input_queue
@@ -28,7 +28,7 @@ class QuantityAndProfit(Worker):
         self.state_storage = QuantityAndProfitStateStorage(storage_dir)
         self.dedup_strategy = DedupBySenderStrategy(self.state_storage)
         self.eof_storage = EofStorage(storage_dir)
-        self.expected_acks = expected_acks
+        self.expected_eofs = expected_eofs
         self.node_id = container_name
         
     def start(self):
@@ -52,7 +52,7 @@ class QuantityAndProfit(Worker):
                 logging.info(f"action: message received | request_id: {message.request_id} | type: {message.type}")
                             
                 if message.type == MESSAGE_TYPE_EOF:
-                    if self.on_eof_message(message, self.dedup_strategy, self.eof_storage, self.expected_acks):
+                    if self.on_eof_message(message, self.dedup_strategy, self.eof_storage, self.expected_eofs):
                         logging.info(f"action: all_eofs_received | request_id: {message.request_id} | sending results")
                         self._send_results_by_date(message.request_id, data_output_queue)
                         self.eof_storage.delete_state(message.request_id)

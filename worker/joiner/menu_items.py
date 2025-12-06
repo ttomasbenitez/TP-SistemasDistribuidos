@@ -20,7 +20,7 @@ class JoinerMenuItems(Joiner):
                  host: str,
                  storage_dir: str = None,
                  aggregator_quantity_profit_replicas: int = 2): 
-        # Expected EOFs: 1 from menu_items + N from aggregator-quantity-profit replicas
+        
         expected_eofs = 1 + aggregator_quantity_profit_replicas
         super().__init_client_handler__(menu_items_input_queue, host, expected_eofs, JoinerMenuItemsStateStorage(storage_dir, {
             "menu_items": {},
@@ -28,9 +28,9 @@ class JoinerMenuItems(Joiner):
             "pending_results": [],
             "last_eof_count": 0,
         }))
+        
         self.data_input_queue = data_input_queue
         self.data_output_exchange = data_output_exchange
-        self.pending_items = []
         self.eofs_sent_by_request = {}
 
     def _process_items_to_join(self, message):
