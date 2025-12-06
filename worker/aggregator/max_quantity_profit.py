@@ -93,7 +93,8 @@ class QuantityAndProfit(Worker):
                 existing_item.subtotal += it.subtotal
             else:
                 items_by_ym[ym][item_id] = it
-                
+            
+        state["items_by_ym"] = items_by_ym
         self.state_storage.save_state(request_id)
             
         logging.info(f"action: state_persisted | request_id: {request_id}")

@@ -19,7 +19,6 @@ class QuantityAndProfitStateStorage(StateStorage):
         )
         
         items_by_ym = state["items_by_ym"]
-        loaded_items = 0
         
         for line in file_handle:
             line = line.strip()
@@ -56,7 +55,6 @@ class QuantityAndProfitStateStorage(StateStorage):
                         f"| ym: {ym} | item_id: {item.item_id} "
                         f"| qty: {item.quantity} | sub: {item.subtotal}"
                     )
-                loaded_items += 1
             except Exception as e:
                 logging.warning(
                     f"action: failed_to_load_item | request_id: {request_id} | error: {e}"
@@ -65,11 +63,9 @@ class QuantityAndProfitStateStorage(StateStorage):
             
         state["items_by_ym"] = items_by_ym
 
-        total_qty = sum(item.quantity for ym_dict in items_by_ym.values() for item in ym_dict.values())
-        total_sub = sum(item.subtotal for ym_dict in items_by_ym.values() for item in ym_dict.values())
         logging.info(
             f"action: load_state_summary | request_id: {request_id} "
-            f"| loaded_items: {loaded_items} | total_qty: {total_qty} | total_sub: {total_sub}"
+            f"| loaded_items: {items_by_ym}"
         )
             
     def _save_state_to_file(self, file_handle, request_id):
