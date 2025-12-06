@@ -3,7 +3,7 @@ from Middleware.middleware import MessageMiddlewareExchange, MessageMiddlewareQu
 from Middleware.connection import PikaConnection
 import logging
 from pkg.message.message import Message
-from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_QUERY_2_INTERMEDIATE_RESULT, MESSAGE_TYPE_TRANSACTION_ITEMS
+from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_QUERY_2_INTERMEDIATE_RESULT
 from utils.custom_logging import initialize_log
 from pkg.message.q2_result import Q2IntermediateResult
 import os
@@ -93,10 +93,10 @@ class AggregatorMonth(Worker):
             queue_index = hash_val % self.sharding_q2_amount
             new_chunk = ''.join(item.serialize() for item in items)
             new_msg_count = self.get_msg_count(original_message.request_id)
-            new_message =  Message(original_message.request_id, original_message.type, new_msg_count, new_chunk, self.node_id)
+            new_message =  Message(original_message.request_id, MESSAGE_TYPE_QUERY_2_INTERMEDIATE_RESULT, new_msg_count, new_chunk, self.node_id)
             logging.info(f"action: sending group | key: {key} | to_queue_index: {queue_index} | request_id: {new_message.request_id} | type: {new_message.type} | msg_num: {new_msg_count} | node_id: {self.node_id}")
             serialized = new_message.serialize()
-            output_exchange.send(serialized, f"{MESSAGE_TYPE_TRANSACTION_ITEMS}.q2.{queue_index}")
+            output_exchange.send(serialized, f"{MESSAGE_TYPE_QUERY_2_INTERMEDIATE_RESULT}.q2.{queue_index}")
         
 
     def get_msg_count(self, request_id):
@@ -174,7 +174,7 @@ def main():
     output_exchange_queues = {}
     index = 0
     for queue in config_params["output_queues"]:
-        output_exchange_queues[queue] = [f"{str(MESSAGE_TYPE_TRANSACTION_ITEMS)}.q2.{index}", str(MESSAGE_TYPE_EOF)]
+        output_exchange_queues[queue] = [f"{str(MESSAGE_TYPE_QUERY_2_INTERMEDIATE_RESULT)}.q2.{index}", str(MESSAGE_TYPE_EOF)]
         index += 1
     sharding_q2_amount = len(config_params["output_queues"])
     aggregator = AggregatorMonth(config_params["input_queue"], 

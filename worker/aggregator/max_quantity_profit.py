@@ -57,6 +57,8 @@ class QuantityAndProfit(Worker):
                         logging.info(f"action: all_eofs_received | request_id: {message.request_id} | sending results")
                         self._send_results_by_date(message.request_id, data_output_queue)
                         self.eof_storage.delete_state(message.request_id)
+                        
+                    return
                 
                 if self.dedup_strategy.is_duplicate(message):
                     logging.info(f"action: duplicated_message | request_id: {message.request_id}")
@@ -76,10 +78,10 @@ class QuantityAndProfit(Worker):
         Acumula cantidad y subtotal por año, mes y producto
         """
         state = self.state_storage.get_state(request_id)
-        items_by_ym = state.setdefault("items_by_ym", {})
+        items_by_ym = state.get("items_by_ym", {})
         
         for it in items:
-            ym = it.get_year()
+            ym = str(it.year_month_created_at)
             item_id = it.item_id
             
             if ym not in items_by_ym:
@@ -87,21 +89,16 @@ class QuantityAndProfit(Worker):
             
             existing_item = items_by_ym[ym].get(item_id)
             if existing_item:
-                old_qty = existing_item.quantity
-                old_sub = existing_item.subtotal
                 existing_item.quantity += it.quantity
                 existing_item.subtotal += it.subtotal
-                logging.debug(f"action: item_updated | ym: {ym} | item_id: {item_id} | qty: {old_qty}→{existing_item.quantity} | sub: {old_sub}→{existing_item.subtotal}")
             else:
                 items_by_ym[ym][item_id] = it
-                logging.debug(f"action: item_added | ym: {ym} | item_id: {item_id} | qty: {it.quantity} | sub: {it.subtotal}")
-     
+                
         self.state_storage.save_state(request_id)
             
         logging.info(f"action: state_persisted | request_id: {request_id}")
     
     def _send_results_by_date(self, request_id_of_eof, data_output_queue):
-        chunk = ''
         
         if request_id_of_eof not in self.state_storage.data_by_request:
             logging.warning(f"action: send_results_no_data | request_id: {request_id_of_eof}")
@@ -109,36 +106,89 @@ class QuantityAndProfit(Worker):
 
         data_for_request = self.state_storage.get_state(request_id_of_eof)
         items_by_ym = data_for_request.get("items_by_ym", {})
-        
-        logging.info(f"action: send_results_start | request_id: {request_id_of_eof} | yms_count: {len(items_by_ym)}")
 
+        if not items_by_ym:
+            logging.warning(f"action: send_results_empty_state | request_id: {request_id_of_eof}")
+            return
+        
+        logging.info(
+            f"action: send_results_start | request_id: {request_id_of_eof} "
+            f"| yms_count: {len(items_by_ym)}"
+        )
+
+        chunk = ""
         results_count = 0
-        for ym, items_by_id in items_by_ym.items():
-            if not items_by_id:
+
+        # Itero por fecha ordenada para que el output sea determinista
+        for ym in sorted(items_by_ym.keys()):
+            items_dict = items_by_ym[ym]
+            
+            if not items_dict:
                 continue
 
+            # Máximo por cantidad
             max_item_quantity_id, max_item_quantity = max(
-                items_by_id.items(), key=lambda kv: kv[1].quantity
+                items_dict.items(),
+                key=lambda kv: kv[1].quantity,
             )
 
+            # Máximo por profit
             max_item_profit_id, max_item_profit = max(
-                items_by_id.items(), key=lambda kv: kv[1].subtotal
+                items_dict.items(),
+                key=lambda kv: kv[1].subtotal,
             )
-            
-            logging.debug(f"action: max_found | ym: {ym} | max_qty_item: {max_item_quantity_id} ({max_item_quantity.quantity}) | max_profit_item: {max_item_profit_id} ({max_item_profit.subtotal})")
-            chunk += Q2Result(ym, max_item_quantity_id, max_item_quantity.quantity, MAX_QUANTITY).serialize()
-            chunk += Q2Result(ym, max_item_profit_id, max_item_profit.subtotal, MAX_PROFIT).serialize()
+
+            logging.info(
+                f"action: ym_results_computed | request_id: {request_id_of_eof} | ym: {ym} "
+                f"| max_qty_item_id: {max_item_quantity_id} | max_qty: {max_item_quantity.quantity} "
+                f"| max_profit_item_id: {max_item_profit_id} | max_profit: {max_item_profit.subtotal}"
+            )
+
+            # Armo resultados y los agrego al chunk
+            chunk += Q2Result(
+                ym,
+                max_item_quantity_id,
+                max_item_quantity.quantity,
+                MAX_QUANTITY,
+            ).serialize()
+
+            chunk += Q2Result(
+                ym,
+                max_item_profit_id,
+                max_item_profit.subtotal,
+                MAX_PROFIT,
+            ).serialize()
+
             results_count += 2
 
         if chunk:
-            logging.info(f"action: send_results_done | request_id: {request_id_of_eof} | results_count: {results_count} | CHUNK: {chunk}")
-            message = Message(request_id_of_eof, MESSAGE_TYPE_QUERY_2_RESULT, 0, chunk, self.node_id)
+            logging.info(
+                f"action: send_results_done | request_id: {request_id_of_eof} "
+                f"| results_count: {results_count}"
+            )
+
+            # Si no te importa numerar el mensaje, podés dejar msg_num = 0
+            msg_num = 0
+            message = Message(
+                request_id_of_eof,
+                MESSAGE_TYPE_QUERY_2_RESULT,
+                msg_num,
+                chunk,
+                self.node_id,
+            )
             serialized_message = message.serialize()
             data_output_queue.send(serialized_message)
-            logging.info(f"action: results_sent | msg_num: {0} | node_id: {self.node_id} | request_id: {request_id_of_eof}")
+
+            logging.info(
+                f"action: results_sent | request_id: {request_id_of_eof} "
+                f"| msg_num: {msg_num} | node_id: {self.node_id}"
+            )
         else:
-            logging.warning(f"action: send_results_empty | request_id: {request_id_of_eof} | no_results")
-            
+            logging.warning(
+                f"action: send_results_empty | request_id: {request_id_of_eof} | no_results"
+            )
+
+  
         self.state_storage.delete_state(request_id_of_eof)
         self.dedup_strategy.clean_dedup_state(request_id_of_eof)
 

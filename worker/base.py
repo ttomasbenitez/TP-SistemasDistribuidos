@@ -136,7 +136,7 @@ class Worker(ABC):
             logging.info(f"Mensaje EOF duplicado ignorado | request_id: {message.request_id}")
             return
         
-        logging.info(f"EOF recibido en service queue | request_id: {message.request_id}")
+        logging.info(f"EOF recibido | request_id: {message.request_id}")
         state = eof_storage.get_state(message.request_id)
         state["eofs_count"] = state.get('eofs_count') + 1  
         if state["eofs_count"] == expected_acks:
@@ -144,5 +144,5 @@ class Worker(ABC):
             return True
         else:
             eof_storage.data_by_request[message.request_id] = state
-            eof_storage.save_state(message)
+            eof_storage.save_state(message.request_id)
             return False
