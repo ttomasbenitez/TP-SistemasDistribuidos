@@ -92,6 +92,28 @@ def run_top_three_chaos(interval):
         
         print(f"Sleeping for {interval} seconds...")
         time.sleep(interval)
+        
+def run_query_chaos(interval, possible_targets):
+    while True:
+        containers = get_running_containers()
+
+        # Intersect running containers ∩ targets
+        targets = [c for c in containers if c in possible_targets]
+
+        if not targets:
+            print("⚠️ No target containers found.")
+        else:
+            # Elegir hasta 5 contenedores al azar
+            kill_count = min(6, len(targets))
+            chosen = random.sample(targets, kill_count)
+
+            print(f"🔥 Selected {kill_count} container(s) to KILL: {chosen}")
+
+            for target in chosen:
+                kill_container(target)
+
+        print(f"⏳ Sleeping for {interval}s...\n")
+        time.sleep(interval)
 
 def run_q1_chaos(interval):
     """Kills 5 random target containers every `interval` seconds."""
@@ -104,26 +126,8 @@ def run_q1_chaos(interval):
         'filter-year-1', 'filter-year-2', 'filter-year-eof-service'
     ]
 
-    while True:
-        containers = get_running_containers()
-
-        # Intersect running containers ∩ targets
-        targets = [c for c in containers if c in possible_targets]
-
-        if not targets:
-            print("⚠️ No target containers found.")
-        else:
-            # Elegir hasta 5 contenedores al azar
-            kill_count = min(6, len(targets))
-            chosen = random.sample(targets, kill_count)
-
-            print(f"🔥 Selected {kill_count} container(s) to KILL: {chosen}")
-
-            for target in chosen:
-                kill_container(target)
-
-        print(f"⏳ Sleeping for {interval}s...\n")
-        time.sleep(interval)
+    run_query_chaos(interval, possible_targets)
+    
         
 def run_q2_chaos(interval):
     """Kills 5 random target containers every `interval` seconds."""
@@ -134,27 +138,21 @@ def run_q2_chaos(interval):
         'aggregator-month-1', 'aggregator-month-2',
         'aggregator-quantity-profit-1', 'aggregator-quantity-profit-2', 'aggregator-quantity-profit-3',
     ]
+    
+    run_query_chaos(interval, possible_targets)
+    
+def run_q3_chaos(interval):
+    """Kills 5 random target containers every `interval` seconds."""
+    print(f"😈 Starting Chaos Monkey (Q3 Mode). Interval: {interval}s")
+    print(f"🎯 Target services: 5 random from joiner/stores/q3 and aggregator/store/q3 family")
 
-    while True:
-        containers = get_running_containers()
-
-        # Intersect running containers ∩ targets
-        targets = [c for c in containers if c in possible_targets]
-
-        if not targets:
-            print("⚠️ No target containers found.")
-        else:
-            # Elegir hasta 5 contenedores al azar
-            kill_count = min(6, len(targets))
-            chosen = random.sample(targets, kill_count)
-
-            print(f"🔥 Selected {kill_count} container(s) to KILL: {chosen}")
-
-            for target in chosen:
-                kill_container(target)
-
-        print(f"⏳ Sleeping for {interval}s...\n")
-        time.sleep(interval)
+    possible_targets = [
+        # 'join-stores-q3',
+        'aggregator-store-q3-1', 'aggregator-store-q3-2',
+        'aggregator-semester-1', 'aggregator-semester-1',
+    ]
+    
+    run_query_chaos(interval, possible_targets)
 
 def run_combined_chaos(random_interval, top_three_interval):
     """Runs both random and top-three chaos simultaneously in separate threads."""
@@ -211,6 +209,13 @@ def main():
     parser.add_argument('--q2-interval', type=float, default=5,
                         help='Interval in seconds for q2 mode (default: 5)')
     
+    
+    parser.add_argument('--q3', action='store_true',
+                        help='Enable q2 killing mode')
+    parser.add_argument('--q3-interval', type=float, default=5,
+                        help='Interval in seconds for q2 mode (default: 5)')
+    
+    
     args = parser.parse_args()
 
     if args.node:
@@ -243,6 +248,12 @@ def main():
     elif args.q2:
         try:
             run_q2_chaos(args.q2_interval)
+        except KeyboardInterrupt:
+            print("\n😇 Chaos Monkey stopped.")
+            
+    elif args.q3:
+        try:
+            run_q3_chaos(args.q3_interval)
         except KeyboardInterrupt:
             print("\n😇 Chaos Monkey stopped.")
 

@@ -131,7 +131,7 @@ class Worker(ABC):
         self.state_storage.data_by_request[message.request_id] = state
         return False
     
-    def on_eof_message(self, message: Message, dedup_strategy, eof_storage: EofStorage, expected_acks: int):
+    def on_eof_message(self, message: Message, dedup_strategy, eof_storage: EofStorage, expected_eofs: int):
         if dedup_strategy.is_duplicate(message):
             logging.info(f"Mensaje EOF duplicado ignorado | request_id: {message.request_id}")
             return
@@ -139,7 +139,7 @@ class Worker(ABC):
         logging.info(f"EOF recibido | request_id: {message.request_id}")
         state = eof_storage.get_state(message.request_id)
         state["eofs_count"] = state.get('eofs_count', 0) + 1  
-        if state["eofs_count"] == expected_acks:
+        if state["eofs_count"] == expected_eofs:
             logging.info(f"Enviando final EOF del cliente {message.request_id}")
             return True
         else:

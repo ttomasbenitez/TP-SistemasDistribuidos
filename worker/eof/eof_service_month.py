@@ -15,14 +15,14 @@ class EofServiceMonth(EofService):
     def __init__(self, 
                  eof_input_queque: str, 
                  output_queues: list,
-                 expected_acks: int,
+                 expected_eofs: int,
                  host: str,
                  storage_dir: str):
         
         self.connection = PikaConnection(host)
         self.eof_input_queque = eof_input_queque
         self.eof_output_queues = output_queues
-        self.expected_acks = expected_acks
+        self.expected_eofs = expected_eofs
         storage = DedupBySenderStorage(storage_dir)
         self.dedup_strategy = DedupBySenderStrategy(storage)
         self.eof_storage = EofStorage(storage_dir)
@@ -62,7 +62,7 @@ def initialize_config():
     config_params = {
         "rabbitmq_host": os.getenv('RABBITMQ_HOST'),
         "input_queue": os.getenv('INPUT_QUEUE'),
-        "expected_acks": int(os.getenv('EXPECTED_ACKS')),
+        "expected_eofs": int(os.getenv('EXPECTED_ACKS')),
         "logging_level": os.getenv('LOG_LEVEL', 'INFO'),
         "storage_dir": os.getenv('STORAGE_DIR'),
     }
@@ -106,7 +106,7 @@ def main():
     eof_service = EofServiceMonth(
         config_params["input_queue"],
         config_params["output_queues"],
-        config_params["expected_acks"],
+        config_params["expected_eofs"],
         config_params["rabbitmq_host"],
         config_params["storage_dir"]
     )

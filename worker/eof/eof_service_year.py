@@ -31,7 +31,7 @@ def initialize_config():
         "input_queue": os.getenv('INPUT_QUEUE'),
         "output_queue": os.getenv('OUTPUT_QUEUE'),
         "logging_level": os.getenv('LOG_LEVEL', 'INFO'),
-        "expected_acks": int(os.getenv('EXPECTED_ACKS')),
+        "expected_eofs": int(os.getenv('EXPECTED_ACKS')),
     }
 
     required_keys = [
@@ -54,7 +54,7 @@ def main():
     eof_service = EofServiceYear(
         config_params["input_queue"],
         config_params["output_queue"],
-        config_params["expected_acks"],
+        config_params["expected_eofs"],
         config_params["rabbitmq_host"]
     )
     eof_service.start()

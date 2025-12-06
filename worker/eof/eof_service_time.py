@@ -7,8 +7,8 @@ from pkg.message.constants import MESSAGE_TYPE_EOF
 
 class EofServiceTime(EofService):
     
-    def __init__(self, eof_input_queque, eof_output_middleware, eof_queues, expected_acks, host):
-        super().__init__(eof_input_queque, eof_output_middleware, expected_acks, host)
+    def __init__(self, eof_input_queque, eof_output_middleware, eof_queues, expected_eofs, host):
+        super().__init__(eof_input_queque, eof_output_middleware, expected_eofs, host)
         self.eof_queues = eof_queues
     
     def send_message(self, message):
@@ -37,7 +37,7 @@ def initialize_config():
         "input_queue": os.getenv('INPUT_QUEUE'),
         "output_exchange_filter": os.getenv('EXCHANGE_NAME'),
         "logging_level": os.getenv('LOG_LEVEL', 'INFO'),
-        "expected_acks": int(os.getenv('EXPECTED_ACKS')),
+        "expected_eofs": int(os.getenv('EXPECTED_ACKS')),
     }
     
     output_queues = [
@@ -76,7 +76,7 @@ def main():
         config_params["input_queue"],
         config_params["output_exchange_filter"],
         eof_queues,
-        config_params["expected_acks"],
+        config_params["expected_eofs"],
         config_params["rabbitmq_host"]
     )
     eof_service.start()

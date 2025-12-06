@@ -30,7 +30,7 @@ def initialize_config():
         "rabbitmq_host": os.getenv('RABBITMQ_HOST'),
         "input_queue": os.getenv('INPUT_QUEUE'),
         "output_queue": os.getenv('OUTPUT_QUEUE'),
-        "expected_acks": int(os.getenv('EXPECTED_ACKS')),
+        "expected_eofs": int(os.getenv('EXPECTED_ACKS')),
         "logging_level": os.getenv('LOG_LEVEL', 'INFO'),
     }
 
@@ -54,7 +54,7 @@ def main():
     eof_service = EofServiceQuantityProfit(
         config_params["input_queue"],
         config_params["output_queue"], 
-        config_params["expected_acks"],
+        config_params["expected_eofs"],
         config_params["rabbitmq_host"]
     )
     eof_service.start()
