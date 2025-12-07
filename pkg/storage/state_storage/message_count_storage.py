@@ -3,6 +3,7 @@ import logging
 class MessageCountStorage(StateStorage):
     
     def __init__(self, storage_dir):
+        
         default_state = {
             'current_msg_num': -1, 
         }

@@ -84,11 +84,11 @@ def canon_tuple(rec: dict, atol: float) -> Tuple:
                 str(rec.get("period")),
                 str(rec.get("store_name")),
                 _quantize(_to_float(rec.get("tpv")), atol))
-    # elif q == "q4":
-    #     return ("q4",
-    #             str(rec.get("store_name")),
-    #             str(rec.get("birthdate")),
-    #             _to_int(rec.get("purchases_qty")))
+    elif q == "q4":
+        return ("q4",
+                str(rec.get("store_name")),
+                str(rec.get("birthdate")),
+                _to_int(rec.get("purchases_qty")))
     else:
         return ("unknown",)
     

@@ -117,6 +117,8 @@ class SemesterAggregator(Worker):
                     msg_num += 1
             
             logging.info(f"action: send_results_done | request_id: {request_id}")
+            new_eof = Message(request_id, MESSAGE_TYPE_EOF, msg_num, '', self.node_id).serialize()
+            data_output_queue.send(new_eof)
         except Exception as e:
             logging.error(f"action: send_results_error | request_id: {request_id} | error: {type(e).__name__}: {e}")
 

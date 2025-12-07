@@ -7,13 +7,10 @@ from pkg.message.q1_result import Q1Result
 from utils.custom_logging import initialize_log
 import os
 from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_QUERY_1_RESULT
-from multiprocessing import Process
 from utils.heartbeat import start_heartbeat_sender
 from Middleware.connection import PikaConnection
 
-MAX_PENDING_SIZE = 1000
 AMOUNT_THRESHOLD = 75
-SNAPSHOT_INTERVAL = 250
 
 class FilterAmountNode(Worker):
     
@@ -31,7 +28,6 @@ class FilterAmountNode(Worker):
         self.data_output_exchange = data_output_exchange
         self.amount_to_filter = amount_to_filter
         self.dedup_strategy = SlidingWindowDedupStrategy(total_shards, storage_dir)
-        self.curr_snapshot_interval = {}
         
     def start(self):
        

@@ -41,7 +41,7 @@ class Gateway:
                 connection = PikaConnection(self._rabbitmq_host)
                 results_in_queue = MessageMiddlewareQueue(results_queue_name, connection)
                 
-                queues_dict = self.create_queues_dict()
+                queues_dict = self.create_queues_dict(self._request_id)
                 exchange = MessageMiddlewareExchange(self._exchange_name, queues_dict, connection)
 
                 handler = ClientHandler(self._request_id, client_sock, exchange, results_in_queue, self._output_exchange_name, connection, self._q1_replicas)
@@ -79,19 +79,23 @@ class Gateway:
 
         logging.info("action: gateway_shutdown | result: success")
 
-    def create_queues_dict(self):
+    def create_queues_dict(self, request_id):
         queues_dict = {}
 
         for key, queue_name in os.environ.items():
+            name = queue_name
             if key.startswith("OUTPUT_QUEUE_"):
                 if queue_name.startswith("users"):
+                    name = f"{queue_name}.{request_id}"
                     routing_key = [str(MESSAGE_TYPE_USERS), str(MESSAGE_TYPE_EOF)]
                 elif queue_name.startswith("menu"):
+                    name = f"{queue_name}.{request_id}"
                     routing_key = [str(MESSAGE_TYPE_MENU_ITEMS), str(MESSAGE_TYPE_EOF)]
                 elif queue_name.startswith("stores"):
+                    name = f"{queue_name}.{request_id}"
                     routing_key = [str(MESSAGE_TYPE_STORES), str(MESSAGE_TYPE_EOF)]
                 else:
                     routing_key = [str(MESSAGE_TYPE_TRANSACTIONS), str(MESSAGE_TYPE_TRANSACTION_ITEMS), str(MESSAGE_TYPE_EOF)]
                 
-                queues_dict[queue_name] = routing_key
+                queues_dict[name] = routing_key
         return queues_dict

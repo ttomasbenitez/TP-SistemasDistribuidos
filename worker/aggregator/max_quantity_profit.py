@@ -56,6 +56,7 @@ class QuantityAndProfit(Worker):
                         logging.info(f"action: all_eofs_received | request_id: {message.request_id} | sending results")
                         self._send_results_by_date(message.request_id, data_output_queue)
                         self.eof_storage.delete_state(message.request_id)
+                        self.state_storage.delete_state(message.request_id)
                         self.dedup_strategy.clean_dedup_state(message.request_id)
                     return
                 
@@ -183,13 +184,14 @@ class QuantityAndProfit(Worker):
                 f"action: results_sent | request_id: {request_id_of_eof} "
                 f"| msg_num: {msg_num} | node_id: {self.node_id}"
             )
+            new_eof = Message( request_id_of_eof, MESSAGE_TYPE_EOF, 1, '', self.node_id).serialize()
+            data_output_queue.send(new_eof)
         else:
             logging.warning(
                 f"action: send_results_empty | request_id: {request_id_of_eof} | no_results"
             )
 
   
-        self.state_storage.delete_state(request_id_of_eof)
 
     def close(self):
         try:

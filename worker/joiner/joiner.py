@@ -1,79 +1,100 @@
 
 from worker.base import Worker 
 from abc import ABC, abstractmethod
-import threading
 from utils.heartbeat import start_heartbeat_sender
 import logging
 from pkg.message.message import Message
-from Middleware.middleware import MessageMiddlewareQueue
+from Middleware.middleware import MessageMiddlewareQueue, MessageMiddlewareExchange
 from pkg.message.constants import MESSAGE_TYPE_EOF
 from Middleware.connection import PikaConnection
-
+from pkg.dedup.dedup_by_sender_strategy import DedupBySenderStrategy
+from pkg.storage.state_storage.base import StateStorage
 class Joiner(Worker, ABC):
-  
-    def __init_client_handler__(self, items_input_queue: str, host: str, expected_eofs: int, state_storage):
+    
+    def __init__(self, 
+                 data_input_queue: str, 
+                 items_input_queue: str,
+                 data_output_middleware: str,
+                 state_storage: StateStorage,
+                 container_name :str,
+                 query_num: int,
+                 host: str,
+                 expected_eofs):
         
-        self.__init_manager__()
-        self.__init_middlewares_handler__()
+        self.data_input_queue = data_input_queue
+        self.data_output_middleware = data_output_middleware
         self.items_input_queue = items_input_queue
+        self.node_id = container_name
         self.connection = PikaConnection(host)
-        self.expected_eofs = expected_eofs
         self.state_storage = state_storage
+        self.dedup_strategy = DedupBySenderStrategy(self.state_storage)
+        self.expected_eofs = expected_eofs
+        self.query_num = query_num
         
     def start(self):
         self.heartbeat_sender = start_heartbeat_sender()
-        
         self.state_storage.load_state_all()
-    
         self.connection.start()
-        self._consume_data_queue()
-        self._consume_items_to_join_queue()
+        self.consume_data_queue()
         self.connection.start_consuming()
 
-    @abstractmethod
-    def _consume_data_queue(self):
-        pass
-    
-    @abstractmethod
-    def _process_items_to_join(self, message):
-        pass
-    
-    @abstractmethod
-    def _send_results(self, message):
-        pass
-    
-    def _process_on_eof_message__(self, message):
-        state = self.state_storage.get_state(message.request_id)
-        state["last_eof_count"] = state.get("last_eof_count", 0) + 1
-        if state["last_eof_count"] < self.expected_eofs:
-            logging.info(f"action: EOF message received {state['last_eof_count']}/{self.expected_eofs} | request_id: {message.request_id} | type: {message.type}")
-            return
-        try:
-            self._ensure_request(message.request_id)
-            self.drained[message.request_id].wait()
-            logging.info(f"action: EOF message received {state['last_eof_count']}/{self.expected_eofs} send results | request_id: {message.request_id} | type: {message.type}")
-            self._send_results(message)
-        except Exception as e:
-            logging.error(f"Error al procesar mensajes pendientes: {e}")
-        return
-    
-    def _consume_items_to_join_queue(self):
-        items_input_queue = MessageMiddlewareQueue(self.items_input_queue, self.connection)
-        self.message_middlewares.append(items_input_queue)
+    def consume_data_queue(self):
+        data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
+
+        def __on_message__(msg):
+            message = Message.deserialize(msg)
+            logging.info(f"action: message received from data_queue | request_id: {message.request_id} | type: {message.type}")
+            
+            if message.type == MESSAGE_TYPE_EOF:
+                if self.on_eof_message(message, self.dedup_strategy, self.state_storage, self.expected_eofs):
+                    logging.info(f"action: EOF message processed | request_id: {message.request_id} | type: {message.type}")
+                    self.consume_items_to_join_queue(message.request_id)
+                return
+            
+            if self.dedup_strategy.is_duplicate(message):
+                logging.info(f"action: duplicate message discarded | request_id: {message.request_id} | type: {message.type} | sender_id: {message.node_id} | msg_num: {message.msg_num}")
+                return
+            
+            try:
+                items = message.process_message() 
+                request_id = message.request_id
+                state = self.state_storage.get_state(request_id)
+                pending_results = state.get("pending_results", [])
+                pending_results.extend(items)
+                state['pending_results'] = pending_results
+            finally:
+                self.state_storage.save_state(message.request_id)
+                        
+        data_input_queue.start_consuming(__on_message__)
+
+
+    def _send_eof(self, message: Message):
+        
+        data_output_middleware = MessageMiddlewareExchange(self.data_output_middleware, {}, self.connection)
+        current_state = self.state_storage.get_state(message.request_id)
+        current_msg_num = current_state.get("current_msg_num", -1)
+        new_msg_num = current_msg_num + 1
+        new_eof = Message(message.request_id, MESSAGE_TYPE_EOF, new_msg_num, self.query_num, self.node_id)
+        data_output_middleware.send(new_eof.serialize(), str(message.request_id))
+        self.state_storage.delete_state(message.request_id)
+        logging.info(f"action: EOF sent | request_id: {message.request_id} | type: {message.type}")
+
+    def consume_items_to_join_queue(self, request_id: int):
+        items_input_queue = MessageMiddlewareQueue(f"{self.items_input_queue}.{request_id}", self.connection)
+        
         def __on_items_message__(message):
             message = Message.deserialize(message)
             logging.info(f"action: message received in items to join queue | request_id: {message.request_id} | msg_type: {message.type}")
              
             if message.type == MESSAGE_TYPE_EOF:
-                return self._process_on_eof_message__(message)
+                self._send_eof(message)
             
-            self._ensure_request(message.request_id)
-            self._inc_inflight(message.request_id)
-            try:
-                self._process_items_to_join(message)
-            finally:
-                if message.type != MESSAGE_TYPE_EOF:
-                    self._dec_inflight(message.request_id)
-                    self.state_storage.save_state(message.request_id)
+            self._process_items_to_join(message)
+            logging.info(f"action: items to join processed | request_id: {message.request_id} | msg_type: {message.type}")
+            self.state_storage.save_state(message.request_id)
             
         items_input_queue.start_consuming(__on_items_message__)
+        
+    @abstractmethod
+    def _process_items_to_join(self, message: Message):
+        pass

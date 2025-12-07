@@ -21,7 +21,7 @@ class StoreAggregator(Worker):
                  total_shards: int,
                  storage_dir: str,
                  sharding_key: str,
-                 node_number: int):
+                 container_name: str):
         
         self.__init_manager__()
         self.__init_middlewares_handler__()
@@ -31,7 +31,7 @@ class StoreAggregator(Worker):
         self.connection = PikaConnection(host)
         self.total_shards = total_shards
         self.sharding_key = sharding_key
-        self.node_id = node_number
+        self.node_id = container_name
         self.dedup_strategy = SlidingWindowDedupStrategy(total_shards, storage_dir)
 
     def start(self):    
@@ -123,7 +123,7 @@ def initialize_config():
         "total_shards": int(os.getenv('TOTAL_SHARDS', 3)),
         "storage_dir": os.getenv('STORAGE_DIR', './data'),
         "sharding_key": os.getenv('SHARDING_KEY', 'request_id'),
-        "node_number": int(os.getenv('NODE_NUMBER', 1)),
+        "container_name": os.getenv('CONTAINER_NAME'),
     }
 
     required_keys = [
@@ -165,7 +165,7 @@ def main():
                                  config_params["total_shards"],
                                  config_params["storage_dir"],
                                  config_params["sharding_key"],
-                                 config_params["node_number"])
+                                 config_params["container_name"])
     aggregator.start()
 
 if __name__ == "__main__":

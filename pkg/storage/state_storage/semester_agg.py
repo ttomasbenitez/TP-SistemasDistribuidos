@@ -5,6 +5,7 @@ import logging
 class SemesterAggregatorStateStorage(StateStorage):
     
     def __init__(self, storage_dir):
+        
         default_state = {
             "last_by_sender": dict(),
             "agg_by_period": dict(),

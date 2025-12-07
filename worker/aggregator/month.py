@@ -12,7 +12,6 @@ import hashlib
 from pkg.storage.state_storage.message_count_storage import MessageCountStorage
 from pkg.dedup.sliding_window_dedup_strategy import SlidingWindowDedupStrategy
 
-SNAPSHOT_INTERVAL = 100
 
 class AggregatorMonth(Worker):
     
@@ -32,7 +31,6 @@ class AggregatorMonth(Worker):
         self.connection = PikaConnection(host)
         self.node_id = container_name 
         self.dedup_strategy = SlidingWindowDedupStrategy(2, storage_dir)
-        self.snapshot_interval = {}
     
     def start(self):
         
