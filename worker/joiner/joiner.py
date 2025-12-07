@@ -35,6 +35,12 @@ class Joiner(Worker, ABC):
         self.heartbeat_sender = start_heartbeat_sender()
         self.state_storage.load_state_all()
         self.connection.start()
+
+        index = 0
+        for data in self.state_storage.data_by_request:
+            if data[index]["last_eof_count"] == self.expected_eofs:
+                self.consume_items_to_join_queue(index)
+                index += 1
         self.consume_data_queue()
         self.connection.start_consuming()
 
@@ -88,10 +94,11 @@ class Joiner(Worker, ABC):
              
             if message.type == MESSAGE_TYPE_EOF:
                 self._send_eof(message)
+                return
             
             self._process_items_to_join(message)
             logging.info(f"action: items to join processed | request_id: {message.request_id} | msg_type: {message.type}")
-            self.state_storage.save_state(message.request_id)
+            # self.state_storage.save_state(message.request_id) TODO Ver si podemos reducir la cantidad de accesos a disco aca
             
         items_input_queue.start_consuming(__on_items_message__)
         
