@@ -22,6 +22,7 @@ services:
       LOG_LEVEL: INFO
       LISTEN_BACKLOG: '5'
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: gateway
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: results-queue
@@ -47,6 +48,7 @@ services:
     command: "/worker/filter/year.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: filter-year-1
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: batches-queue
@@ -75,6 +77,7 @@ services:
     command: "/worker/filter/year.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: filter-year-2
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: batches-queue
@@ -103,6 +106,7 @@ services:
     command: "/worker/eof/eof_service_year.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: filter-year-eof-service
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE: eof-service-filter-year
@@ -115,281 +119,295 @@ services:
     depends_on:
     - gateway
 
-  # filter-time-1:
-  #   container_name: filter-time-1
-  #   image: worker:latest
-  #   command: "/worker/filter/time.py"
-  #   environment:
-  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #     CONTAINER_NAME: filter-time-1
-  #     RABBITMQ_HOST: rabbitmq
-  #     INPUT_QUEUE_1: year-filtered-queue-q1-q3
-  #     EOF_SELF_QUEUE: EOF-filter-time-1
-  #     OUTPUT_QUEUE_Q1_1: time-filtered-queue-q1-1
-  #     OUTPUT_QUEUE_Q1_2: time-filtered-queue-q1-2
-  #     OUTPUT_QUEUE_Q1_3: time-filtered-queue-q1-3
-  #     OUTPUT_QUEUE_Q3_1: time-filtered-queue-q3-1
-  #     OUTPUT_QUEUE_Q3_2: time-filtered-queue-q3-2
-  #     EOF_QUEUE_NODO_1: EOF-filter-time-1
-  #     EOF_QUEUE_NODO_2: EOF-filter-time-2
-  #     EXCHANGE_NAME: time-filtered-exchange
-  #     EOF_EXCHANGE_NAME: eof-exchange-filter-time
-  #     EOF_SERVICE_QUEUE: eof-service-filter-time
-  #     LOG_LEVEL: INFO
-  #   networks:
-  #   - testing_net
-  #   depends_on:
-  #   - gateway
+  filter-time-1:
+    container_name: filter-time-1
+    image: worker:latest
+    command: "/worker/filter/time.py"
+    environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
+      CONTAINER_NAME: filter-time-1
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: year-filtered-queue-q1-q3
+      EOF_SELF_QUEUE: EOF-filter-time-1
+      OUTPUT_QUEUE_Q1_1: time-filtered-queue-q1-1
+      OUTPUT_QUEUE_Q1_2: time-filtered-queue-q1-2
+      OUTPUT_QUEUE_Q1_3: time-filtered-queue-q1-3
+      OUTPUT_QUEUE_Q3_1: time-filtered-queue-q3-1
+      OUTPUT_QUEUE_Q3_2: time-filtered-queue-q3-2
+      EOF_QUEUE_NODO_1: EOF-filter-time-1
+      EOF_QUEUE_NODO_2: EOF-filter-time-2
+      EXCHANGE_NAME: time-filtered-exchange
+      EOF_EXCHANGE_NAME: eof-exchange-filter-time
+      EOF_SERVICE_QUEUE: eof-service-filter-time
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
+    
+  filter-time-2:
+    container_name: filter-time-2
+    image: worker:latest
+    command: "/worker/filter/time.py"
+    environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
+      CONTAINER_NAME: filter-time-2
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: year-filtered-queue-q1-q3
+      EOF_SELF_QUEUE: EOF-filter-time-2
+      OUTPUT_QUEUE_Q1_1: time-filtered-queue-q1-1
+      OUTPUT_QUEUE_Q1_2: time-filtered-queue-q1-2
+      OUTPUT_QUEUE_Q1_3: time-filtered-queue-q1-3
+      OUTPUT_QUEUE_Q3_1: time-filtered-queue-q3-1
+      OUTPUT_QUEUE_Q3_2: time-filtered-queue-q3-2
+      EOF_QUEUE_NODO_1: EOF-filter-time-1
+      EOF_QUEUE_NODO_2: EOF-filter-time-2
+      EXCHANGE_NAME: time-filtered-exchange
+      EOF_EXCHANGE_NAME: eof-exchange-filter-time
+      EOF_SERVICE_QUEUE: eof-service-filter-time
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
 
-  # filter-time-2:
-  #   container_name: filter-time-2
-  #   image: worker:latest
-  #   command: "/worker/filter/time.py"
-  #   environment:
-  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #     CONTAINER_NAME: filter-time-2
-  #     RABBITMQ_HOST: rabbitmq
-  #     INPUT_QUEUE_1: year-filtered-queue-q1-q3
-  #     EOF_SELF_QUEUE: EOF-filter-time-2
-  #     OUTPUT_QUEUE_Q1_1: time-filtered-queue-q1-1
-  #     OUTPUT_QUEUE_Q1_2: time-filtered-queue-q1-2
-  #     OUTPUT_QUEUE_Q1_3: time-filtered-queue-q1-3
-  #     OUTPUT_QUEUE_Q3_1: time-filtered-queue-q3-1
-  #     OUTPUT_QUEUE_Q3_2: time-filtered-queue-q3-2
-  #     EOF_QUEUE_NODO_1: EOF-filter-time-1
-  #     EOF_QUEUE_NODO_2: EOF-filter-time-2
-  #     EXCHANGE_NAME: time-filtered-exchange
-  #     EOF_EXCHANGE_NAME: eof-exchange-filter-time
-  #     EOF_SERVICE_QUEUE: eof-service-filter-time
-  #     LOG_LEVEL: INFO
-  #   networks:
-  #   - testing_net
-  #   depends_on:
-  #   - gateway
+  filter-time-eof-service:
+    container_name: filter-time-eof-service
+    image: worker:latest
+    command: "/worker/eof/eof_service_time.py"
+    environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
+      CONTAINER_NAME: filter-time-eof-service
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE: eof-service-filter-time
+      OUTPUT_QUEUE_1: time-filtered-queue-q1-1
+      OUTPUT_QUEUE_2: time-filtered-queue-q1-2
+      OUTPUT_QUEUE_3: time-filtered-queue-q1-3
+      OUTPUT_QUEUE_4: time-filtered-queue-q3-1
+      OUTPUT_QUEUE_5: time-filtered-queue-q3-2
+      EXCHANGE_NAME: time-filtered-exchange-eof
+      LOG_LEVEL: INFO
+      EXPECTED_ACKS: 2
+      STORAGE_DIR: ./data/filter-time-eof-service
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
 
-  # filter-time-eof-service:
-  #   container_name: filter-time-eof-service
-  #   image: worker:latest
-  #   command: "/worker/eof/eof_service_time.py"
-  #   environment:
-  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #     CONTAINER_NAME: filter-time-eof-service
-  #     RABBITMQ_HOST: rabbitmq
-  #     INPUT_QUEUE: eof-service-filter-time
-  #     OUTPUT_QUEUE_1: time-filtered-queue-q1-1
-  #     OUTPUT_QUEUE_2: time-filtered-queue-q1-2
-  #     OUTPUT_QUEUE_3: time-filtered-queue-q1-3
-  #     OUTPUT_QUEUE_4: time-filtered-queue-q3-1
-  #     OUTPUT_QUEUE_5: time-filtered-queue-q3-2
-  #     EXCHANGE_NAME: time-filtered-exchange-eof
-  #     LOG_LEVEL: INFO
-  #     EXPECTED_ACKS: 2
-  #     STORAGE_DIR: ./data/filter-time-eof-service
-  #   networks:
-  #   - testing_net
-  #   depends_on:
-  #   - gateway
+  filter-amount-1:
+    container_name: filter-amount-1
+    image: worker:latest
+    command: "/worker/filter/amount.py"
+    environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
+      CONTAINER_NAME: filter-amount-1
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: time-filtered-queue-q1-1
+      EXCHANGE_NAME: results-exchange
+      TOTAL_SHARDS: 3
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
 
-  # filter-amount-1:
-  #   container_name: filter-amount-1
-  #   image: worker:latest
-  #   command: "/worker/filter/amount.py"
-  #   environment:
-  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #     CONTAINER_NAME: filter-amount-1
-  #     RABBITMQ_HOST: rabbitmq
-  #     INPUT_QUEUE_1: time-filtered-queue-q1-1
-  #     EXCHANGE_NAME: results-exchange
-  #     TOTAL_SHARDS: 3
-  #     LOG_LEVEL: INFO
-  #   networks:
-  #   - testing_net
-  #   depends_on:
-  #   - gateway
+  filter-amount-2:
+    container_name: filter-amount-2
+    image: worker:latest
+    command: "/worker/filter/amount.py"
+    environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
+      CONTAINER_NAME: filter-amount-2
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: time-filtered-queue-q1-2
+      EXCHANGE_NAME: results-exchange
+      TOTAL_SHARDS: 3
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
 
-  # filter-amount-2:
-  #   container_name: filter-amount-2
-  #   image: worker:latest
-  #   command: "/worker/filter/amount.py"
-  #   environment:
-  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #     CONTAINER_NAME: filter-amount-2
-  #     RABBITMQ_HOST: rabbitmq
-  #     INPUT_QUEUE_1: time-filtered-queue-q1-2
-  #     EXCHANGE_NAME: results-exchange
-  #     TOTAL_SHARDS: 3
-  #     LOG_LEVEL: INFO
-  #   networks:
-  #   - testing_net
-  #   depends_on:
-  #   - gateway
+  filter-amount-3:
+    container_name: filter-amount-3
+    image: worker:latest
+    command: "/worker/filter/amount.py"
+    environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
+      CONTAINER_NAME: filter-amount-3
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: time-filtered-queue-q1-3
+      EXCHANGE_NAME: results-exchange
+      TOTAL_SHARDS: 3
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
 
-  # filter-amount-3:
-  #   container_name: filter-amount-3
-  #   image: worker:latest
-  #   command: "/worker/filter/amount.py"
-  #   environment:
-  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #     CONTAINER_NAME: filter-amount-3
-  #     RABBITMQ_HOST: rabbitmq
-  #     INPUT_QUEUE_1: time-filtered-queue-q1-3
-  #     EXCHANGE_NAME: results-exchange
-  #     TOTAL_SHARDS: 3
-  #     LOG_LEVEL: INFO
-  #   networks:
-  #   - testing_net
-  #   depends_on:
-  #   - gateway
+  aggregator-month-1:
+    container_name: aggregator-month-1
+    image: worker:latest
+    command: "/worker/aggregator/month.py"
+    environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
+      CONTAINER_NAME: aggregator-month-1
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: aggregated-month-input-queue-1
+      OUTPUT_QUEUE_1: aggregated-month-queue-1
+      OUTPUT_QUEUE_2: aggregated-month-queue-2
+      OUTPUT_QUEUE_3: aggregated-month-queue-3
+      EXCHANGE_NAME: aggregated-month-exchange
+      STORAGE_DIR: ./data/aggregator-month-1
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
 
-  # aggregator-month-1:
-  #   container_name: aggregator-month-1
-  #   image: worker:latest
-  #   command: "/worker/aggregator/month.py"
-  #   environment:
-  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #     CONTAINER_NAME: aggregator-month-1
-  #     RABBITMQ_HOST: rabbitmq
-  #     INPUT_QUEUE_1: aggregated-month-input-queue-1
-  #     OUTPUT_QUEUE_1: aggregated-month-queue-1
-  #     OUTPUT_QUEUE_2: aggregated-month-queue-2
-  #     OUTPUT_QUEUE_3: aggregated-month-queue-3
-  #     EXCHANGE_NAME: aggregated-month-exchange
-  #     STORAGE_DIR: ./data/aggregator-month-1
-  #     LOG_LEVEL: INFO
-  #   networks:
-  #   - testing_net
-  #   depends_on:
-  #   - gateway
+  aggregator-month-2:
+    container_name: aggregator-month-2
+    image: worker:latest
+    command: "/worker/aggregator/month.py"
+    environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
+      CONTAINER_NAME: aggregator-month-2
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: aggregated-month-input-queue-2
+      OUTPUT_QUEUE_1: aggregated-month-queue-1
+      OUTPUT_QUEUE_2: aggregated-month-queue-2
+      OUTPUT_QUEUE_3: aggregated-month-queue-3
+      EXCHANGE_NAME: aggregated-month-exchange
+      STORAGE_DIR: ./data/aggregator-month-2
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
 
-  # aggregator-month-2:
-  #   container_name: aggregator-month-2
-  #   image: worker:latest
-  #   command: "/worker/aggregator/month.py"
-  #   environment:
-  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #     CONTAINER_NAME: aggregator-month-2
-  #     RABBITMQ_HOST: rabbitmq
-  #     INPUT_QUEUE_1: aggregated-month-input-queue-2
-  #     OUTPUT_QUEUE_1: aggregated-month-queue-1
-  #     OUTPUT_QUEUE_2: aggregated-month-queue-2
-  #     OUTPUT_QUEUE_3: aggregated-month-queue-3
-  #     EXCHANGE_NAME: aggregated-month-exchange
-  #     STORAGE_DIR: ./data/aggregator-month-2
-  #     LOG_LEVEL: INFO
-  #   networks:
-  #   - testing_net
-  #   depends_on:
-  #   - gateway
+  aggregator-quantity-profit-1:
+    container_name: aggregator-quantity-profit-1
+    image: worker:latest
+    command: "/worker/aggregator/max_quantity_profit.py"
+    environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
+      CONTAINER_NAME: aggregator-quantity-profit-1
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: aggregated-month-queue-1
+      OUTPUT_QUEUE_1: products-results-queue
+      EXPECTED_EOFS: 2
+      STORAGE_DIR: ./data/aggregator-quantity-profit-1
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
 
-  # aggregator-quantity-profit-1:
-  #   container_name: aggregator-quantity-profit-1
-  #   image: worker:latest
-  #   command: "/worker/aggregator/max_quantity_profit.py"
-  #   environment:
-  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #     CONTAINER_NAME: aggregator-quantity-profit-1
-  #     RABBITMQ_HOST: rabbitmq
-  #     INPUT_QUEUE_1: aggregated-month-queue-1
-  #     OUTPUT_QUEUE_1: products-results-queue
-  #     EXPECTED_EOFS: 2
-  #     STORAGE_DIR: ./data/aggregator-quantity-profit-1
-  #     LOG_LEVEL: INFO
-  #   networks:
-  #   - testing_net
-  #   depends_on:
-  #   - gateway
+  aggregator-quantity-profit-2:
+    container_name: aggregator-quantity-profit-2
+    image: worker:latest
+    command: "/worker/aggregator/max_quantity_profit.py"
+    environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
+      CONTAINER_NAME: aggregator-quantity-profit-2
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: aggregated-month-queue-2
+      OUTPUT_QUEUE_1: products-results-queue
+      EXPECTED_EOFS: 2
+      STORAGE_DIR: ./data/aggregator-quantity-profit-2
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
 
-  # aggregator-quantity-profit-2:
-  #   container_name: aggregator-quantity-profit-2
-  #   image: worker:latest
-  #   command: "/worker/aggregator/max_quantity_profit.py"
-  #   environment:
-  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #     CONTAINER_NAME: aggregator-quantity-profit-2
-  #     RABBITMQ_HOST: rabbitmq
-  #     INPUT_QUEUE_1: aggregated-month-queue-2
-  #     OUTPUT_QUEUE_1: products-results-queue
-  #     EXPECTED_EOFS: 2
-  #     STORAGE_DIR: ./data/aggregator-quantity-profit-2
-  #     LOG_LEVEL: INFO
-  #   networks:
-  #   - testing_net
-  #   depends_on:
-  #   - gateway
+  aggregator-quantity-profit-3:
+    container_name: aggregator-quantity-profit-3
+    image: worker:latest
+    command: "/worker/aggregator/max_quantity_profit.py"
+    environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
+      CONTAINER_NAME: aggregator-quantity-profit-3
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: aggregated-month-queue-3
+      OUTPUT_QUEUE_1: products-results-queue
+      EXPECTED_EOFS: 2
+      STORAGE_DIR: ./data/aggregator-quantity-profit-3
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
 
-  # aggregator-quantity-profit-3:
-  #   container_name: aggregator-quantity-profit-3
-  #   image: worker:latest
-  #   command: "/worker/aggregator/max_quantity_profit.py"
-  #   environment:
-  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #     CONTAINER_NAME: aggregator-quantity-profit-3
-  #     RABBITMQ_HOST: rabbitmq
-  #     INPUT_QUEUE_1: aggregated-month-queue-3
-  #     OUTPUT_QUEUE_1: products-results-queue
-  #     EXPECTED_EOFS: 2
-  #     STORAGE_DIR: ./data/aggregator-quantity-profit-3
-  #     LOG_LEVEL: INFO
-  #   networks:
-  #   - testing_net
-  #   depends_on:
-  #   - gateway
+  joiner-menu-items:
+    container_name: joiner-menu-items
+    image: worker:latest
+    command: "/worker/joiner/menu_items.py"
+    environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
+      CONTAINER_NAME: joiner-menu-items
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: products-results-queue
+      INPUT_QUEUE_2: menu-items-queue
+      OUTPUT_EXCHANGE: results-exchange
+      EXPECTED_EOFS: 3
+      LOG_LEVEL: INFO
+    networks:
+    - testing_net
+    depends_on:
+    - aggregator-quantity-profit-1
+    - aggregator-quantity-profit-2
+    - aggregator-quantity-profit-3
 
-  # joiner-menu-items:
-  #   container_name: joiner-menu-items
-  #   image: worker:latest
-  #   command: "/worker/joiner/menu_items.py"
-  #   environment:
-  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #     CONTAINER_NAME: joiner-menu-items
-  #     RABBITMQ_HOST: rabbitmq
-  #     INPUT_QUEUE_1: products-results-queue
-  #     INPUT_QUEUE_2: menu-items-queue
-  #     OUTPUT_EXCHANGE: results-exchange
-  #     EXPECTED_EOFS: 3
-  #     LOG_LEVEL: INFO
-  #   networks:
-  #   - testing_net
-  #   depends_on:
-  #   - aggregator-quantity-profit-1
-  #   - aggregator-quantity-profit-2
-  #   - aggregator-quantity-profit-3
-  
-  # aggregator-semester-1:
-  #   container_name: aggregator-semester-1
-  #   image: worker:latest
-  #   command: "/worker/aggregator/semester_aggregator.py"
-  #   environment:
-  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #     CONTAINER_NAME: aggregator-semester-1
-  #     RABBITMQ_HOST: rabbitmq
-  #     INPUT_QUEUE_1: aggregated-store-q3-queue-1
-  #     OUTPUT_QUEUE_1: aggregated-semester-queue
-  #     STORAGE_DIR: ./data/aggregator-semester-1
-  #     LOG_LEVEL: INFO
-  #     EXPECTED_ACKS: 2
-  #   networks:
-  #   - testing_net
-  #   depends_on:
-  #   - gateway
+  aggregator-semester-1:
+    container_name: aggregator-semester-1
+    image: worker:latest
+    command: "/worker/aggregator/semester_aggregator.py"
+    environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
+      CONTAINER_NAME: aggregator-semester-1
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: aggregated-store-q3-queue-1
+      OUTPUT_QUEUE_1: aggregated-semester-queue
+      STORAGE_DIR: ./data/aggregator-semester-1
+      LOG_LEVEL: INFO
+      EXPECTED_ACKS: 2
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
 
-  # aggregator-semester-2:
-  #   container_name: aggregator-semester-2
-  #   image: worker:latest
-  #   command: "/worker/aggregator/semester_aggregator.py"
-  #   environment:
-  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #     CONTAINER_NAME: aggregator-semester-2
-  #     RABBITMQ_HOST: rabbitmq
-  #     INPUT_QUEUE_1: aggregated-store-q3-queue-2
-  #     OUTPUT_QUEUE_1: aggregated-semester-queue
-  #     STORAGE_DIR: ./data/aggregator-semester-2
-  #     LOG_LEVEL: INFO
-  #     EXPECTED_ACKS: 2
-  #   networks:
-  #   - testing_net
-  #   depends_on:
-  #   - gateway
+  aggregator-semester-2:
+    container_name: aggregator-semester-2
+    image: worker:latest
+    command: "/worker/aggregator/semester_aggregator.py"
+    environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
+      CONTAINER_NAME: aggregator-semester-2
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: aggregated-store-q3-queue-2
+      OUTPUT_QUEUE_1: aggregated-semester-queue
+      STORAGE_DIR: ./data/aggregator-semester-2
+      LOG_LEVEL: INFO
+      EXPECTED_ACKS: 2
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
 
   aggregator-store-q3-1:
     container_name: aggregator-store-q3-1
@@ -397,6 +415,7 @@ services:
     command: "/worker/aggregator/store_aggregator.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: aggregator-store-q3-1
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: time-filtered-queue-q3-1
@@ -420,6 +439,7 @@ services:
     command: "/worker/aggregator/store_aggregator.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: aggregator-store-q3-2
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: time-filtered-queue-q3-2
@@ -435,24 +455,25 @@ services:
     depends_on:
     - gateway
   
-  # joiner-stores-q3:
-  #   container_name: joiner-stores-q3
-  #   image: worker:latest
-  #   command: "/worker/joiner/q3_stores_joiner.py"
-  #   environment:
-  #     HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
-  #     CONTAINER_NAME: joiner-stores-q3
-  #     RABBITMQ_HOST: rabbitmq
-  #     INPUT_QUEUE_1: aggregated-semester-queue
-  #     INPUT_QUEUE_2: stores-queue-1
-  #     OUTPUT_EXCHANGE_NAME: results-exchange
-  #     STORAGE_DIR: ./data/join_stores_q3
-  #     LOG_LEVEL: INFO
-  #     AGGREGATOR_SEMESTER_REPLICAS: 2
-  #   networks:
-  #   - testing_net
-  #   depends_on:
-  #   - gateway
+  joiner-stores-q3:
+    container_name: joiner-stores-q3
+    image: worker:latest
+    command: "/worker/joiner/q3_stores_joiner.py"
+    environment:
+      HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
+      CONTAINER_NAME: joiner-stores-q3
+      RABBITMQ_HOST: rabbitmq
+      INPUT_QUEUE_1: aggregated-semester-queue
+      INPUT_QUEUE_2: stores-queue-1
+      OUTPUT_EXCHANGE_NAME: results-exchange
+      STORAGE_DIR: ./data/join_stores_q3
+      LOG_LEVEL: INFO
+      AGGREGATOR_SEMESTER_REPLICAS: 2
+    networks:
+    - testing_net
+    depends_on:
+    - gateway
 
   aggregator-store-q4-1:
     container_name: aggregator-store-q4-1
@@ -460,6 +481,7 @@ services:
     command: "/worker/aggregator/store_aggregator.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: aggregator-store-q4-1
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: year-filtered-queue-q4-1
@@ -482,6 +504,7 @@ services:
     command: "/worker/aggregator/store_aggregator.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: aggregator-store-q4-2
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: year-filtered-queue-q4-2
@@ -521,6 +544,7 @@ services:
     command: "/worker/joiner/top_three_clients.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: top-three-clients-1
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-store-q4-queue-1
@@ -539,6 +563,7 @@ services:
     command: "/worker/joiner/top_three_clients.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: top-three-clients-2
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-store-q4-queue-2
@@ -557,6 +582,7 @@ services:
     command: "/worker/joiner/top_three_clients.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: top-three-clients-3
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-store-q4-queue-3
@@ -575,6 +601,7 @@ services:
     command: "/worker/joiner/join_stores_q4.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: join-stores-q4
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: top-clients-queue
@@ -671,8 +698,14 @@ services:
     environment:
       NODE_NAME: health-monitor-1
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
+      HEARTBEAT_INTERVAL: 1.0
       CONTAINER_NAME: health-monitor-1
       LOG_LEVEL: DEBUG
+      MONITOR_PORT: 5000
+      MONITOR_TIMEOUT: 3.0
+      MONITOR_CHECK_INTERVAL: 1.0
+      MONITORED_SERVICES: gateway,filter-year-1,filter-year-2,filter-year-eof-service,filter-time-1,filter-time-2,filter-time-eof-service,filter-amount-1,filter-amount-2,filter-amount-3,aggregator-month-1,aggregator-month-2,aggregator-quantity-profit-1,aggregator-quantity-profit-2,aggregator-quantity-profit-3,joiner-menu-items,aggregator-semester-1,aggregator-semester-2,aggregator-store-q3-1,aggregator-store-q3-2,aggregator-store-q4-1,aggregator-store-q4-2,aggregator-store-q4-eof-service,top-three-clients-1,top-three-clients-2,top-three-clients-3,join-stores-q4,health-monitor-1,health-monitor-2,health-monitor-3
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
@@ -684,8 +717,14 @@ services:
     environment:
       NODE_NAME: health-monitor-2
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
+      HEARTBEAT_INTERVAL: 1.0
       CONTAINER_NAME: health-monitor-2
       LOG_LEVEL: DEBUG
+      MONITOR_PORT: 5000
+      MONITOR_TIMEOUT: 3.0
+      MONITOR_CHECK_INTERVAL: 1.0
+      MONITORED_SERVICES: gateway,filter-year-1,filter-year-2,filter-year-eof-service,filter-time-1,filter-time-2,filter-time-eof-service,filter-amount-1,filter-amount-2,filter-amount-3,aggregator-month-1,aggregator-month-2,aggregator-quantity-profit-1,aggregator-quantity-profit-2,aggregator-quantity-profit-3,joiner-menu-items,aggregator-semester-1,aggregator-semester-2,aggregator-store-q3-1,aggregator-store-q3-2,aggregator-store-q4-1,aggregator-store-q4-2,aggregator-store-q4-eof-service,top-three-clients-1,top-three-clients-2,top-three-clients-3,join-stores-q4,health-monitor-1,health-monitor-2,health-monitor-3
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
@@ -697,8 +736,14 @@ services:
     environment:
       NODE_NAME: health-monitor-3
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
+      HEARTBEAT_INTERVAL: 1.0
       CONTAINER_NAME: health-monitor-3
       LOG_LEVEL: DEBUG
+      MONITOR_PORT: 5000
+      MONITOR_TIMEOUT: 3.0
+      MONITOR_CHECK_INTERVAL: 1.0
+      MONITORED_SERVICES: gateway,filter-year-1,filter-year-2,filter-year-eof-service,filter-time-1,filter-time-2,filter-time-eof-service,filter-amount-1,filter-amount-2,filter-amount-3,aggregator-month-1,aggregator-month-2,aggregator-quantity-profit-1,aggregator-quantity-profit-2,aggregator-quantity-profit-3,joiner-menu-items,aggregator-semester-1,aggregator-semester-2,aggregator-store-q3-1,aggregator-store-q3-2,aggregator-store-q4-1,aggregator-store-q4-2,aggregator-store-q4-eof-service,top-three-clients-1,top-three-clients-2,top-three-clients-3,join-stores-q4,health-monitor-1,health-monitor-2,health-monitor-3
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
