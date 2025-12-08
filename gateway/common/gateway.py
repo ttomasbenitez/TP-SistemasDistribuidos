@@ -83,6 +83,7 @@ class Gateway:
         queues_dict = {}
 
         for key, queue_name in os.environ.items():
+            name = queue_name
             if key.startswith("OUTPUT_QUEUE_"):
                 if queue_name.startswith("users"):
                     routing_key = [str(MESSAGE_TYPE_USERS), str(MESSAGE_TYPE_EOF)]
@@ -93,5 +94,5 @@ class Gateway:
                 else:
                     routing_key = [str(MESSAGE_TYPE_TRANSACTIONS), str(MESSAGE_TYPE_TRANSACTION_ITEMS), str(MESSAGE_TYPE_EOF)]
                 
-                queues_dict[queue_name] = routing_key
+                queues_dict[name] = routing_key
         return queues_dict

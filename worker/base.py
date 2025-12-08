@@ -5,6 +5,7 @@ from pkg.message.message import Message
 import signal
 import logging
 from multiprocessing import Manager
+from pkg.storage.state_storage.eof_storage import EofStorage
 
 class Worker(ABC):
     
@@ -57,18 +58,19 @@ class Worker(ABC):
         eof_self_queue = MessageMiddlewareQueue(self.eof_self_queue, self.connection)
         self.message_middlewares.extend([eof_service_queue, eof_self_queue])
         
-        def on_eof_message(message):
+        def _on_eof_message(message):
             try:
                 message = Message.deserialize(message)
                 if message.type == MESSAGE_TYPE_EOF:
                     logging.info(f"EOF recibido en nodo | request_id: {message.request_id} | type: {message.type}")
                     self._ensure_request(message.request_id)
                     self.drained[message.request_id].wait()
-                    eof_service_queue.send(message.serialize())
+                    eof_message = Message(message.request_id, MESSAGE_TYPE_EOF, message.msg_num, '', self.node_id)
+                    eof_service_queue.send(eof_message.serialize())
             except Exception as e:
                 logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
         
-        eof_self_queue.start_consuming(on_eof_message)
+        eof_self_queue.start_consuming(_on_eof_message)
     
     def stop(self):
         try:
@@ -101,30 +103,18 @@ class Worker(ABC):
             logging.error(f'action: worker shutdown | result: failed to close | signal: {signum}')  
         logging.info(f'action: worker shutdown | result: success')
         
-    def _sender_key(self, message: Message, stream: str) -> str:
-        try:
-            sender_id = message.get_node_id_and_request_id()
-        except Exception:
-            # Fallback to node_id only if combined is not available
-            sender_id = "unknown_sender" if message.node_id is None else message.node_id
-            sender_id = f"{sender_id}.{message.request_id}"
-        return f"{stream}:{sender_id}"
-
-    def is_dupped(self, message: Message, stream: str = "data") -> bool:
-        """
-        Returns True if the message is a duplicate or out-of-order for the given stream
-        (based on last seen msg_num for its sender+request). Updates last seen on accept.
-        """
-        key = self._sender_key(message, stream)
-        state = self.state_storage.get_state(message.request_id)
-        last_by_sender = state.get("last_by_sender", {})
-        last = last_by_sender.get(key, -1)
-        if message.msg_num <= last:
-            if message.msg_num == last:
-                logging.info(f"action: duplicate_msg | stream:{stream} | sender:{key} | msg:{message.msg_num}")
-            else:
-                logging.warning(f"action: out_of_order_msg | stream:{stream} | sender:{key} | msg:{message.msg_num} < last:{last}")
+    def on_eof_message(self, message: Message, dedup_strategy, eof_storage: EofStorage, expected_eofs: int):
+        if dedup_strategy.is_duplicate(message):
+            logging.info(f"Mensaje EOF duplicado ignorado | request_id: {message.request_id}")
+            return
+        
+        logging.info(f"EOF recibido | request_id: {message.request_id}")
+        
+        state = eof_storage.get_state(message.request_id)
+        state["eofs_count"] = state.get('eofs_count', 0) + 1  
+        if state["eofs_count"] == expected_eofs:
             return True
-        state["last_by_sender"][key] = message.msg_num
-        self.state_storage.data_by_request[message.request_id] = state
-        return False
+        else:
+            eof_storage.data_by_request[message.request_id] = state
+            eof_storage.save_state(message.request_id)
+            return False

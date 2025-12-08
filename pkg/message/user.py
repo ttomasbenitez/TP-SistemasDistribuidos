@@ -52,7 +52,7 @@ class User:
         return f"{self.id};{self.birthdate}\n"
     
     
-    def get_user_id(self):
+    def get_id(self):
         """
         Obtiene el año de registro del usuario.
         :return: Año de registro o None si no está disponible.

@@ -6,15 +6,20 @@ from pkg.message.message import Message
 from pkg.message.constants import MESSAGE_TYPE_EOF
 from abc import ABC, abstractmethod
 from utils.heartbeat import start_heartbeat_sender
-from Middleware.connection import PikaConnection
+from Middleware.connection import PikaConnection 
+from pkg.dedup.dedup_by_sender_strategy import DedupBySenderStrategy
+from pkg.storage.state_storage.eof_storage import EofStorage
+from pkg.storage.state_storage.dedup_by_sender_storage import DedupBySenderStorage
 class EofService(Worker, ABC):
   
-    def __init__(self, eof_input_queque: str, eof_output_middleware: str, expected_acks: int, host: str):
+    def __init__(self, eof_input_queque: str, eof_output_middleware: str, expected_eofs: int, host: str, storage_dir: str = "./data/eof_service_storage"):
         self.connection = PikaConnection(host)
         self.eof_input_queque = eof_input_queque
         self.eof_output_middleware = eof_output_middleware
-        self.expected_acks = expected_acks
-        self.acks_by_client = dict()
+        self.expected_eofs = expected_eofs
+        storage = DedupBySenderStorage(storage_dir)
+        self.dedup_strategy = DedupBySenderStrategy(storage)
+        self.eof_storage = EofStorage(storage_dir)
         
         signal.signal(signal.SIGTERM, self.__handle_shutdown)
         signal.signal(signal.SIGINT, self.__handle_shutdown)
@@ -26,6 +31,8 @@ class EofService(Worker, ABC):
         self.connection.start()
         self._consume_eof_queue()
         logging.info("Eof Service iniciado y consumiendo mensajes.")
+        self.dedup_strategy.load_dedup_state()
+        self.eof_storage.load_state_all()
         self.connection.start_consuming()
       
     def _consume_eof_queue(self):
@@ -35,12 +42,11 @@ class EofService(Worker, ABC):
             try:
                 message = Message.deserialize(message)
                 if message.type == MESSAGE_TYPE_EOF:
-                    logging.info(f"EOF recibido en service queue | request_id: {message.request_id}")
-                    self.acks_by_client[message.request_id] = self.acks_by_client.get(message.request_id, 0) + 1  
-                    if self.acks_by_client[message.request_id] == self.expected_acks:
-                        logging.info(f"Enviando final EOF del cliente {message.request_id}")
+                    if self.on_eof_message(message, self.dedup_strategy, self.eof_storage, self.expected_eofs):
+                        logging.info(f"action: all_eofs_received | request_id: {message.request_id} | sending EOF ack")
                         self.send_message(message)
-                        del self.acks_by_client[message.request_id]
+                        self.eof_storage.delete_state(message.request_id)
+                        self.dedup_strategy.clean_dedup_state(message.request_id)
             except Exception as e:
                 logging.error(f"Error al procesar el mensaje: {type(e).__name__}: {e}")
                 

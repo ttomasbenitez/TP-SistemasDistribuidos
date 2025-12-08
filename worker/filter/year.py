@@ -15,13 +15,14 @@ class FilterYearNode(Worker):
                  data_input_queue: str,
                  data_output_exchange: str,
                  output_exchange_queues: dict,
-                 sharding_q4_amount: str,
-                 sharding_q2_amount: str,
+                 sharding_q4_amount: int,
+                 sharding_q2_amount: int,
                  eof_output_exchange: str,
                  eof_output_queues: dict,
                  eof_self_queue: str,
                  eof_service_queue: str,
                  eof_final_queue: str,
+                 container_name: str,
                  host: str,
                  years_set):
         self.__init_manager__()
@@ -38,6 +39,7 @@ class FilterYearNode(Worker):
         self.eof_service_queue = eof_service_queue
         self.eof_self_queue = eof_self_queue
         self.eof_final_queue = eof_final_queue
+        self.node_id = container_name
         self.years = years_set
 
     def start(self):
@@ -49,7 +51,6 @@ class FilterYearNode(Worker):
         self._consume_eof_final()
         self.connection.start_consuming()
         
-
     def _consume_eof_final(self):
         eof_final_queue = MessageMiddlewareQueue(self.eof_final_queue, self.connection)
         data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, self.output_exchange_queues, self.connection)
@@ -95,6 +96,7 @@ class FilterYearNode(Worker):
                     return
 
                 new_chunk = ''.join(it.serialize() for it in items if it.get_year() in self.years)
+
                 if new_chunk:
                     message.update_content(new_chunk)
                     if message.type == MESSAGE_TYPE_TRANSACTIONS:
@@ -113,13 +115,19 @@ class FilterYearNode(Worker):
                     self._dec_inflight(message.request_id)
 
         data_input_queue.start_consuming(__on_message__)
+        
+    def close(self):
+        try:
+            self.connection.close()
+        except Exception as e:
+            logging.error(f"action: ERROR during middleware closing | error: {type(e).__name__}: {e}")
+            
 
 def initialize_config():
     config_params = {
         "rabbitmq_host": os.getenv('RABBITMQ_HOST'),
         "input_queue": os.getenv('INPUT_QUEUE_1'),
         "output_queue_1": os.getenv('OUTPUT_QUEUE_1'),
-        "output_queue_3": os.getenv('OUTPUT_QUEUE_3'),
         "output_exchange_filter_year": os.getenv('EXCHANGE_NAME'),
         "eof_exchange_name": os.getenv('EOF_EXCHANGE_NAME'),
         "eof_self_queue": os.getenv('EOF_SELF_QUEUE'),
@@ -127,7 +135,9 @@ def initialize_config():
         "eof_queue_2": os.getenv('EOF_QUEUE_2'),
         "eof_service_queue": os.getenv('EOF_SERVICE_QUEUE'),
         "eof_final_queue": os.getenv('EOF_FINAL_QUEUE'),
+        "container_name": os.getenv('CONTAINER_NAME'),
         "logging_level": os.getenv('LOG_LEVEL', 'INFO'),
+        "years": os.getenv('FILTER_YEARS'),
     }
     
     q4_queues = []
@@ -152,8 +162,15 @@ def initialize_config():
         "rabbitmq_host",
         "input_queue",
         "output_queue_1",
-        "output_queue_3",
         "output_exchange_filter_year",
+        "eof_exchange_name",
+        "eof_self_queue",
+        "eof_queue_1",
+        "eof_queue_2",
+        "eof_service_queue",
+        "eof_final_queue",
+        "container_name",
+        "years",
     ]
     
     missing = [k for k in required_keys if config_params[k] is None]
@@ -189,6 +206,9 @@ def main():
    
     eof_output_queues = {config["eof_queue_1"]: [str(MESSAGE_TYPE_EOF)],
                             config["eof_queue_2"]: [str(MESSAGE_TYPE_EOF)]}
+    
+    years_set = set(map(int, config["years"].split(',')))
+    logging.info(f"action: filtering years | years: {years_set}")
     node = FilterYearNode(
         config["input_queue"],
         config["output_exchange_filter_year"],
@@ -200,9 +220,11 @@ def main():
         config["eof_self_queue"],
         config["eof_service_queue"],
         config["eof_final_queue"],
+        config["container_name"],
         config["rabbitmq_host"],
-        years_set={2024, 2025},
+        years_set,
     )
+    
     node.start()
 
 if __name__ == "__main__":

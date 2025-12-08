@@ -3,9 +3,9 @@ from pkg.message.utils import  parse_int, get_items_from_bytes, parse_float
 
 class Q4IntermediateResult: 
     
-    def __init__(self, store_id, birthdate, purchases_qty):
+    def __init__(self, store_id, user_id, purchases_qty):
         self.store_id = store_id
-        self.birthdate = birthdate
+        self.user_id = user_id
         self.purchases_qty = purchases_qty
         self.query = QUERY_4
         
@@ -17,9 +17,9 @@ class Q4IntermediateResult:
         """
         parts = data.split(';')
         store_id = parse_int(parts[0])
-        birthdate = parts[1]
+        user_id = parts[1]
         purchases_qty = parse_int(parts[2])
-        return Q4IntermediateResult(store_id, birthdate, purchases_qty)
+        return Q4IntermediateResult(store_id, user_id, purchases_qty)
     
     def get_q4_result_from_bytes(data: bytes):
         """
@@ -34,13 +34,13 @@ class Q4IntermediateResult:
         Serializa el objeto Transaction a bytes.
         :return: Datos en bytes.
         """
-        return f"{self.store_id};{self.birthdate};{self.purchases_qty}\n"
+        return f"{self.store_id};{self.user_id};{self.purchases_qty}\n"
     
     def get_store(self):
         return self.store_id
     
-    def get_birthdate(self):
-        return self.birthdate
+    def get_user_id(self):
+        return self.user_id
     
     def get_purchases_qty(self):
         return self.purchases_qty

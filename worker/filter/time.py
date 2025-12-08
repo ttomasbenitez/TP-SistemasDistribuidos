@@ -5,11 +5,9 @@ from pkg.message.message import Message
 from utils.custom_logging import initialize_log
 import os
 from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_TRANSACTIONS
-from multiprocessing import Process
 from utils.heartbeat import start_heartbeat_sender
 from Middleware.connection import PikaConnection
 
-import hashlib
 
 class FilterTimeNode(Worker):
     
@@ -23,6 +21,7 @@ class FilterTimeNode(Worker):
                  eof_output_queues: dict,
                  eof_self_queue: str,
                  eof_service_queue: str,
+                 container_name: str,
                  host: str, 
                  time_set):
         
@@ -39,6 +38,7 @@ class FilterTimeNode(Worker):
         self.eof_service_queue = eof_service_queue
         self.eof_self_queue = eof_self_queue
         self.time = time_set
+        self.node_id = container_name
 
     def start(self):
     
@@ -61,7 +61,8 @@ class FilterTimeNode(Worker):
 
                 if message.type == MESSAGE_TYPE_EOF:
                     logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
-                    eof_output_exchange.send(message.serialize(), str(message.type))
+                    new_message = Message(message.request_id, MESSAGE_TYPE_EOF, message.msg_num, '', self.node_id)
+                    eof_output_exchange.send(new_message.serialize(), str(message.type))
                     return
 
                 logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
@@ -83,8 +84,8 @@ class FilterTimeNode(Worker):
                         new_chunk += item.serialize()
                 
                 if new_chunk:
-                    message.update_content(new_chunk)
-                    serialized = message.serialize()
+                    new_message = Message(message.request_id, message.type, message.msg_num, new_chunk, self.node_id)
+                    serialized = new_message.serialize()
                     
                     sharding_key_q1 = message.msg_num % self.sharding_q1_amount
                     sharding_key_q3 = message.msg_num % self.sharding_q3_amount
@@ -112,10 +113,10 @@ def initialize_config():
         "output_exchange_filter_time": os.getenv('EXCHANGE_NAME'),
         "eof_exchange_name": os.getenv('EOF_EXCHANGE_NAME'),
         "eof_service_queue": os.getenv('EOF_SERVICE_QUEUE'),
-        "logging_level": os.getenv('LOG_LEVEL', 'INFO')
+        "logging_level": os.getenv('LOG_LEVEL', 'INFO'),
+        "container_name": os.getenv('CONTAINER_NAME', 'filter_time_node'),
     }
     
-    # Read Q1 output queues
     q1_queues = []
     q3_queues = []
     i = 1
@@ -153,8 +154,6 @@ def main():
     config_params = initialize_config()
 
     initialize_log(config_params["logging_level"])
-
-    # output_exchange_queues no longer used for data, but maybe for EOF? No, EOF uses eof_output_queues
     
     eof_output_queues = {config_params["eof_queue_1"]: [str(MESSAGE_TYPE_EOF)],
                         config_params["eof_queue_2"]: [str(MESSAGE_TYPE_EOF)]}
@@ -182,7 +181,9 @@ def main():
                             eof_output_queues,
                             config_params["eof_self_queue"],
                             config_params["eof_service_queue"],
-                            config_params["rabbitmq_host"], {6, 23})
+                            config_params["container_name"],
+                            config_params["rabbitmq_host"], 
+                            {6, 23})
     filter.start()
 
 if __name__ == "__main__":

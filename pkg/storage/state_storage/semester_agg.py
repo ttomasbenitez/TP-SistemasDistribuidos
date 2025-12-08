@@ -3,6 +3,17 @@ import logging
 
 
 class SemesterAggregatorStateStorage(StateStorage):
+    
+    def __init__(self, storage_dir):
+        
+        default_state = {
+            "last_by_sender": dict(),
+            "agg_by_period": dict(),
+        }
+        
+        filepath = f"{storage_dir}/dedup_by_sender_storage"
+        super().__init__(filepath, default_state)
+
     """
     Persist incremental aggregation by period/store and last-seen message numbers per upstream sender.
     File format (append-only, one record per line):

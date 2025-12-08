@@ -9,82 +9,41 @@ from pkg.message.q2_result import Q2IntermediateResult
 import os
 from utils.heartbeat import start_heartbeat_sender
 import hashlib
-from pkg.message.utils import calculate_sub_message_id
-from pkg.message.constants import SUB_MESSAGE_START_ID
+from pkg.storage.state_storage.message_count_storage import MessageCountStorage
+from pkg.dedup.sliding_window_dedup_strategy import SlidingWindowDedupStrategy
 
 
 class AggregatorMonth(Worker):
     
     def __init__(self,
                  data_input_queue: str,
-                 data_output_queues: list,
-                 eof_output_exchange: str,
-                 eof_output_queues: dict,
-                 eof_self_queue: str,
-                 eof_service_queue: str,
+                 data_output_exchange: str,
+                 output_exchange_queues: list,
+                 sharding_q2_amount: int,
+                 storage_dir: str,
                  host: str,
                  container_name: str):
-        self.__init_manager__()
-        self.__init_middlewares_handler__()
+        
+        self.data_output_exchange = data_output_exchange
         self.data_input_queue = data_input_queue
-        self.data_output_queues = data_output_queues
-        self.eof_output_exchange = eof_output_exchange
-        self.eof_output_queues = eof_output_queues
+        self.output_exchange_queues = output_exchange_queues
+        self.sharding_q2_amount = sharding_q2_amount
         self.connection = PikaConnection(host)
-        self.eof_self_queue= eof_self_queue
-        self.eof_service_queue = eof_service_queue
-        
-        # Initialize msg_num_counter starting at 0, incremental
-        # Extract node_id from container name (e.g., "aggregator-month-1" -> 1)
-        try:
-            self.node_id = int(container_name.split('-')[-1])
-        except (ValueError, AttributeError, IndexError):
-            self.node_id = 1  # Default to 1 if parsing fails
-            logging.error(f"Could not parse node_id from {container_name}, defaulting to 1")
-        
-        self.msg_num_counter = 0
+        self.node_id = container_name 
+        self.dedup_strategy = SlidingWindowDedupStrategy(2, storage_dir)
     
     def start(self):
         
         self.heartbeat_sender = start_heartbeat_sender()
-        
+        self.dedup_strategy.load_dedup_state()
         self.connection.start()
         self._consume_data_queue()
-        self._consume_eof()
         self.connection.start_consuming()
        
     
     def _consume_data_queue(self):
-        eof_output_exchange = MessageMiddlewareExchange(self.eof_output_exchange, self.eof_output_queues, self.connection)
-        data_output_queues = [MessageMiddlewareQueue(queue, self.connection) for queue in self.data_output_queues]
         data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
-        self.message_middlewares.extend([eof_output_exchange, data_input_queue] + data_output_queues)
-        
-        self.buffers = {}
-        self.last_message = {}
-
-        def _flush_buffer(request_id, month, output_queues):
-            if request_id not in self.buffers or month not in self.buffers[request_id]:
-                return
-            
-            items = self.buffers[request_id][month]
-            if not items:
-                return
-
-            # Use the last message as a template
-            original_message = self.last_message.get(request_id)
-            if not original_message:
-                logging.error(f"action: flush_buffer | error: no original message found for request_id: {request_id}")
-                return
-
-            single_group = {month: items}
-            
-            template_message = Message(original_message.request_id, MESSAGE_TYPE_QUERY_2_INTERMEDIATE_RESULT, original_message.msg_num, '')
-            
-            self._send_groups_sharded(template_message, single_group, output_queues)
-            
-            # Clear the buffer
-            self.buffers[request_id][month] = []
+        data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, self.output_exchange_queues, self.connection)
 
         def __on_message__(message):
             try:
@@ -92,43 +51,26 @@ class AggregatorMonth(Worker):
 
                 if message.type == MESSAGE_TYPE_EOF:
                     logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
-                    
-                    # Flush all remaining buffers for this request_id
-                    if message.request_id in self.buffers:
-                        for month in list(self.buffers[message.request_id].keys()):
-                            _flush_buffer(message.request_id, month, data_output_queues)
-                        del self.buffers[message.request_id]
-                    
-                    if message.request_id in self.last_message:
-                        del self.last_message[message.request_id]
-
-                    eof_output_exchange.send(message.serialize(), str(message.type))
+                    new_msg_count = self.get_msg_count(message.request_id)
+                    new_eof_message = Message(message.request_id, MESSAGE_TYPE_EOF, new_msg_count, '', self.node_id)
+                    data_output_exchange.send(new_eof_message.serialize(), str(MESSAGE_TYPE_EOF))
+                    self.dedup_strategy.save_dedup_state(message)
                     return
 
                 logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
-                #self._ensure_request(message.request_id)
-                #self._inc_inflight(message.request_id)
-
-                self.last_message[message.request_id] = message
-                if message.request_id not in self.buffers:
-                    self.buffers[message.request_id] = {}
-
+                if self.dedup_strategy.is_duplicate(message):
+                    logging.info(f"action: duplicate message detected and skipped | request_id: {message.request_id} | msg_type: {message.type} | msg_num: {message.msg_num}")
+                    return
+        
                 items = message.process_message()
                 groups = self._group_items_by_month(items)
-                
-                for month, group_items in groups.items():
-                    if month not in self.buffers[message.request_id]:
-                        self.buffers[message.request_id][month] = []
-                    
-                    self.buffers[message.request_id][month].extend(group_items)
-                    _flush_buffer(message.request_id, month, data_output_queues)
+                self._send_groups_sharded(message, groups, data_output_exchange)
 
+                self.dedup_strategy.save_dedup_state(message)
+                   
             except Exception as e:
                 logging.error(f"action: ERROR processing message | error: {type(e).__name__}: {e}")
-            #finally:
-            #    if message.type != MESSAGE_TYPE_EOF:
-            #        self._dec_inflight(message.request_id)
-            
+
         data_input_queue.start_consuming(__on_message__)
 
     def _group_items_by_month(self, items):
@@ -140,26 +82,28 @@ class AggregatorMonth(Worker):
             groups.setdefault(f"{year}-{month}", []).append(q4_intermediate)
         return groups
     
-    def _send_groups_sharded(self, original_message: Message, groups: dict, output_queues: list):
+    def _send_groups_sharded(self, original_message: Message, groups: dict, output_exchange: MessageMiddlewareExchange):
         for key, items in groups.items():
-            # key is "YYYY-MM"
-            # Use hash to select queue
             hash_val = int(hashlib.sha256(key.encode()).hexdigest(), 16)
-            queue_index = hash_val % len(output_queues)
-            target_queue = output_queues[queue_index]
+            queue_index = hash_val % self.sharding_q2_amount
             new_chunk = ''.join(item.serialize() for item in items)
-            
-            # Use incremental msg_num_counter starting at 0
-            new_msg_num = self.msg_num_counter
-            self.msg_num_counter += 1
-            
-            new_message = original_message.new_from_original(new_chunk, msg_num=new_msg_num)
-            # Add node_id to message for dedup tracking per source
-            new_message.add_node_id(self.node_id)
-            logging.info(f"action: sending group | key: {key} | to_queue_index: {queue_index} | request_id: {new_message.request_id} | type: {new_message.type} | msg_num: {new_msg_num} | node_id: {self.node_id}")
+            new_msg_count = self.get_msg_count(original_message.request_id)
+            new_message =  Message(original_message.request_id, MESSAGE_TYPE_QUERY_2_INTERMEDIATE_RESULT, new_msg_count, new_chunk, self.node_id)
+            logging.info(f"action: sending group | key: {key} | to_queue_index: {queue_index} | request_id: {new_message.request_id} | type: {new_message.type} | msg_num: {new_msg_count} | node_id: {self.node_id}")
             serialized = new_message.serialize()
-            target_queue.send(serialized)
+            output_exchange.send(serialized, f"{MESSAGE_TYPE_QUERY_2_INTERMEDIATE_RESULT}.q2.{queue_index}")
+            
 
+    def get_msg_count(self, request_id: int) -> int:
+        # Leo el valor actual (o -1 si no existe)…
+        current = self.dedup_strategy.current_msg_num.get(request_id, -1)
+        # …y genero el siguiente
+        new_val = current + 1
+        # Lo guardo asociado a ese request_id
+        self.dedup_strategy.current_msg_num[request_id] = new_val
+        return new_val
+
+    
     def close(self):
         try:
             for middleware in self.message_middlewares:
@@ -180,13 +124,24 @@ def initialize_config():
     If parsing succeeded, the function returns a dict with config parameters
     """
 
-    config_params = {}
     
-    config_params["rabbitmq_host"] = os.getenv('RABBITMQ_HOST')
-    config_params["input_queue"] = os.getenv('INPUT_QUEUE_1')
-    config_params["eof_self_queue"] = os.getenv('EOF_SELF_QUEUE')
+    config_params = {           
+        "rabbitmq_host": os.getenv('RABBITMQ_HOST'),
+        "input_queue": os.getenv('INPUT_QUEUE_1'),
+        "exchange": os.getenv('EXCHANGE_NAME'),
+        "logging_level": os.getenv('LOG_LEVEL', 'INFO'),
+        "storage_dir": os.getenv('STORAGE_DIR'),
+        "container_name": os.getenv('CONTAINER_NAME'),
+    }
     
-    # Read multiple output queues
+    required_keys = [
+        "rabbitmq_host",
+        "input_queue",
+        "exchange",
+        "container_name",
+        "storage_dir",
+    ]
+    
     output_queues = []
     i = 1
     while True:
@@ -197,21 +152,16 @@ def initialize_config():
         i += 1
     
     if not output_queues:
-        # Fallback to OUTPUT_QUEUE_1 if loop didn't find anything (though loop starts at 1)
-        # Actually if OUTPUT_QUEUE_1 is missing it breaks immediately.
-        # Let's check if we found any.
         pass
 
     config_params["output_queues"] = output_queues
-    config_params["eof_exchange_name"] = os.getenv('EOF_EXCHANGE_NAME')
-    config_params["eof_queue_1"] = os.getenv('EOF_QUEUE_1')
-    config_params["eof_queue_2"] = os.getenv('EOF_QUEUE_2')
-    config_params["eof_service_queue"] = os.getenv('EOF_SERVICE_QUEUE')
-    config_params["logging_level"] = os.getenv('LOG_LEVEL', 'INFO')
-    config_params["logger_name"] = os.getenv('CONTAINER_NAME')
-
-    if config_params["rabbitmq_host"] is None or config_params["input_queue"] is None or not config_params["output_queues"]:
-        raise ValueError("Expected value not found. Aborting filter.")
+    
+    missing = [k for k in required_keys if config_params[k] is None]
+    if missing:
+        raise ValueError(f"Expected value(s) not found for: {', '.join(missing)}. Aborting filter.")
+    
+    if not config_params["output_queues"]:
+         raise ValueError("Expected at least one Q2 output queue. Aborting filter.")
     
     return config_params
 
@@ -220,17 +170,19 @@ def main():
 
     initialize_log(config_params["logging_level"])
     
-    eof_output_queues = {config_params["eof_queue_1"]: [str(MESSAGE_TYPE_EOF)],
-                            config_params["eof_queue_2"]: [str(MESSAGE_TYPE_EOF)]}
-
+    output_exchange_queues = {}
+    index = 0
+    for queue in config_params["output_queues"]:
+        output_exchange_queues[queue] = [f"{str(MESSAGE_TYPE_QUERY_2_INTERMEDIATE_RESULT)}.q2.{index}", str(MESSAGE_TYPE_EOF)]
+        index += 1
+    sharding_q2_amount = len(config_params["output_queues"])
     aggregator = AggregatorMonth(config_params["input_queue"], 
-                                config_params["output_queues"], 
-                                config_params["eof_exchange_name"], 
-                                eof_output_queues,
-                                config_params["eof_self_queue"],
-                                config_params["eof_service_queue"],
+                                config_params["exchange"], 
+                                output_exchange_queues,
+                                sharding_q2_amount,
+                                config_params["storage_dir"],
                                 config_params["rabbitmq_host"],
-                                config_params["logger_name"])
+                                config_params["container_name"])
     aggregator.start()
 
 if __name__ == "__main__":
