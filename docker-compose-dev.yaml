@@ -698,7 +698,18 @@ services:
       MONITOR_PORT: 5000
       MONITOR_TIMEOUT: 3.0
       MONITOR_CHECK_INTERVAL: 1.0
-      MONITORED_SERVICES: gateway,filter-year-1,filter-year-2,filter-year-eof-service,filter-time-1,filter-time-2,filter-time-eof-service,filter-amount-1,filter-amount-2,filter-amount-3,aggregator-month-1,aggregator-month-2,aggregator-quantity-profit-1,aggregator-quantity-profit-2,aggregator-quantity-profit-3,joiner-menu-items,aggregator-semester-1,aggregator-semester-2,aggregator-store-q3-1,aggregator-store-q3-2,aggregator-store-q4-1,aggregator-store-q4-2,aggregator-store-q4-eof-service,top-three-clients-1,top-three-clients-2,top-three-clients-3,join-stores-q4,health-monitor-1,health-monitor-2,health-monitor-3
+      MONITORED_SERVICES: gateway,
+        filter-year-1,filter-year-2,filter-year-eof-service,
+        filter-time-1,filter-time-2,filter-time-eof-service,
+        filter-amount-1,filter-amount-2,filter-amount-3,
+        aggregator-month-1,aggregator-month-2,
+        aggregator-quantity-profit-1,aggregator-quantity-profit-2,aggregator-quantity-profit-3,joiner-menu-items,
+        aggregator-semester-1,aggregator-semester-2,
+        aggregator-store-q3-1,aggregator-store-q3-2,
+        aggregator-store-q4-1,aggregator-store-q4-2,
+        aggregator-top-three-clients-1,aggregator-top-three-clients-2,aggregator-top-three-clients-3,
+        join-users-q4, join-stores-q4,
+        health-monitor-1,health-monitor-2,health-monitor-3
       CONTAINER_NAME: health-monitor-1
       LOG_LEVEL: DEBUG
     volumes:
@@ -717,7 +728,18 @@ services:
       MONITOR_PORT: 5000
       MONITOR_TIMEOUT: 3.0
       MONITOR_CHECK_INTERVAL: 1.0
-      MONITORED_SERVICES: gateway,filter-year-1,filter-year-2,filter-year-eof-service,filter-time-1,filter-time-2,filter-time-eof-service,filter-amount-1,filter-amount-2,filter-amount-3,aggregator-month-1,aggregator-month-2,aggregator-quantity-profit-1,aggregator-quantity-profit-2,aggregator-quantity-profit-3,joiner-menu-items,aggregator-semester-1,aggregator-semester-2,aggregator-store-q3-1,aggregator-store-q3-2,aggregator-store-q4-1,aggregator-store-q4-2,aggregator-store-q4-eof-service,top-three-clients-1,top-three-clients-2,top-three-clients-3,join-stores-q4,health-monitor-1,health-monitor-2,health-monitor-3
+      MONITORED_SERVICES: gateway,
+        filter-year-1,filter-year-2,filter-year-eof-service,
+        filter-time-1,filter-time-2,filter-time-eof-service,
+        filter-amount-1,filter-amount-2,filter-amount-3,
+        aggregator-month-1,aggregator-month-2,
+        aggregator-quantity-profit-1,aggregator-quantity-profit-2,aggregator-quantity-profit-3,joiner-menu-items,
+        aggregator-semester-1,aggregator-semester-2,
+        aggregator-store-q3-1,aggregator-store-q3-2,
+        aggregator-store-q4-1,aggregator-store-q4-2,
+        aggregator-top-three-clients-1,aggregator-top-three-clients-2,aggregator-top-three-clients-3,
+        join-users-q4, join-stores-q4,
+        health-monitor-1,health-monitor-2,health-monitor-3
       CONTAINER_NAME: health-monitor-2
       LOG_LEVEL: DEBUG
     volumes:
@@ -736,7 +758,18 @@ services:
       MONITOR_PORT: 5000
       MONITOR_TIMEOUT: 3.0
       MONITOR_CHECK_INTERVAL: 1.0
-      MONITORED_SERVICES: gateway,filter-year-1,filter-year-2,filter-year-eof-service,filter-time-1,filter-time-2,filter-time-eof-service,filter-amount-1,filter-amount-2,filter-amount-3,aggregator-month-1,aggregator-month-2,aggregator-quantity-profit-1,aggregator-quantity-profit-2,aggregator-quantity-profit-3,joiner-menu-items,aggregator-semester-1,aggregator-semester-2,aggregator-store-q3-1,aggregator-store-q3-2,aggregator-store-q4-1,aggregator-store-q4-2,aggregator-store-q4-eof-service,top-three-clients-1,top-three-clients-2,top-three-clients-3,join-stores-q4,health-monitor-1,health-monitor-2,health-monitor-3
+      MONITORED_SERVICES: gateway,
+        filter-year-1,filter-year-2,filter-year-eof-service,
+        filter-time-1,filter-time-2,filter-time-eof-service,
+        filter-amount-1,filter-amount-2,filter-amount-3,
+        aggregator-month-1,aggregator-month-2,
+        aggregator-quantity-profit-1,aggregator-quantity-profit-2,aggregator-quantity-profit-3,joiner-menu-items,
+        aggregator-semester-1,aggregator-semester-2,
+        aggregator-store-q3-1,aggregator-store-q3-2,
+        aggregator-store-q4-1,aggregator-store-q4-2,
+        aggregator-top-three-clients-1,aggregator-top-three-clients-2,aggregator-top-three-clients-3,
+        join-users-q4, join-stores-q4,
+        health-monitor-1,health-monitor-2,health-monitor-3
       CONTAINER_NAME: health-monitor-3
       LOG_LEVEL: DEBUG
     volumes:

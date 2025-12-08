@@ -42,7 +42,6 @@ class Q4Users(Joiner):
         items_state = self.joiner_storage.get_state(request_id)
         users = items_state.get("items", {})
         birthdate = users.get(parse_int(item.get_user_id()))
-        logging.info(f"action: joining item | request_id: {request_id} | user_id: {item.get_user_id()} | birthdate: {birthdate}")
         if birthdate:
             q4 = Q4IntermediateResult(item.get_store(), birthdate, item.get_purchases_qty())
             return q4.serialize()

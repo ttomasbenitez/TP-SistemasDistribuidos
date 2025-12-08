@@ -17,7 +17,7 @@ EXCLUDED_CONTAINERS = ['rabbitmq', 'gateway',
                     #   'join-stores-q3',
                     #   'join-stores-q4',
                     #   'aggregator-store-q3-1', 'aggregator-store-q3-2', 'aggregator-store-q3-eof-service',
-                    #   'aggregator-store-q4-1', 'aggregator-store-q4-2', 'aggregator-store-q4-eof-service',
+                    #   'aggregator-store-q4-1', 'aggregator-store-q4-2', '',
                     #   'filter-time-1', 'filter-time-2', 'filter-time-eof-service',
                        'top-three-clients-1', 'top-three-clients-2', 'top-three-clients-3',
                        #'joiner-stores-q4',
@@ -159,6 +159,7 @@ def run_q2_chaos(interval):
     possible_targets = [
         'aggregator-month-1', 'aggregator-month-2',
         'aggregator-quantity-profit-1', 'aggregator-quantity-profit-2', 'aggregator-quantity-profit-3',
+        'joiner-menu-items'
     ]
     
     run_query_chaos(interval, possible_targets)
@@ -169,12 +170,26 @@ def run_q3_chaos(interval):
     print(f"🎯 Target services: 5 random from joiner/stores/q3 and aggregator/store/q3 family")
 
     possible_targets = [
-        # 'join-stores-q3',
+        'join-stores-q3',
         'aggregator-store-q3-1', 'aggregator-store-q3-2',
         'aggregator-semester-1', 'aggregator-semester-1',
     ]
     
     run_query_chaos(interval, possible_targets)
+    
+def run_q4_chaos(interval):
+    """Kills 5 random target containers every `interval` seconds."""
+    print(f"😈 Starting Chaos Monkey (Q3 Mode). Interval: {interval}s")
+    print(f"🎯 Target services: 5 random from joiner/stores/q3 and aggregator/store/q3 family")
+
+    possible_targets = [
+        'join-stores-q3',
+        'aggregator-store-stores_state-1', 'aggregator-store-stores_state-2', "aggregator-store-stores_state-3"
+        'aggregator-semester-1', 'aggregator-semester-1',
+    ]
+    
+    run_query_chaos(interval, possible_targets)
+
 
 def run_combined_chaos(random_interval, top_three_interval):
     """Runs both random and top-three chaos simultaneously in separate threads."""
