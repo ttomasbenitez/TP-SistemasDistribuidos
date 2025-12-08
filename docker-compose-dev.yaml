@@ -360,7 +360,7 @@ services:
       INPUT_QUEUE_2: menu-items-queue
       STORAGE_DIR: ./data/join_menu_items
       OUTPUT_MIDDLEWARE: results-exchange
-      EXPECTED_EOFS: 2
+      EXPECTED_EOFS: 4
       LOG_LEVEL: INFO
     networks:
     - testing_net
@@ -422,7 +422,7 @@ services:
       OUTPUT_QUEUE_2: aggregated-store-q3-queue-2
       TOTAL_SHARDS: 2
       LOG_LEVEL: INFO
-      SHARDING_KEY: store
+      SHARDING_KEY: semester
     networks:
     - testing_net
     depends_on:
@@ -443,7 +443,7 @@ services:
       OUTPUT_QUEUE_2: aggregated-store-q3-queue-2
       TOTAL_SHARDS: 2
       LOG_LEVEL: INFO
-      SHARDING_KEY: store
+      SHARDING_KEY: semester
     networks:
     - testing_net
     depends_on:
@@ -463,7 +463,7 @@ services:
       OUTPUT_MIDDLEWARE: results-exchange
       STORAGE_DIR: ./data/join_stores_q3
       LOG_LEVEL: INFO
-      EXPECTED_EOFS: 2
+      EXPECTED_EOFS: 3
     networks:
     - testing_net
     depends_on:
@@ -483,9 +483,9 @@ services:
       OUTPUT_QUEUE_1: aggregated-store-q4-queue-1
       OUTPUT_QUEUE_2: aggregated-store-q4-queue-2
       OUTPUT_QUEUE_3: aggregated-store-q4-queue-3
-      TOTAL_SHARDS: 2
+      TOTAL_SHARDS: 3
       LOG_LEVEL: INFO
-      SHARDING_KEY: semester
+      SHARDING_KEY: store
     networks:
     - testing_net
     depends_on:
@@ -505,9 +505,9 @@ services:
       OUTPUT_QUEUE_1: aggregated-store-q4-queue-1
       OUTPUT_QUEUE_2: aggregated-store-q4-queue-2
       OUTPUT_QUEUE_3: aggregated-store-q4-queue-3
-      TOTAL_SHARDS: 2
+      TOTAL_SHARDS: 3
       LOG_LEVEL: INFO
-      SHARDING_KEY: semester
+      SHARDING_KEY: store
     networks:
     - testing_net
     depends_on:
@@ -584,7 +584,7 @@ services:
       OUTPUT_MIDDLEWARE: top-clients-queue-joined-users
       STORAGE_DIR: ./data/join-users-q4
       LOG_LEVEL: INFO
-      EXPECTED_EOFS: 3
+      EXPECTED_EOFS: 4
     networks:
     - testing_net
     depends_on:
@@ -604,7 +604,7 @@ services:
       OUTPUT_MIDDLEWARE: results-exchange
       STORAGE_DIR: ./data/join_stores_q4
       LOG_LEVEL: INFO
-      EXPECTED_EOFS: 1
+      EXPECTED_EOFS: 2
     networks:
     - testing_net
     depends_on:

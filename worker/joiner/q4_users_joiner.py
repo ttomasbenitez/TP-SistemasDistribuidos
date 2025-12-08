@@ -7,75 +7,56 @@ from pkg.storage.state_storage.joiner_storage import JoinerQ4StateStorage
 from pkg.message.q4_result import Q4IntermediateResult
 from utils.joiner import initialize_config
 from pkg.message.utils import parse_int
+from utils.heartbeat import start_heartbeat_sender
 
 class Q4Users(Joiner):
-                
-    def _process_items_to_join(self, message: Message): 
+    
+    def start(self):
+        self.heartbeat_sender = start_heartbeat_sender()
+        self.state_storage.load_state_all()
+        self.joiner_storage.load_state_all()
+        self.connection.start()
+        data_output_middleware = MessageMiddlewareQueue(self.data_output_middleware, self.connection)
+        self.consume_items_to_join_queue(data_output_middleware)
+        self.consume_data_queue(data_output_middleware)
         
-        data_output_queue = MessageMiddlewareQueue(self.data_output_middleware, self.connection)
+        self.connection.start_consuming()
         
-        users = message.process_message()
-        request_id = message.request_id
-
-        if not users:
-            logging.info(f"action: no_users_to_join | request_id: {request_id}")
-            return
+    def _process_items(self, message: Message):
+        try:
+            items = message.process_message()
+            users_state = self.joiner_storage.get_state(message.request_id)
+            users = users_state.get("items", {})
             
-        state = self.state_storage.get_state(request_id)
-        pending_results = state.get("pending_results", [])
-        current_msg_num = state.get("current_msg_num", -1)
-        if not pending_results:
-            logging.info(f"action: no_pending_results | request_id: {request_id}")
-            return
-
-        users_by_id = {}
-        new_pending = []
-        chunk = ''
-        
-        for u in users:
-            users_by_id[u.get_id()] = u
+            if items:
+                for item in items:
+                    users[item.get_id()] = item.get_birthdate()
             
-        for item in pending_results:
-            item_user_id = parse_int(item.get_user_id())
-            user = users_by_id.get(item_user_id)
-            if not user:
-                new_pending.append(item)
-                continue
-            
-            user_birthdate = user.get_birthdate()
-            q4 = Q4IntermediateResult(item.get_store(), user_birthdate, item.get_purchases_qty())
-            chunk += q4.serialize()
-
-        if chunk:
-            new_msg_num = current_msg_num + 1
-            msg = Message(
-                request_id,
-                MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT,
-                new_msg_num,
-                chunk,
-                self.node_id
-            )
-            data_output_queue.send(msg.serialize())
-            state["current_msg_num"] = new_msg_num
-        else:
-            logging.info(
-                f"action: join_no_matches | request_id: {request_id} "
-                f"| pending_results_total: {len(pending_results)}"
-            )
+            users_state["items"] = users
+            self.joiner_storage.data_by_request[message.request_id] = users_state
+                    
+        except Exception as e:
+                logging.error(f"action: error processing items to join | request_id: {message.request_id} | error: {str(e)}")
         
-        state["pending_results"] = new_pending
-            
-    def _send_eof(self, message: Message):
-        data_output_queue = MessageMiddlewareQueue(self.data_output_middleware, self.connection)
-        current_state = self.state_storage.get_state(message.request_id)
-        current_msg_num = current_state.get("current_msg_num", -1)
-        new_msg_num = current_msg_num + 1
-        new_eof = Message(message.request_id, MESSAGE_TYPE_EOF, new_msg_num, self.query_num, self.node_id)
-        self.state_storage.delete_state(message.request_id)
-        data_output_queue.send(new_eof.serialize())
-        logging.info(f"action: EOF sent | request_id: {message.request_id} | type: {message.type}")
-
+    def _join(self, request_id, item):
+        items_state = self.joiner_storage.get_state(request_id)
+        users = items_state.get("items", {})
+        birthdate = users.get(parse_int(item.get_user_id()))
+        logging.info(f"action: joining item | request_id: {request_id} | user_id: {item.get_user_id()} | birthdate: {birthdate}")
+        if birthdate:
+            q4 = Q4IntermediateResult(item.get_store(), birthdate, item.get_purchases_qty())
+            return q4.serialize()
+        return None
+    
+    def _process_items_to_join(self, message: Message, data_output_queue: MessageMiddlewareQueue):
+        self._process_items_to_join_by_message_type(message, data_output_queue, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT)
+       
+    def _process_pending_clients(self, message: Message, data_output_queue: MessageMiddlewareQueue):
+        self._process_pending_clients_by_message_type(message, data_output_queue, MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT)
         
+    def _send_message(self, data_output_middleware: MessageMiddlewareQueue, message: Message):
+        data_output_middleware.send(message.serialize())
+
 def main():
     config_params = initialize_config()
 
@@ -84,6 +65,7 @@ def main():
     joiner = Q4Users(config_params["input_queue_1"], 
                             config_params["input_queue_2"],
                             config_params["output_middleware"],
+                            config_params["storage_dir"],
                             state_storage,
                             config_params["container_name"],
                             4,

@@ -12,7 +12,7 @@ from pkg.storage.state_storage.eof_storage import EofStorage
 from pkg.storage.state_storage.top_three_clients_storage import TopThreeClientsStateStorage
 from utils.heartbeat import start_heartbeat_sender
 
-SNAPSHOT_INTERVAL = 2000
+SNAPSHOT_INTERVAL = 1000
 
 class TopThreeClients(Worker):
 
@@ -90,7 +90,8 @@ class TopThreeClients(Worker):
             store_users[user_id] = store_users.get(user_id, 0) + 1
         
         state["users_by_store"] = users_by_store
-         # Contador por request_id para decidir cuándo hacer snapshot
+        self.state_storage.save_state(request_id)
+        
         # self.snapshot_interval.setdefault(request_id, 0)
         # self.snapshot_interval[request_id] += 1
         
@@ -117,6 +118,7 @@ class TopThreeClients(Worker):
             sorted_users = sorted(users.items(), key=lambda x: (-x[1], x[0]))
 
             unique_values = []
+            
             for user_id, count in sorted_users:
                 if count not in unique_values:
                     unique_values.append(count)
