@@ -20,9 +20,10 @@ EXCLUDED_CONTAINERS = ['rabbitmq', 'gateway',
                     #   'aggregator-store-q4-1', 'aggregator-store-q4-2', 'aggregator-store-q4-eof-service',
                     #   'filter-time-1', 'filter-time-2', 'filter-time-eof-service',
                        'top-three-clients-1', 'top-three-clients-2', 'top-three-clients-3',
-                       'joiner-stores-q4',
+                       #'joiner-stores-q4',
                     #   'aggregator-store-q4', 
-                        'health-monitor-1', 'health-monitor-2', 'health-monitor-3']
+                        'health-monitor-1', 'health-monitor-2', 'health-monitor-3'
+                        ]
 
 def get_running_containers():
     """Returns a list of running container names for the current project."""
@@ -92,6 +93,27 @@ def run_top_three_chaos(interval):
         
         print(f"Sleeping for {interval} seconds...")
         time.sleep(interval)
+
+def run_monitors_chaos(interval):
+    """Kills all health-monitor containers every interval seconds."""
+    print(f"😈 Starting Chaos Monkey (Health Monitors Mode). Interval: {interval}s")
+    print(f"🎯 Target services: health-monitor-1, health-monitor-2, health-monitor-3")
+    
+    while True:
+        containers = get_running_containers()
+        # Filter for health-monitor containers
+        targets = [c for c in containers if c in ['health-monitor-1', 'health-monitor-2', 'health-monitor-3']]
+        
+        if not targets:
+            print("No health-monitor containers found.")
+        else:
+            print(f"Found {len(targets)} health-monitor container(s): {targets}")
+            # Kill one random monitor to test recovery
+            target = random.choice(targets)
+            kill_container(target)
+        
+        print(f"Sleeping for {interval} seconds...")
+        time.sleep(interval)
         
 def run_query_chaos(interval, possible_targets):
     while True:
@@ -137,7 +159,6 @@ def run_q2_chaos(interval):
     possible_targets = [
         'aggregator-month-1', 'aggregator-month-2',
         'aggregator-quantity-profit-1', 'aggregator-quantity-profit-2', 'aggregator-quantity-profit-3',
-        'joiner-menu-items',
     ]
     
     run_query_chaos(interval, possible_targets)
@@ -148,7 +169,7 @@ def run_q3_chaos(interval):
     print(f"🎯 Target services: 5 random from joiner/stores/q3 and aggregator/store/q3 family")
 
     possible_targets = [
-        'join-stores-q3',
+        # 'join-stores-q3',
         'aggregator-store-q3-1', 'aggregator-store-q3-2',
         'aggregator-semester-1', 'aggregator-semester-1',
     ]
@@ -190,7 +211,7 @@ def main():
                         help='Enable both random and top-three modes simultaneously')
     
     # Intervalos
-    parser.add_argument('--interval', type=float, default=1,
+    parser.add_argument('--interval', type=float, default=0.2,
                         help='Interval in seconds for random mode (default: 1)')
     parser.add_argument('--top-three-interval', type=float, default=15,
                         help='Interval in seconds for top-three mode (default: 15)')
@@ -212,9 +233,14 @@ def main():
     
     
     parser.add_argument('--q3', action='store_true',
-                        help='Enable q2 killing mode')
+                        help='Enable q3 killing mode')
     parser.add_argument('--q3-interval', type=float, default=5,
-                        help='Interval in seconds for q2 mode (default: 5)')
+                        help='Interval in seconds for q3 mode (default: 5)')
+    
+    parser.add_argument('--monitors', action='store_true',
+                        help='Enable health-monitors killing mode')
+    parser.add_argument('--monitors-interval', type=float, default=5,
+                        help='Interval in seconds for monitors mode (default: 5)')
     
     
     args = parser.parse_args()
@@ -255,6 +281,12 @@ def main():
     elif args.q3:
         try:
             run_q3_chaos(args.q3_interval)
+        except KeyboardInterrupt:
+            print("\n😇 Chaos Monkey stopped.")
+    
+    elif args.monitors:
+        try:
+            run_monitors_chaos(args.monitors_interval)
         except KeyboardInterrupt:
             print("\n😇 Chaos Monkey stopped.")
 

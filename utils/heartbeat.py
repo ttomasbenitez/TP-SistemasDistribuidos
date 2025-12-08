@@ -5,8 +5,12 @@ import threading
 import logging
 import os
 
+# Configuration constants
+DEFAULT_HEARTBEAT_PORT = 5000
+DEFAULT_HEARTBEAT_INTERVAL = 1.0  # seconds between heartbeats
+
 class HeartbeatSender:
-    def __init__(self, service_name, health_monitors, port=5000, interval=1.0):
+    def __init__(self, service_name, health_monitors, port=DEFAULT_HEARTBEAT_PORT, interval=DEFAULT_HEARTBEAT_INTERVAL):
         """
         Args:
             service_name (str): Name of the service sending heartbeats.
@@ -74,7 +78,11 @@ def start_heartbeat_sender():
 
     health_monitors = [h.strip() for h in health_monitors_str.split(",") if h.strip()]
     
-    logging.info(f"Initializing HeartbeatSender for {service_name} with monitors {health_monitors}")
-    sender = HeartbeatSender(service_name, health_monitors)
+    # Read port and interval from environment variables
+    port = int(os.getenv("HEARTBEAT_PORT", DEFAULT_HEARTBEAT_PORT))
+    interval = float(os.getenv("HEARTBEAT_INTERVAL", DEFAULT_HEARTBEAT_INTERVAL))
+    
+    logging.info(f"Initializing HeartbeatSender for {service_name} with monitors {health_monitors}, port {port}, interval {interval}s")
+    sender = HeartbeatSender(service_name, health_monitors, port=port, interval=interval)
     sender.start()
     return sender

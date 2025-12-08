@@ -7,34 +7,49 @@ import docker
 import os
 import hashlib
 
+# Configuration constants
+DEFAULT_MONITOR_PORT = 5000
+DEFAULT_HEARTBEAT_TIMEOUT = 5.0  # seconds without heartbeat to consider node dead
+DEFAULT_CHECK_INTERVAL = 1.0  # interval to check for dead nodes
+DEFAULT_UDP_BUFFER_SIZE = 1024  # bytes
+DEFAULT_BIND_ADDRESS = '0.0.0.0'
+
 class HealthMonitor:
-    def __init__(self, hostname, monitors, port=5000, timeout=5.0, check_interval=1.0):
+    def __init__(self, hostname, monitors, monitored_services=None, port=DEFAULT_MONITOR_PORT, timeout=DEFAULT_HEARTBEAT_TIMEOUT, check_interval=DEFAULT_CHECK_INTERVAL):
         """
         Args:
             hostname (str): Name of this health monitor (e.g., health-monitor-1).
             monitors (list): List of all health monitor hostnames, sorted.
+            monitored_services (list): List of all services to monitor (workers + monitors).
             port (int): UDP port to listen on.
             timeout (float): Seconds without heartbeat to consider a node dead.
             check_interval (float): Interval to check for dead nodes.
         """
         self.hostname = hostname
         self.monitors = sorted(monitors)
+        self.monitored_services = monitored_services or []
         self.port = port
         self.timeout = timeout
         self.check_interval = check_interval
+        self.udp_buffer_size = DEFAULT_UDP_BUFFER_SIZE
         
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind(('0.0.0.0', self.port))
+        self.sock.bind((DEFAULT_BIND_ADDRESS, self.port))
         
         self.last_heartbeats = {}
         self.lock = threading.Lock()
         self.running = False
         
-        # Initialize heartbeats for all monitors to avoid startup race conditions
-        # We assume everyone is alive at start (optimistic)
+        # Initialize heartbeats for all monitored services
+        # Set timestamp to 0 to force immediate check after restart
         now = time.time()
+        for service in self.monitored_services:
+            self.last_heartbeats[service] = 0 if service != self.hostname else now
+        
+        # Ensure all monitors are in the list (backward compatibility)
         for m in self.monitors:
-            self.last_heartbeats[m] = now
+            if m not in self.last_heartbeats:
+                self.last_heartbeats[m] = 0 if m != self.hostname else now
 
         try:
             self.docker_client = docker.from_env()
@@ -59,7 +74,7 @@ class HealthMonitor:
         logging.info(f"Listening for heartbeats on port {self.port}")
         while self.running:
             try:
-                data, addr = self.sock.recvfrom(1024)
+                data, addr = self.sock.recvfrom(self.udp_buffer_size)
                 message = json.loads(data.decode('utf-8'))
                 service_name = message.get('service_name')
                 timestamp = message.get('timestamp')
@@ -106,28 +121,27 @@ class HealthMonitor:
         active_monitors = self._get_active_monitors()
         #logging.debug(f"Active monitors: {active_monitors}")
 
-        for node in dead_nodes:
+        dead_monitors = [node for node in dead_nodes if node in self.monitors]
+        dead_workers = [node for node in dead_nodes if node not in self.monitors]
+        
+        # Priority 1: Revive monitors
+        for node in dead_monitors:
+            if self._am_i_responsible(node, active_monitors):
+                logging.warning(f"CRITICAL: Monitor {node} is DEAD. Reviving with HIGH PRIORITY (Active Ring: {len(active_monitors)})...")
+                self._revive_node(node)
+        
+        # Priority 2: Revive workers
+        for node in dead_workers:
             if self._am_i_responsible(node, active_monitors):
                 logging.info(f"Node {node} is DEAD. I am responsible (Active Ring: {len(active_monitors)}). Reviving...")
                 self._revive_node(node)
-                with self.lock:
-                    self.last_heartbeats[node] = now
             else:
                 pass
 
     def _am_i_responsible(self, service_name, active_monitors):
-        """
-        Ring algorithm:
-        Hash the service name and find the monitor with the next highest hash.
-        For simplicity, since we have a fixed list of monitors, we can use consistent hashing 
-        or just modulo arithmetic on the hash.
-        
-        Simple approach: hash(service_name) % len(active_monitors) -> index of responsible monitor.
-        """
         if not active_monitors:
             return False
             
-        # Use a stable hash (MD5)
         h = int(hashlib.md5(service_name.encode('utf-8')).hexdigest(), 16)
         index = h % len(active_monitors)
         responsible_monitor = active_monitors[index]

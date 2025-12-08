@@ -3,6 +3,7 @@ import time
 import logging
 from monitor import HealthMonitor
 from utils.heartbeat import HeartbeatSender
+from monitor import DEFAULT_MONITOR_PORT, DEFAULT_HEARTBEAT_TIMEOUT, DEFAULT_CHECK_INTERVAL
 
 def initialize_log(logging_level):
     logging.basicConfig(
@@ -30,8 +31,29 @@ def main():
         return
 
     logging.info(f"Starting Health Monitor: {node_name}")
+        
+    # Read configuration from environment variables
+    port = int(os.getenv('MONITOR_PORT', DEFAULT_MONITOR_PORT))
+    timeout = float(os.getenv('MONITOR_TIMEOUT', DEFAULT_HEARTBEAT_TIMEOUT))
+    check_interval = float(os.getenv('MONITOR_CHECK_INTERVAL', DEFAULT_CHECK_INTERVAL))
     
-    monitor = HealthMonitor(node_name, monitors)
+    # Read monitored services list
+    monitored_services_str = os.getenv('MONITORED_SERVICES', '')
+    monitored_services = [s.strip() for s in monitored_services_str.split(',') if s.strip()]
+    
+    if monitored_services:
+        logging.info(f"Monitoring {len(monitored_services)} services: {monitored_services}")
+    else:
+        logging.warning("MONITORED_SERVICES env var not set. Will only track services that send heartbeats.")
+    
+    monitor = HealthMonitor(
+        hostname=node_name,
+        monitors=monitors,
+        monitored_services=monitored_services,
+        port=port,
+        timeout=timeout,
+        check_interval=check_interval
+    )
     monitor.start()
 
     # Start sending heartbeats too, so other monitors know I'm alive

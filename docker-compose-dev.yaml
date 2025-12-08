@@ -45,6 +45,7 @@ services:
     command: "/worker/filter/year.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: filter-year-1
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: batches-queue
@@ -73,6 +74,7 @@ services:
     command: "/worker/filter/year.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: filter-year-2
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: batches-queue
@@ -101,6 +103,7 @@ services:
     command: "/worker/eof/eof_service_year.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: filter-year-eof-service
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE: eof-service-filter-year
@@ -119,6 +122,7 @@ services:
     command: "/worker/filter/time.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: filter-time-1
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: year-filtered-queue-q1-q3
@@ -145,6 +149,7 @@ services:
     command: "/worker/filter/time.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: filter-time-2
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: year-filtered-queue-q1-q3
@@ -171,6 +176,7 @@ services:
     command: "/worker/eof/eof_service_time.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: filter-time-eof-service
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE: eof-service-filter-time
@@ -194,6 +200,7 @@ services:
     command: "/worker/filter/amount.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: filter-amount-1
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: time-filtered-queue-q1-1
@@ -211,6 +218,7 @@ services:
     command: "/worker/filter/amount.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: filter-amount-2
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: time-filtered-queue-q1-2
@@ -228,6 +236,7 @@ services:
     command: "/worker/filter/amount.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: filter-amount-3
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: time-filtered-queue-q1-3
@@ -245,6 +254,7 @@ services:
     command: "/worker/aggregator/month.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: aggregator-month-1
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-month-input-queue-1
@@ -265,6 +275,7 @@ services:
     command: "/worker/aggregator/month.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: aggregator-month-2
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-month-input-queue-2
@@ -285,6 +296,7 @@ services:
     command: "/worker/aggregator/max_quantity_profit.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: aggregator-quantity-profit-1
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-month-queue-1
@@ -303,6 +315,7 @@ services:
     command: "/worker/aggregator/max_quantity_profit.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: aggregator-quantity-profit-2
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-month-queue-2
@@ -321,6 +334,7 @@ services:
     command: "/worker/aggregator/max_quantity_profit.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: aggregator-quantity-profit-3
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-month-queue-3
@@ -339,6 +353,7 @@ services:
     command: "/worker/joiner/q2_menu_items_joiner.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: joiner-menu-items
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: products-results-queue
@@ -360,6 +375,7 @@ services:
     command: "/worker/aggregator/semester_aggregator.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: aggregator-semester-1
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-store-q3-queue-1
@@ -378,6 +394,7 @@ services:
     command: "/worker/aggregator/semester_aggregator.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: aggregator-semester-2
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-store-q3-queue-2
@@ -396,6 +413,7 @@ services:
     command: "/worker/aggregator/store_aggregator.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: aggregator-store-q3-1
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: time-filtered-queue-q3-1
@@ -416,6 +434,7 @@ services:
     command: "/worker/aggregator/store_aggregator.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: aggregator-store-q3-2
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: time-filtered-queue-q3-2
@@ -436,6 +455,7 @@ services:
     command: "/worker/joiner/q3_stores_joiner.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: joiner-stores-q3
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-semester-queue
@@ -455,6 +475,7 @@ services:
     command: "/worker/aggregator/store_aggregator.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: aggregator-store-q4-1
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: year-filtered-queue-q4-1
@@ -476,6 +497,7 @@ services:
     command: "/worker/aggregator/store_aggregator.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: aggregator-store-q4-2
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: year-filtered-queue-q4-2
@@ -497,6 +519,7 @@ services:
     command: "/worker/aggregator/top_three_clients.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: top-three-clients-1
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-store-q4-queue-1
@@ -515,6 +538,7 @@ services:
     command: "/worker/aggregator/top_three_clients.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: top-three-clients-2
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-store-q4-queue-2
@@ -533,6 +557,7 @@ services:
     command: "/worker/aggregator/top_three_clients.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: top-three-clients-3
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: aggregated-store-q4-queue-3
@@ -551,6 +576,7 @@ services:
     command: "/worker/joiner/q4_users_joiner.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: join-users-q4
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: top-clients-queue
@@ -570,6 +596,7 @@ services:
     command: "/worker/joiner/q4_stores_joiner.py"
     environment:
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
       CONTAINER_NAME: join-stores-q4
       RABBITMQ_HOST: rabbitmq
       INPUT_QUEUE_1: top-clients-queue-joined-users
@@ -667,6 +694,11 @@ services:
     environment:
       NODE_NAME: health-monitor-1
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_INTERVAL: 1.0
+      MONITOR_PORT: 5000
+      MONITOR_TIMEOUT: 3.0
+      MONITOR_CHECK_INTERVAL: 1.0
+      MONITORED_SERVICES: gateway,filter-year-1,filter-year-2,filter-year-eof-service,filter-time-1,filter-time-2,filter-time-eof-service,filter-amount-1,filter-amount-2,filter-amount-3,aggregator-month-1,aggregator-month-2,aggregator-quantity-profit-1,aggregator-quantity-profit-2,aggregator-quantity-profit-3,joiner-menu-items,aggregator-semester-1,aggregator-semester-2,aggregator-store-q3-1,aggregator-store-q3-2,aggregator-store-q4-1,aggregator-store-q4-2,aggregator-store-q4-eof-service,top-three-clients-1,top-three-clients-2,top-three-clients-3,join-stores-q4,health-monitor-1,health-monitor-2,health-monitor-3
       CONTAINER_NAME: health-monitor-1
       LOG_LEVEL: DEBUG
     volumes:
@@ -680,6 +712,12 @@ services:
     environment:
       NODE_NAME: health-monitor-2
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
+      HEARTBEAT_INTERVAL: 1.0
+      MONITOR_PORT: 5000
+      MONITOR_TIMEOUT: 3.0
+      MONITOR_CHECK_INTERVAL: 1.0
+      MONITORED_SERVICES: gateway,filter-year-1,filter-year-2,filter-year-eof-service,filter-time-1,filter-time-2,filter-time-eof-service,filter-amount-1,filter-amount-2,filter-amount-3,aggregator-month-1,aggregator-month-2,aggregator-quantity-profit-1,aggregator-quantity-profit-2,aggregator-quantity-profit-3,joiner-menu-items,aggregator-semester-1,aggregator-semester-2,aggregator-store-q3-1,aggregator-store-q3-2,aggregator-store-q4-1,aggregator-store-q4-2,aggregator-store-q4-eof-service,top-three-clients-1,top-three-clients-2,top-three-clients-3,join-stores-q4,health-monitor-1,health-monitor-2,health-monitor-3
       CONTAINER_NAME: health-monitor-2
       LOG_LEVEL: DEBUG
     volumes:
@@ -693,6 +731,12 @@ services:
     environment:
       NODE_NAME: health-monitor-3
       HEALTH_MONITORS: health-monitor-1,health-monitor-2,health-monitor-3
+      HEARTBEAT_PORT: 5000
+      HEARTBEAT_INTERVAL: 1.0
+      MONITOR_PORT: 5000
+      MONITOR_TIMEOUT: 3.0
+      MONITOR_CHECK_INTERVAL: 1.0
+      MONITORED_SERVICES: gateway,filter-year-1,filter-year-2,filter-year-eof-service,filter-time-1,filter-time-2,filter-time-eof-service,filter-amount-1,filter-amount-2,filter-amount-3,aggregator-month-1,aggregator-month-2,aggregator-quantity-profit-1,aggregator-quantity-profit-2,aggregator-quantity-profit-3,joiner-menu-items,aggregator-semester-1,aggregator-semester-2,aggregator-store-q3-1,aggregator-store-q3-2,aggregator-store-q4-1,aggregator-store-q4-2,aggregator-store-q4-eof-service,top-three-clients-1,top-three-clients-2,top-three-clients-3,join-stores-q4,health-monitor-1,health-monitor-2,health-monitor-3
       CONTAINER_NAME: health-monitor-3
       LOG_LEVEL: DEBUG
     volumes:
