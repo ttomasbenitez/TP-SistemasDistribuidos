@@ -3,7 +3,7 @@ from Middleware.middleware import MessageMiddlewareQueue
 import logging
 from pkg.message.message import Message
 from pkg.message.constants import MESSAGE_TYPE_QUERY_4_INTERMEDIATE_RESULT, MESSAGE_TYPE_EOF
-from pkg.storage.state_storage.joiner_storage import JoinerQ4StateStorage
+from pkg.storage.state_storage.joiner import JoinerQ4StateStorage
 from pkg.message.q4_result import Q4IntermediateResult
 from utils.joiner import initialize_config
 from pkg.message.utils import parse_int

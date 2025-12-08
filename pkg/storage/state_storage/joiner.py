@@ -10,7 +10,7 @@ from pkg.message.q2_result import Q2Result
 class JoinerStateStorage(StateStorage, ABC):
     
     def __init__(self, storage_dir):
-        # Defaults reales
+        
         default_state = {
             "last_by_sender": {},
             "pending_results": [],

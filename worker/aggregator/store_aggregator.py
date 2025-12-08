@@ -23,7 +23,6 @@ class StoreAggregator(Worker):
                  sharding_key: str,
                  container_name: str):
         
-        self.__init_manager__()
         self.__init_middlewares_handler__()
         self.data_input_queue = data_input_queue
         self.output_exchange_queues = output_exchange_queues
@@ -45,12 +44,13 @@ class StoreAggregator(Worker):
     def _consume_data_queue(self):
         data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
         data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, self.output_exchange_queues, self.connection)
-        self.message_middlewares.extend([data_input_queue, data_output_exchange])
       
         def __on_message__(message):
             try:
                 message = Message.deserialize(message)
 
+                logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
+                
                 if message.type == MESSAGE_TYPE_EOF:
                     logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
                     new_msg_count = self.get_msg_count(message.request_id)
@@ -58,8 +58,6 @@ class StoreAggregator(Worker):
                     data_output_exchange.send(new_eof_message.serialize(), str(MESSAGE_TYPE_EOF))
                     self.dedup_strategy.save_dedup_state(message)
                     return
-                
-                logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
                 
                 if self.dedup_strategy.is_duplicate(message):
                     logging.info(f"action: duplicate message detected and skipped | request_id: {message.request_id} | msg_type: {message.type} | msg_num: {message.msg_num}")
@@ -98,11 +96,8 @@ class StoreAggregator(Worker):
         
         
     def get_msg_count(self, request_id: int) -> int:
-        # Leo el valor actual (o -1 si no existe)…
         current = self.dedup_strategy.current_msg_num.get(request_id, -1)
-        # …y genero el siguiente
         new_val = current + 1
-        # Lo guardo asociado a ese request_id
         self.dedup_strategy.current_msg_num[request_id] = new_val
         return new_val
                

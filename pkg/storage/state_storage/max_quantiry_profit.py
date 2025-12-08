@@ -6,8 +6,8 @@ class QuantityAndProfitStateStorage(StateStorage):
     
     def __init__(self, storage_dir):
         default_state = {
-            "items_by_ym": {},      # ym -> item_id -> Q2IntermediateResult
-            "last_by_sender": {},   # sender_id -> last_msg_num
+            "items_by_ym": {},  
+            "last_by_sender": {},
         }
         
         filepath = f"{storage_dir}/quantity_and_profit_storage"
@@ -132,14 +132,12 @@ class QuantityAndProfitStateStorage(StateStorage):
         saved_senders = 0
         chunk = ''
         
-        # Items
         for ym, items_dict in items_by_ym.items():
             for item in items_dict.values():
                 line = f"I;{ym};{item.serialize()}\n"
                 chunk += line
                 saved_items += 1
         
-        # Last by sender
         for sender_id, last_num in last_by_sender.items():
             line = f"S;{sender_id};{last_num}\n"
             chunk += line

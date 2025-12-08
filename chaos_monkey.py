@@ -19,7 +19,7 @@ EXCLUDED_CONTAINERS = ['rabbitmq', 'gateway',
                     #   'aggregator-store-q3-1', 'aggregator-store-q3-2', 'aggregator-store-q3-eof-service',
                     #   'aggregator-store-q4-1', 'aggregator-store-q4-2', '',
                     #   'filter-time-1', 'filter-time-2', 'filter-time-eof-service',
-                       'top-three-clients-1', 'top-three-clients-2', 'top-three-clients-3',
+                    #    'aggregator-top-three-clients-1', 'aggregator-top-three-clients-2', 'aggregator-top-three-clients-',
                        #'joiner-stores-q4',
                     #   'aggregator-store-q4', 
                         'health-monitor-1', 'health-monitor-2', 'health-monitor-3'
@@ -170,7 +170,7 @@ def run_q3_chaos(interval):
     print(f"🎯 Target services: 5 random from joiner/stores/q3 and aggregator/store/q3 family")
 
     possible_targets = [
-        'join-stores-q3',
+        'joiner-stores-q3',
         'aggregator-store-q3-1', 'aggregator-store-q3-2',
         'aggregator-semester-1', 'aggregator-semester-1',
     ]
@@ -183,9 +183,9 @@ def run_q4_chaos(interval):
     print(f"🎯 Target services: 5 random from joiner/stores/q3 and aggregator/store/q3 family")
 
     possible_targets = [
-        'join-stores-q3',
-        'aggregator-store-stores_state-1', 'aggregator-store-stores_state-2', "aggregator-store-stores_state-3"
-        'aggregator-semester-1', 'aggregator-semester-1',
+        'aggregator-store-q4-1' ,'aggregator-store-q4-2',
+        'aggregator-top-three-clients-1','aggregator-top-three-clients-2','aggregator-top-three-clients-3',
+        'join-users-q4', 'join-stores-q4'
     ]
     
     run_query_chaos(interval, possible_targets)
@@ -252,6 +252,12 @@ def main():
     parser.add_argument('--q3-interval', type=float, default=5,
                         help='Interval in seconds for q3 mode (default: 5)')
     
+    
+    parser.add_argument('--q4', action='store_true',
+                        help='Enable q4 killing mode')
+    parser.add_argument('--q4-interval', type=float, default=5,
+                        help='Interval in seconds for q3 mode (default: 5)')
+    
     parser.add_argument('--monitors', action='store_true',
                         help='Enable health-monitors killing mode')
     parser.add_argument('--monitors-interval', type=float, default=5,
@@ -296,6 +302,12 @@ def main():
     elif args.q3:
         try:
             run_q3_chaos(args.q3_interval)
+        except KeyboardInterrupt:
+            print("\n😇 Chaos Monkey stopped.")
+    
+    elif args.q4:
+        try:
+            run_q4_chaos(args.q4_interval)
         except KeyboardInterrupt:
             print("\n😇 Chaos Monkey stopped.")
     

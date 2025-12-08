@@ -1,7 +1,7 @@
 from pkg.storage.state_storage.base import StateStorage
 import logging
 
-class DedupStorage(StateStorage):
+class SlidingWindowDedupStrategyStateStorage(StateStorage):
     
     def __init__(self, storage_dir):
         # Defaults reales

@@ -18,7 +18,6 @@ class DedupBySenderStorage(StateStorage):
         Rellena:
             state["last_by_sender"]
         """
-        
         state = self.data_by_request.setdefault(request_id, {
             "last_by_sender": None,
         })

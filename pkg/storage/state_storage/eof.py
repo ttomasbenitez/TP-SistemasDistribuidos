@@ -1,6 +1,6 @@
 from pkg.storage.state_storage.base import StateStorage
 
-class EofStorage(StateStorage):
+class EofStateStorage(StateStorage):
     
     def __init__(self, storage_dir):
         default_state = {
@@ -19,7 +19,6 @@ class EofStorage(StateStorage):
             state["eofs_count"]
            
         """
-        
         state = self.get_state(request_id)
 
         eofs_count = 0

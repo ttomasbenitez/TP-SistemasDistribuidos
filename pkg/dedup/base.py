@@ -18,6 +18,3 @@ class DedupStrategy(ABC):
     @abstractmethod
     def save_dedup_state(self, message: Message):
         pass
-    
-    def append_dedup_state(self, request_id):
-        pass

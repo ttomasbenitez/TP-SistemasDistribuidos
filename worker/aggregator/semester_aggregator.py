@@ -8,8 +8,8 @@ import os
 from pkg.message.q3_result import Q3IntermediateResult
 from pkg.message.constants import MESSAGE_TYPE_EOF, MESSAGE_TYPE_QUERY_3_INTERMEDIATE_RESULT
 from utils.heartbeat import start_heartbeat_sender
-from pkg.storage.state_storage.semester_agg import SemesterAggregatorStateStorage
-from pkg.storage.state_storage.eof_storage import EofStorage
+from pkg.storage.state_storage.semester_aggregator import SemesterAggregatorStateStorage
+from pkg.storage.state_storage.eof import EofStateStorage
 from pkg.dedup.dedup_by_sender_strategy import DedupBySenderStrategy
 
 class SemesterAggregator(Worker):
@@ -22,18 +22,18 @@ class SemesterAggregator(Worker):
                  expected_eofs: int = 2,
                  container_name: str = None):
         
+        self.__init_middlewares_handler__()
         self.connection = PikaConnection(host)
         self.data_input_queue = data_input_queue
         self.data_output_queue = data_output_queue
         self.node_id = container_name
         self.state_storage = SemesterAggregatorStateStorage(storage_dir)
         self.dedup_strategy = DedupBySenderStrategy(self.state_storage)
-        self.eof_storage = EofStorage(storage_dir)
+        self.eof_storage = EofStateStorage(storage_dir)
         self.expected_eofs = expected_eofs
         
     def start(self):
-        # Load persisted state once on startup and hydrate last-msg map
-        logging.info(f"action: startup | loading persisted state for recovery")
+        
         self.state_storage.load_state_all()
         self.eof_storage.load_state_all()
         self.heartbeat_sender = start_heartbeat_sender()
@@ -60,7 +60,6 @@ class SemesterAggregator(Worker):
                     return
                 
                 if self.dedup_strategy.is_duplicate(message):
-                    logging.info(f"action: duplicated_message | request_id: {message.request_id}")
                     return
                 
                 items = message.process_message()

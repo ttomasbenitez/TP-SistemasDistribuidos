@@ -18,7 +18,6 @@ class TopThreeClientsStateStorage(StateStorage):
                 ...
             },
         }
-
     Formato en archivo (por request_id):
 
         U;store_id;user_id;count

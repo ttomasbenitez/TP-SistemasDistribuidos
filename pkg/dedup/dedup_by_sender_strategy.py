@@ -6,7 +6,6 @@ class DedupBySenderStrategy(DedupStrategy):
     
     def __init__(self, storage):
         self.state_storage = storage
-        self.snapshot_interval = {}
     
     def is_duplicate(self, message: Message):
         """
@@ -33,9 +32,6 @@ class DedupBySenderStrategy(DedupStrategy):
     def save_dedup_state(self, message: Message):
         self.state_storage.save_state(message.request_id)
         
-    def append_dedup_state(self, request_id):
-        self.state_storage.append_state(request_id)
-    
     def load_dedup_state(self):
         self.state_storage.load_state_all()
         

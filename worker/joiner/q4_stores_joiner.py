@@ -5,7 +5,7 @@ import logging
 from pkg.message.message import Message
 from pkg.message.constants import MESSAGE_TYPE_QUERY_4_RESULT
 from utils.joiner import initialize_config
-from pkg.storage.state_storage.joiner_storage import JoinerQ4StateStorage
+from pkg.storage.state_storage.joiner import JoinerQ4StateStorage
 from pkg.message.utils import parse_int
 
 class Q4Stores(Joiner):

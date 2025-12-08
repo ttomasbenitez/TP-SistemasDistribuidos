@@ -8,7 +8,7 @@ class JoinerItemsStateStorage(StateStorage):
         default_state = {
             "items": {},
         }
-        filepath = f"{storage_dir}/items_storage"
+        filepath = f"{storage_dir}/joiner_items_storage"
         super().__init__(filepath, default_state)
     """
     Persiste el estado por request_id:
@@ -86,7 +86,6 @@ class JoinerItemsStateStorage(StateStorage):
 
         items = state.get("items", {})
         
-        # Último mensaje por sender
         chunk = ''
         for item_id, item_data in items.items():
             line = f"{item_id};{item_data}\n"

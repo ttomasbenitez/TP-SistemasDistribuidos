@@ -54,7 +54,6 @@ class FilterYearNode(Worker):
     def _consume_eof_final(self):
         eof_final_queue = MessageMiddlewareQueue(self.eof_final_queue, self.connection)
         data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, self.output_exchange_queues, self.connection)
-        self.message_middlewares.extend([eof_final_queue, data_output_exchange])
         
         def __on_eof_final_message__(message):
             try:
@@ -73,7 +72,6 @@ class FilterYearNode(Worker):
         data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
         data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, self.output_exchange_queues, self.connection)
         eof_exchange = MessageMiddlewareExchange(self.eof_output_exchange, self.eof_output_queues, self.connection)
-        self.message_middlewares.extend([data_input_queue, data_output_exchange, eof_exchange])
 
         def __on_message__(message_bytes):
             

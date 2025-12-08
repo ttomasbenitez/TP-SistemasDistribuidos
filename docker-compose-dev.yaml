@@ -708,7 +708,7 @@ services:
         aggregator-store-q3-1,aggregator-store-q3-2,
         aggregator-store-q4-1,aggregator-store-q4-2,
         aggregator-top-three-clients-1,aggregator-top-three-clients-2,aggregator-top-three-clients-3,
-        join-users-q4, join-stores-q4,
+        join-users-q4, join-stores-q4, joiner-stores-q3,
         health-monitor-1,health-monitor-2,health-monitor-3
       CONTAINER_NAME: health-monitor-1
       LOG_LEVEL: DEBUG
@@ -738,7 +738,7 @@ services:
         aggregator-store-q3-1,aggregator-store-q3-2,
         aggregator-store-q4-1,aggregator-store-q4-2,
         aggregator-top-three-clients-1,aggregator-top-three-clients-2,aggregator-top-three-clients-3,
-        join-users-q4, join-stores-q4,
+        join-users-q4, join-stores-q4, joiner-stores-q3,
         health-monitor-1,health-monitor-2,health-monitor-3
       CONTAINER_NAME: health-monitor-2
       LOG_LEVEL: DEBUG
@@ -768,7 +768,7 @@ services:
         aggregator-store-q3-1,aggregator-store-q3-2,
         aggregator-store-q4-1,aggregator-store-q4-2,
         aggregator-top-three-clients-1,aggregator-top-three-clients-2,aggregator-top-three-clients-3,
-        join-users-q4, join-stores-q4,
+        join-users-q4, join-stores-q4,joiner-stores-q3,
         health-monitor-1,health-monitor-2,health-monitor-3
       CONTAINER_NAME: health-monitor-3
       LOG_LEVEL: DEBUG

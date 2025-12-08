@@ -10,7 +10,7 @@ from pkg.message.q2_result import Q2Result
 from Middleware.connection import PikaConnection
 from utils.heartbeat import start_heartbeat_sender
 from pkg.dedup.dedup_by_sender_strategy import DedupBySenderStrategy
-from pkg.storage.state_storage.eof_storage import EofStorage
+from pkg.storage.state_storage.eof import EofStateStorage
 
 class QuantityAndProfit(Worker):
     
@@ -21,13 +21,13 @@ class QuantityAndProfit(Worker):
                  host: str,
                  expected_eofs: int = 2,
                  container_name: str = 'unknown-quantity-profit-node'):
-        
+        self.__init_middlewares_handler__()
         self.data_input_queue = data_input_queue
         self.data_output_queue = data_output_queue
         self.connection = PikaConnection(host)
         self.state_storage = QuantityAndProfitStateStorage(storage_dir)
         self.dedup_strategy = DedupBySenderStrategy(self.state_storage)
-        self.eof_storage = EofStorage(storage_dir)
+        self.eof_storage = EofStateStorage(storage_dir)
         self.expected_eofs = expected_eofs
         self.node_id = container_name
         
@@ -49,6 +49,7 @@ class QuantityAndProfit(Worker):
         def __on_message__(msg):
             try:
                 message = Message.deserialize(msg)
+                
                 logging.info(f"action: message received | request_id: {message.request_id} | type: {message.type}")
                             
                 if message.type == MESSAGE_TYPE_EOF:
@@ -57,11 +58,9 @@ class QuantityAndProfit(Worker):
                         self._send_results_by_date(message.request_id, data_output_queue)
                         self.eof_storage.delete_state(message.request_id)
                         self.state_storage.delete_state(message.request_id)
-                        self.dedup_strategy.clean_dedup_state(message.request_id)
                     return
                 
                 if self.dedup_strategy.is_duplicate(message):
-                    logging.info(f"action: duplicated_message | request_id: {message.request_id}")
                     return
                 
                 items = message.process_message()
@@ -120,32 +119,22 @@ class QuantityAndProfit(Worker):
         chunk = ""
         results_count = 0
 
-        # Itero por fecha ordenada para que el output sea determinista
         for ym in sorted(items_by_ym.keys()):
             items_dict = items_by_ym[ym]
             
             if not items_dict:
                 continue
 
-            # Máximo por cantidad
             max_item_quantity_id, max_item_quantity = max(
                 items_dict.items(),
                 key=lambda kv: kv[1].quantity,
             )
 
-            # Máximo por profit
             max_item_profit_id, max_item_profit = max(
                 items_dict.items(),
                 key=lambda kv: kv[1].subtotal,
             )
 
-            logging.info(
-                f"action: ym_results_computed | request_id: {request_id_of_eof} | ym: {ym} "
-                f"| max_qty_item_id: {max_item_quantity_id} | max_qty: {max_item_quantity.quantity} "
-                f"| max_profit_item_id: {max_item_profit_id} | max_profit: {max_item_profit.subtotal}"
-            )
-
-            # Armo resultados y los agrego al chunk
             chunk += Q2Result(
                 ym,
                 max_item_quantity_id,
@@ -168,7 +157,6 @@ class QuantityAndProfit(Worker):
                 f"| results_count: {results_count}"
             )
 
-            # Si no te importa numerar el mensaje, podés dejar msg_num = 0
             msg_num = 0
             message = Message(
                 request_id_of_eof,
@@ -187,19 +175,7 @@ class QuantityAndProfit(Worker):
             new_eof = Message( request_id_of_eof, MESSAGE_TYPE_EOF, 1, '', self.node_id).serialize()
             data_output_queue.send(new_eof)
         else:
-            logging.warning(
-                f"action: send_results_empty | request_id: {request_id_of_eof} | no_results"
-            )
-
-  
-
-    def close(self):
-        try:
-            self.heartbeat_sender.stop()
-            self.connection.close()
-            logging.info(f"action=close_connections | status=success")
-        except Exception as e:
-            logging.error(f"Error al cerrar: {type(e).__name__}: {e}")
+            logging.warning(f"action: send_results_empty | request_id: {request_id_of_eof} | no_results")
 
 def initialize_config():
     """ Parse env variables to find program config params

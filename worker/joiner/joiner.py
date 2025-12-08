@@ -9,7 +9,10 @@ from pkg.message.constants import MESSAGE_TYPE_EOF
 from Middleware.connection import PikaConnection
 from pkg.dedup.dedup_by_sender_strategy import DedupBySenderStrategy
 from pkg.storage.state_storage.base import StateStorage
-from pkg.storage.state_storage.joiner_items_storage import JoinerItemsStateStorage
+from pkg.storage.state_storage.joiner_items import JoinerItemsStateStorage
+
+SNAPSHOT_INTERVAL = 1000
+
 class Joiner(Worker, ABC):
     
     def __init__(self, 
@@ -22,7 +25,8 @@ class Joiner(Worker, ABC):
                  query_num: int,
                  host: str,
                  expected_eofs):
-        
+ 
+        self.__init_middlewares_handler__()
         self.data_input_queue = data_input_queue
         self.data_output_middleware = data_output_middleware
         self.items_input_queue = items_input_queue
@@ -33,6 +37,7 @@ class Joiner(Worker, ABC):
         self.dedup_strategy = DedupBySenderStrategy(self.state_storage)
         self.expected_eofs = expected_eofs
         self.query_num = query_num
+        self.snapshot_interval = {}
         
     def start(self):
         self.heartbeat_sender = start_heartbeat_sender()
@@ -50,6 +55,7 @@ class Joiner(Worker, ABC):
 
         def __on_message__(msg):
             message = Message.deserialize(msg)
+            
             logging.info(f"action: message received from data_queue | request_id: {message.request_id} | type: {message.type}")
             
             if message.type == MESSAGE_TYPE_EOF:
@@ -60,7 +66,6 @@ class Joiner(Worker, ABC):
                 return
             
             if self.dedup_strategy.is_duplicate(message):
-                logging.info(f"action: duplicate message discarded | request_id: {message.request_id} | type: {message.type} | sender_id: {message.node_id} | msg_num: {message.msg_num}")
                 return
             
             try:
@@ -99,7 +104,16 @@ class Joiner(Worker, ABC):
                 return
             
             self._process_items(message)
-            self.joiner_storage.append_state(message.request_id)
+            request_id = message.request_id
+            self.snapshot_interval.setdefault(request_id, 0)
+            self.snapshot_interval[request_id] += 1
+            
+            if self.snapshot_interval[request_id] >= SNAPSHOT_INTERVAL:
+                logging.info(f"action: snapshot_interval_reached | request_id: {message.request_id} | interval: {SNAPSHOT_INTERVAL}")
+                self.snapshot_interval[request_id] = 0
+                self.joiner_storage.save_state(message.request_id)
+            else:
+                self.joiner_storage.append_state(message.request_id)
             
         items_input_queue.start_consuming(__on_items_message__)
      

@@ -9,7 +9,6 @@ from pkg.message.q2_result import Q2IntermediateResult
 import os
 from utils.heartbeat import start_heartbeat_sender
 import hashlib
-from pkg.storage.state_storage.message_count_storage import MessageCountStorage
 from pkg.dedup.sliding_window_dedup_strategy import SlidingWindowDedupStrategy
 
 
@@ -24,6 +23,7 @@ class AggregatorMonth(Worker):
                  host: str,
                  container_name: str):
         
+        self.__init_middlewares_handler__()
         self.data_output_exchange = data_output_exchange
         self.data_input_queue = data_input_queue
         self.output_exchange_queues = output_exchange_queues
@@ -49,6 +49,8 @@ class AggregatorMonth(Worker):
             try:
                 message = Message.deserialize(message)
 
+                logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
+                
                 if message.type == MESSAGE_TYPE_EOF:
                     logging.info(f"action: EOF message received in data queue | request_id: {message.request_id}")
                     new_msg_count = self.get_msg_count(message.request_id)
@@ -57,9 +59,8 @@ class AggregatorMonth(Worker):
                     self.dedup_strategy.save_dedup_state(message)
                     return
 
-                logging.info(f"action: message received in data queue | request_id: {message.request_id} | msg_type: {message.type}")
+                
                 if self.dedup_strategy.is_duplicate(message):
-                    logging.info(f"action: duplicate message detected and skipped | request_id: {message.request_id} | msg_type: {message.type} | msg_num: {message.msg_num}")
                     return
         
                 items = message.process_message()
@@ -95,24 +96,10 @@ class AggregatorMonth(Worker):
             
 
     def get_msg_count(self, request_id: int) -> int:
-        # Leo el valor actual (o -1 si no existe)…
         current = self.dedup_strategy.current_msg_num.get(request_id, -1)
-        # …y genero el siguiente
         new_val = current + 1
-        # Lo guardo asociado a ese request_id
         self.dedup_strategy.current_msg_num[request_id] = new_val
         return new_val
-
-    
-    def close(self):
-        try:
-            for middleware in self.message_middlewares:
-                middleware.close()
-            self.heartbeat_sender.stop()
-            self.message_middlewares = []
-            logging.info(f"action=close_connections | status=success")
-        except Exception as e:
-            logging.error(f"Error al cerrar las conexiones: {type(e).__name__}: {e}")
 
 def initialize_config():
     """ Parse env variables to find program config params

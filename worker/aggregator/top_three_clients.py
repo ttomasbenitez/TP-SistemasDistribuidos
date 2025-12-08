@@ -8,11 +8,9 @@ import os
 from pkg.message.q4_result import Q4IntermediateResult
 from Middleware.connection import PikaConnection
 from pkg.dedup.dedup_by_sender_strategy import DedupBySenderStrategy
-from pkg.storage.state_storage.eof_storage import EofStorage
-from pkg.storage.state_storage.top_three_clients_storage import TopThreeClientsStateStorage
+from pkg.storage.state_storage.eof import EofStateStorage
+from pkg.storage.state_storage.top_three_clients import TopThreeClientsStateStorage
 from utils.heartbeat import start_heartbeat_sender
-
-SNAPSHOT_INTERVAL = 1000
 
 class TopThreeClients(Worker):
 
@@ -24,19 +22,17 @@ class TopThreeClients(Worker):
                  expected_eofs: int,
                  container_name: str):
         
+        self.__init_middlewares_handler__()
         self.data_input_queue = data_input_queue
         self.data_output_queue = data_output_queue
         self.connection = PikaConnection(host)
         self.state_storage = TopThreeClientsStateStorage(storage_dir)
         self.dedup_strategy = DedupBySenderStrategy(self.state_storage)
-        self.eof_storage = EofStorage(storage_dir)
+        self.eof_storage = EofStateStorage(storage_dir)
         self.expected_eofs = expected_eofs
         self.node_id = container_name
-        self.snapshot_interval = {}
         
     def start(self):
-        logging.info(f"action: startup | loading persisted state for recovery")
-        
         self.state_storage.load_state_all()
         self.eof_storage.load_state_all()
         self.heartbeat_sender = start_heartbeat_sender()
@@ -51,6 +47,7 @@ class TopThreeClients(Worker):
         
         def __on_message__(msg):
             message = Message.deserialize(msg)
+            
             logging.info(f"action: message received | request_id: {message.request_id} | type: {message.type}")
 
             if message.type == MESSAGE_TYPE_EOF:
@@ -62,7 +59,6 @@ class TopThreeClients(Worker):
                 return
                 
             if self.dedup_strategy.is_duplicate(message):
-                logging.info(f"action: duplicated_message | request_id: {message.request_id}")
                 return
                 
             items = message.process_message()
@@ -91,18 +87,8 @@ class TopThreeClients(Worker):
         
         state["users_by_store"] = users_by_store
         self.state_storage.save_state(request_id)
-        
-        # self.snapshot_interval.setdefault(request_id, 0)
-        # self.snapshot_interval[request_id] += 1
-        
-        # if self.snapshot_interval[request_id] >= SNAPSHOT_INTERVAL:
-        #     self.snapshot_interval[request_id] = 0
-        #     self.state_storage.save_state(request_id)
-        # else:
-        #     self.state_storage.append_state(request_id)
    
     def _send_results(self, message: Message, data_output_queue: MessageMiddlewareQueue):
-        
         """Send 1 message per store with top-3 users joined with birthdates."""
         current_state = self.state_storage.get_state(message.request_id)
         

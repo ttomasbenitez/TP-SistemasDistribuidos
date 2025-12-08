@@ -5,7 +5,7 @@ from pkg.message.message import Message
 import signal
 import logging
 from multiprocessing import Manager
-from pkg.storage.state_storage.eof_storage import EofStorage
+from pkg.storage.state_storage.eof import EofStateStorage
 
 class Worker(ABC):
     
@@ -14,7 +14,6 @@ class Worker(ABC):
         pass
         
     def __init_middlewares_handler__(self):
-        self.message_middlewares = []
         signal.signal(signal.SIGTERM, self.__handle_shutdown)
         signal.signal(signal.SIGINT, self.__handle_shutdown)
         
@@ -56,7 +55,6 @@ class Worker(ABC):
     def _consume_eof(self):
         eof_service_queue = MessageMiddlewareQueue(self.eof_service_queue, self.connection)
         eof_self_queue = MessageMiddlewareQueue(self.eof_self_queue, self.connection)
-        self.message_middlewares.extend([eof_service_queue, eof_self_queue])
         
         def _on_eof_message(message):
             try:
@@ -74,18 +72,15 @@ class Worker(ABC):
     
     def stop(self):
         try:
-            for message_middleware in self.message_middlewares:
-                message_middleware.stop_consuming()
             if hasattr(self, 'heartbeat_sender') and self.heartbeat_sender:
                 self.heartbeat_sender.stop()
+            self.connection.stop()
         except Exception as e:
             print(f"Error al detener: {type(e).__name__}: {e}")
          
     def close(self):
         try:
-            for message_middleware in self.message_middlewares:
-                message_middleware.close()
-            
+            self.connection.close()
         except Exception as e:
             print(f"Error al detener: {type(e).__name__}: {e}")
     
@@ -103,7 +98,7 @@ class Worker(ABC):
             logging.error(f'action: worker shutdown | result: failed to close | signal: {signum}')  
         logging.info(f'action: worker shutdown | result: success')
         
-    def on_eof_message(self, message: Message, dedup_strategy, eof_storage: EofStorage, expected_eofs: int):
+    def on_eof_message(self, message: Message, dedup_strategy, eof_storage: EofStateStorage, expected_eofs: int):
         if dedup_strategy.is_duplicate(message):
             logging.info(f"Mensaje EOF duplicado ignorado | request_id: {message.request_id}")
             return

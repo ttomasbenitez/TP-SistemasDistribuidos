@@ -1,7 +1,7 @@
 from pkg.message.message import Message
 from pkg.dedup.base import DedupStrategy
 import logging
-from pkg.storage.state_storage.dedup_storage import DedupStorage
+from pkg.storage.state_storage.sliding_window_dedup_strategy import SlidingWindowDedupStrategyStateStorage
 
 MAX_PENDING_SIZE = 5000
 SNAPSHOT_INTERVAL = 1000
@@ -15,7 +15,7 @@ class SlidingWindowDedupStrategy(DedupStrategy):
         # mensajes vistos pero aún no contiguos
         self.pending_messages = {}          # request_id -> set[int]
         # storage persistente
-        self.state_storage = DedupStorage(storage_dir)
+        self.state_storage = SlidingWindowDedupStrategyStateStorage(storage_dir)
         # cuántas veces se actualizó un request_id desde el último snapshot
         self.snapshot_interval = {}         # request_id -> int
         self.current_msg_num = {}
@@ -81,12 +81,12 @@ class SlidingWindowDedupStrategy(DedupStrategy):
        
         for request_id, state in self.state_storage.data_by_request.items():
             self.last_contiguous_msg_num[request_id] = state.get('last_contiguous_msg_num', -1)
-            # me aseguro que pending sea un set
+            
             pending = state.get('pending_messages', set())
             if not isinstance(pending, set):
                 pending = set(pending)
             self.pending_messages[request_id] = pending
-            self.snapshot_interval[request_id] = 0  # arranco el contador desde cero
+            self.snapshot_interval[request_id] = 0
             self.current_msg_num[request_id] = state.get('current_msg_num', -1)
 
             logging.info(
@@ -166,7 +166,6 @@ class SlidingWindowDedupStrategy(DedupStrategy):
             'current_msg_num': self.current_msg_num[request_id],
         }
         
-        # Contador por request_id para decidir cuándo hacer snapshot
         self.snapshot_interval.setdefault(request_id, 0)
         self.snapshot_interval[request_id] += 1
         

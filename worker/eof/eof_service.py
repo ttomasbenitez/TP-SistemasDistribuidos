@@ -8,18 +8,19 @@ from abc import ABC, abstractmethod
 from utils.heartbeat import start_heartbeat_sender
 from Middleware.connection import PikaConnection 
 from pkg.dedup.dedup_by_sender_strategy import DedupBySenderStrategy
-from pkg.storage.state_storage.eof_storage import EofStorage
-from pkg.storage.state_storage.dedup_by_sender_storage import DedupBySenderStorage
+from pkg.storage.state_storage.eof import EofStateStorage
+from pkg.storage.state_storage.dedup_by_sender import DedupBySenderStorage
 class EofService(Worker, ABC):
   
     def __init__(self, eof_input_queque: str, eof_output_middleware: str, expected_eofs: int, host: str, storage_dir: str = "./data/eof_service_storage"):
+        
         self.connection = PikaConnection(host)
         self.eof_input_queque = eof_input_queque
         self.eof_output_middleware = eof_output_middleware
         self.expected_eofs = expected_eofs
         storage = DedupBySenderStorage(storage_dir)
         self.dedup_strategy = DedupBySenderStrategy(storage)
-        self.eof_storage = EofStorage(storage_dir)
+        self.eof_storage = EofStateStorage(storage_dir)
         
         signal.signal(signal.SIGTERM, self.__handle_shutdown)
         signal.signal(signal.SIGINT, self.__handle_shutdown)
@@ -56,11 +57,9 @@ class EofService(Worker, ABC):
     def send_message(self, message):
         pass
      
-    #TODO           
     def close(self):
         try:
-            self.in_middleware.close()
-            self.eof_out_middleware.close()
+            self.connection.close()
         except Exception as e:
             print(f"Error al cerrar: {type(e).__name__}: {e}")
             

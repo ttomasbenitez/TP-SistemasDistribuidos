@@ -53,7 +53,6 @@ class FilterTimeNode(Worker):
         data_in_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
         data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, self.output_exchange_queues, self.connection)
         eof_output_exchange = MessageMiddlewareExchange(self.eof_output_exchange, self.eof_output_queues, self.connection)
-        self.message_middlewares.extend([data_in_queue, eof_output_exchange, data_output_exchange])
         
         def __on_message__(message):
             try:

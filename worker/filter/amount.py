@@ -41,7 +41,6 @@ class FilterAmountNode(Worker):
     def _consume_data_queue(self):
         data_input_queue = MessageMiddlewareQueue(self.data_input_queue, self.connection)
         data_output_exchange = MessageMiddlewareExchange(self.data_output_exchange, {}, self.connection)
-        self.message_middlewares.extend([data_input_queue, data_output_exchange])
         
         def __on_message__(message_body):
             try:

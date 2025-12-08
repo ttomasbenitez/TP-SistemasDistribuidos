@@ -5,7 +5,7 @@ from worker.joiner.joiner import Joiner
 from pkg.message.constants import MESSAGE_TYPE_QUERY_3_RESULT
 from pkg.message.q3_result import Q3Result
 from utils.joiner import initialize_config
-from pkg.storage.state_storage.joiner_storage import JoinerQ3StateStorage
+from pkg.storage.state_storage.joiner import JoinerQ3StateStorage
 class Q3Stores(Joiner):
     
     def _process_items(self, message: Message):

@@ -4,7 +4,7 @@ from pkg.message.constants import MESSAGE_TYPE_QUERY_2_RESULT
 from pkg.message.message import Message
 from worker.joiner.joiner import Joiner 
 from Middleware.middleware import MessageMiddlewareExchange
-from pkg.storage.state_storage.joiner_storage import JoinerQ2StateStorage
+from pkg.storage.state_storage.joiner import JoinerQ2StateStorage
 from pkg.message.utils import parse_int
 from utils.joiner import initialize_config
 
